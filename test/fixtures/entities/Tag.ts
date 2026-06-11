@@ -1,7 +1,10 @@
 import { Collection, Entity, ManyToMany, PrimaryKey, Property } from '@mikro-orm/core';
 import type { Post } from './Post.js';
 
-/** 게시글 태그 */
+/**
+ * 게시글 태그
+ * @namespace Blog
+ */
 @Entity()
 export class Tag {
   @PrimaryKey({ type: 'integer' })

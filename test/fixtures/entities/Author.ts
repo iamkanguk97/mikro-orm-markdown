@@ -1,7 +1,10 @@
 import { Collection, Entity, OneToMany, PrimaryKey, Property } from '@mikro-orm/core';
 import type { Post } from './Post.js';
 
-/** 글 작성자 */
+/**
+ * 글 작성자
+ * @namespace Blog
+ */
 @Entity()
 export class Author {
   /** 기본키 */

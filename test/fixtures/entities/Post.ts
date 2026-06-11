@@ -2,7 +2,10 @@ import { Collection, Entity, ManyToMany, ManyToOne, PrimaryKey, Property } from 
 import type { Author } from './Author.js';
 import type { Tag } from './Tag.js';
 
-/** 블로그 게시글 */
+/**
+ * 블로그 게시글
+ * @namespace Blog
+ */
 @Entity()
 export class Post {
   @PrimaryKey({ type: 'integer' })
