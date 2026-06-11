@@ -3,7 +3,7 @@
 Generate **Mermaid ERD + Markdown documentation** from your [MikroORM](https://mikro-orm.io) entities.
 
 [![npm version](https://badge.fury.io/js/mikro-orm-markdown.svg)](https://badge.fury.io/js/mikro-orm-markdown)
-[![CI](https://github.com/YOUR_GITHUB/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_GITHUB/mikro-orm-markdown/actions)
+[![CI](https://github.com/iamkanguk97/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/iamkanguk97/mikro-orm-markdown/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [한국어 문서](./README.ko.md)

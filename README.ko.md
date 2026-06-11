@@ -3,7 +3,7 @@
 [MikroORM](https://mikro-orm.io) 엔티티에서 **Mermaid ERD + Markdown 문서**를 자동으로 생성합니다.
 
 [![npm version](https://badge.fury.io/js/mikro-orm-markdown.svg)](https://badge.fury.io/js/mikro-orm-markdown)
-[![CI](https://github.com/YOUR_GITHUB/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_GITHUB/mikro-orm-markdown/actions)
+[![CI](https://github.com/iamkanguk97/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/iamkanguk97/mikro-orm-markdown/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 [English](./README.md)
