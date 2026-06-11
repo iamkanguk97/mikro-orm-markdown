@@ -13,7 +13,7 @@ Generate **Mermaid ERD + Markdown documentation** from your [MikroORM](https://m
 This tool brings the same ERD + Markdown experience to MikroORM, with additional visualization for MikroORM-specific concepts that cannot be expressed in Prisma:
 
 - **Embeddable** — a value object whose fields are stored as flat columns inside the owning entity's table (e.g. `address_street`, `address_city`). No separate table is created.
-- **Single Table Inheritance (STI)** — subclasses like `Dog` and `Cat` share one `animals` table. A discriminator column (e.g. `type`) distinguishes which subclass each row belongs to.
+- **Single Table Inheritance (STI)** — subclasses like `Dog` and `Cat` share one `animals` table. A discriminator column (e.g. `type`) distinguishes which subclass each row belongs to. Requires `discriminatorColumn` in `@Entity`. Not recommended for most projects — only consider it if you have a deliberate reason to share a single table across multiple entity classes.
 - **@Formula** — a virtual column with no physical DB column. Its value is computed by a SQL expression at SELECT time (e.g. `LENGTH(name)`).
 - **Actual DB column names** derived from your NamingStrategy
 - **Indexes and constraints**

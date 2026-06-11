@@ -13,7 +13,7 @@
 MikroORM에서도 동일한 ERD + Markdown 경험을 제공하며, Prisma로는 표현할 수 없는 MikroORM 고유 개념도 함께 시각화합니다.
 
 - **Embeddable** — 별도 테이블 없이 소유 엔티티의 테이블 안에 컬럼을 펼쳐서 저장하는 값 객체입니다. 예를 들어 `Address` 값 객체는 `address_street`, `address_city` 등의 컬럼으로 저장됩니다. DDD의 Value Object와 같은 개념입니다.
-- **Single Table Inheritance (STI)** — `Dog`, `Cat` 같은 자식 클래스가 `animals` 테이블 하나를 공유합니다. `type` 같은 discriminator 컬럼으로 어떤 자식 클래스인지 구분합니다.
+- **Single Table Inheritance (STI)** — `Dog`, `Cat` 같은 자식 클래스가 `animals` 테이블 하나를 공유합니다. `type` 같은 discriminator 컬럼으로 어떤 자식 클래스인지 구분합니다. `@Entity`에 `discriminatorColumn` 옵션이 필요합니다. 대부분의 프로젝트에는 권장하지 않습니다 — 하나의 테이블을 여러 엔티티 클래스가 공유해야 하는 명확한 이유가 있을 때만 고려하세요.
 - **@Formula** — 실제 DB 컬럼 없이 SELECT 시 SQL 식으로 값을 계산하는 가상 컬럼입니다. 예를 들어 `LENGTH(name)`은 DB에 컬럼이 없지만 조회 시 이름의 길이를 반환합니다.
 - NamingStrategy가 적용된 **실제 DB 컬럼명**
 - **인덱스 및 제약 조건**
