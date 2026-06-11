@@ -64,12 +64,12 @@ npm run erd
 
 ## CLI 옵션
 
-| 옵션 | 기본값 | 설명 |
-|------|--------|------|
-| `-c, --config <path>` | *(필수)* | MikroORM 설정 파일 경로 |
-| `-o, --out <path>` | `./ERD.md` | 출력 Markdown 파일 경로 |
-| `-t, --title <string>` | `Database Schema` | 문서 H1 제목 |
-| `-s, --src <glob>` | — | 엔티티 소스 파일 glob 패턴 (반복 가능). JSDoc 태그 추출에 사용됩니다. |
+| 옵션                   | 기본값            | 설명                                                                  |
+| ---------------------- | ----------------- | --------------------------------------------------------------------- |
+| `-c, --config <path>`  | _(필수)_          | MikroORM 설정 파일 경로                                               |
+| `-o, --out <path>`     | `./ERD.md`        | 출력 Markdown 파일 경로                                               |
+| `-t, --title <string>` | `Database Schema` | 문서 H1 제목                                                          |
+| `-s, --src <glob>`     | —                 | 엔티티 소스 파일 glob 패턴 (반복 가능). JSDoc 태그 추출에 사용됩니다. |
 
 ## JSDoc 태그
 
@@ -88,12 +88,12 @@ export class Post {
 }
 ```
 
-| 태그 | 설명 |
-|------|------|
-| `@namespace <Name>` | `Name` 섹션에 포함 (ERD + 본문 표) |
-| `@erd <Name>` | `Name` 섹션의 ERD 다이어그램에만 포함 |
-| `@describe <Name>` | `Name` 섹션의 본문 표에만 포함 |
-| `@hidden` | 문서 전체에서 제외 |
+| 태그                | 설명                                  |
+| ------------------- | ------------------------------------- |
+| `@namespace <Name>` | `Name` 섹션에 포함 (ERD + 본문 표)    |
+| `@erd <Name>`       | `Name` 섹션의 ERD 다이어그램에만 포함 |
+| `@describe <Name>`  | `Name` 섹션의 본문 표에만 포함        |
+| `@hidden`           | 문서 전체에서 제외                    |
 
 태그가 없는 엔티티는 `default` 섹션에 들어갑니다.
 하나의 엔티티에 여러 태그를 지정할 수 있습니다.
@@ -127,21 +127,21 @@ erDiagram
 
 > 등록된 사용자가 작성한 블로그 게시글입니다.
 
-| Column | Type | Key | Nullable | Description |
-|--------|------|-----|----------|-------------|
-| id | integer | PK | | |
-| title | string | | | 게시글 제목 |
-| body | text | | Y | |
-| author_id | integer | FK (author) | | |
+| Column    | Type    | Key         | Nullable | Description |
+| --------- | ------- | ----------- | -------- | ----------- |
+| id        | integer | PK          |          |             |
+| title     | string  |             |          | 게시글 제목 |
+| body      | text    |             | Y        |             |
+| author_id | integer | FK (author) |          |             |
 ````
 
 **Key 컬럼 주석 의미:**
 
-| 표기 | 의미 |
-|------|------|
-| `formula: <expr>` | `@Formula` 계산 컬럼 — 실제 DB 컬럼 없음 |
+| 표기               | 의미                                         |
+| ------------------ | -------------------------------------------- |
+| `formula: <expr>`  | `@Formula` 계산 컬럼 — 실제 DB 컬럼 없음     |
 | `[EmbeddableType]` | `@Embedded` 값 객체에서 flat으로 저장된 컬럼 |
-| `discriminator` | STI 구분자 컬럼 |
+| `discriminator`    | STI 구분자 컬럼                              |
 
 ## 참고 사항
 

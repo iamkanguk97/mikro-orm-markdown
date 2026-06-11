@@ -64,12 +64,12 @@ npm run erd
 
 ## CLI Options
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `-c, --config <path>` | *(required)* | Path to MikroORM config file |
-| `-o, --out <path>` | `./ERD.md` | Output Markdown file path |
-| `-t, --title <string>` | `Database Schema` | H1 heading of the generated document |
-| `-s, --src <glob>` | — | Glob pattern for entity source files (repeatable). Enables JSDoc tag extraction. |
+| Option                 | Default           | Description                                                                      |
+| ---------------------- | ----------------- | -------------------------------------------------------------------------------- |
+| `-c, --config <path>`  | _(required)_      | Path to MikroORM config file                                                     |
+| `-o, --out <path>`     | `./ERD.md`        | Output Markdown file path                                                        |
+| `-t, --title <string>` | `Database Schema` | H1 heading of the generated document                                             |
+| `-s, --src <glob>`     | —                 | Glob pattern for entity source files (repeatable). Enables JSDoc tag extraction. |
 
 ## JSDoc Tags
 
@@ -88,12 +88,12 @@ export class Post {
 }
 ```
 
-| Tag | Description |
-|-----|-------------|
+| Tag                 | Description                                         |
+| ------------------- | --------------------------------------------------- |
 | `@namespace <Name>` | Include entity in section `Name` (ERD + text table) |
-| `@erd <Name>` | Include in section `Name`'s ERD diagram only |
-| `@describe <Name>` | Include in section `Name`'s text table only |
-| `@hidden` | Exclude entity from the entire document |
+| `@erd <Name>`       | Include in section `Name`'s ERD diagram only        |
+| `@describe <Name>`  | Include in section `Name`'s text table only         |
+| `@hidden`           | Exclude entity from the entire document             |
 
 Entities with no tag are placed in the `default` section.
 An entity can carry multiple tags to appear in more than one section.
@@ -127,21 +127,21 @@ erDiagram
 
 > Blog post authored by a registered user.
 
-| Column | Type | Key | Nullable | Description |
-|--------|------|-----|----------|-------------|
-| id | integer | PK | | |
-| title | string | | | Post title |
-| body | text | | Y | |
-| author_id | integer | FK (author) | | |
+| Column    | Type    | Key         | Nullable | Description |
+| --------- | ------- | ----------- | -------- | ----------- |
+| id        | integer | PK          |          |             |
+| title     | string  |             |          | Post title  |
+| body      | text    |             | Y        |             |
+| author_id | integer | FK (author) |          |             |
 ````
 
 MikroORM-specific annotations in the **Key** column:
 
-| Annotation | Meaning |
-|------------|---------|
-| `formula: <expr>` | `@Formula` computed column — no physical DB column |
+| Annotation         | Meaning                                              |
+| ------------------ | ---------------------------------------------------- |
+| `formula: <expr>`  | `@Formula` computed column — no physical DB column   |
 | `[EmbeddableType]` | Flat column inlined from an `@Embedded` value object |
-| `discriminator` | STI discriminator column |
+| `discriminator`    | STI discriminator column                             |
 
 ## Notes
 

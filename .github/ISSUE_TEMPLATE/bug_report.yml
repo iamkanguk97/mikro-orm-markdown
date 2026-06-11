@@ -1,7 +1,7 @@
 name: Bug Report
 description: Report a bug in mikro-orm-markdown
-title: "[Bug] "
-labels: ["bug"]
+title: '[Bug] '
+labels: ['bug']
 body:
   - type: textarea
     id: description
@@ -47,15 +47,15 @@ body:
     id: node-version
     attributes:
       label: Node.js Version
-      placeholder: "e.g. 20.x"
+      placeholder: 'e.g. 20.x'
     validations:
       required: true
 
   - type: input
     id: mikro-orm-version
     attributes:
-      label: "@mikro-orm/core Version"
-      placeholder: "e.g. 6.3.0"
+      label: '@mikro-orm/core Version'
+      placeholder: 'e.g. 6.3.0'
     validations:
       required: true
 
@@ -63,6 +63,6 @@ body:
     id: package-version
     attributes:
       label: mikro-orm-markdown Version
-      placeholder: "e.g. 0.1.0-alpha.1"
+      placeholder: 'e.g. 0.1.0-alpha.1'
     validations:
       required: true

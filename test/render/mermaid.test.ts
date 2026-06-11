@@ -251,7 +251,14 @@ describe('renderErDiagram — M3 rendering', () => {
         {
           className: 'Customer',
           tableName: 'customer',
-          columns: [makeCol({ propName: 'nameLength', fieldName: 'nameLength', type: 'integer', formula: 'LENGTH(name)' })],
+          columns: [
+            makeCol({
+              propName: 'nameLength',
+              fieldName: 'nameLength',
+              type: 'integer',
+              formula: 'LENGTH(name)',
+            }),
+          ],
           isPivot: false,
           isEmbeddable: false,
           constraints: [],
@@ -268,7 +275,9 @@ describe('renderErDiagram — M3 rendering', () => {
         {
           className: 'Animal',
           tableName: 'animal',
-          columns: [makeCol({ propName: 'type', fieldName: 'type', type: 'string', isDiscriminator: true })],
+          columns: [
+            makeCol({ propName: 'type', fieldName: 'type', type: 'string', isDiscriminator: true }),
+          ],
           isPivot: false,
           isEmbeddable: false,
           discriminatorColumn: 'type',
@@ -286,7 +295,14 @@ describe('renderErDiagram — M3 rendering', () => {
         {
           className: 'Customer',
           tableName: 'customer',
-          columns: [makeCol({ propName: 'address_street', fieldName: 'address_street', type: 'string', embeddedIn: 'Address' })],
+          columns: [
+            makeCol({
+              propName: 'address_street',
+              fieldName: 'address_street',
+              type: 'string',
+              embeddedIn: 'Address',
+            }),
+          ],
           isPivot: false,
           isEmbeddable: false,
           constraints: [],
@@ -301,7 +317,13 @@ describe('renderErDiagram — M3 rendering', () => {
     const model: DiagramModel = {
       entities: [],
       relations: [
-        { fromEntity: 'Dog', toEntity: 'Animal', fromCardinality: '||', toCardinality: '||', label: 'extends' },
+        {
+          fromEntity: 'Dog',
+          toEntity: 'Animal',
+          fromCardinality: '||',
+          toCardinality: '||',
+          label: 'extends',
+        },
       ],
     };
     expect(renderErDiagram(model)).toContain('Dog ||--|| Animal : "extends"');

@@ -1,28 +1,28 @@
 version: 2
 updates:
-  - package-ecosystem: "npm"
-    directory: "/"
+  - package-ecosystem: 'npm'
+    directory: '/'
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: 'weekly'
+      day: 'monday'
     open-pull-requests-limit: 5
     groups:
       mikro-orm:
         patterns:
-          - "@mikro-orm/*"
+          - '@mikro-orm/*'
       typescript-tooling:
         patterns:
-          - "typescript"
-          - "tsup"
-          - "tsx"
-          - "@typescript-eslint/*"
+          - 'typescript'
+          - 'tsup'
+          - 'tsx'
+          - '@typescript-eslint/*'
       testing:
         patterns:
-          - "vitest"
-          - "@vitest/*"
+          - 'vitest'
+          - '@vitest/*'
 
-  - package-ecosystem: "github-actions"
-    directory: "/"
+  - package-ecosystem: 'github-actions'
+    directory: '/'
     schedule:
-      interval: "weekly"
-      day: "monday"
+      interval: 'weekly'
+      day: 'monday'

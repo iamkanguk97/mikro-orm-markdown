@@ -75,9 +75,12 @@ function buildColumn(
 
   if (prop.kind === ReferenceKind.SCALAR) {
     // For @Formula columns, formula is set on a SCALAR-kinded property
-    const formulaExpr: string | undefined = prop.formula !== undefined
-      ? resolveFormulaExpr(prop.formula as (table: FormulaTable, cols: Record<string, string>) => string)
-      : undefined;
+    const formulaExpr: string | undefined =
+      prop.formula !== undefined
+        ? resolveFormulaExpr(
+            prop.formula as (table: FormulaTable, cols: Record<string, string>) => string,
+          )
+        : undefined;
 
     // Flat embedded columns carry `embedded: [ownerPropName, embeddedPropName]`
     let embeddedIn: string | undefined;
@@ -87,8 +90,7 @@ function buildColumn(
     }
 
     const isDiscriminator =
-      owningMeta.discriminatorColumn !== undefined &&
-      prop.name === owningMeta.discriminatorColumn;
+      owningMeta.discriminatorColumn !== undefined && prop.name === owningMeta.discriminatorColumn;
 
     return {
       propName: prop.name,
@@ -135,9 +137,12 @@ function resolveFormulaExpr(
   cb: (table: FormulaTable, cols: Record<string, string>) => string,
 ): string {
   try {
-    const cols = new Proxy({}, {
-      get: (_target, key: string | symbol) => (typeof key === 'string' ? key : ''),
-    });
+    const cols = new Proxy(
+      {},
+      {
+        get: (_target, key: string | symbol) => (typeof key === 'string' ? key : ''),
+      },
+    );
     return cb(FORMULA_DUMMY_TABLE, cols);
   } catch {
     return '';
@@ -202,7 +207,6 @@ function buildRelationEdges(metas: EntityMetadata[]): RelationEdge[] {
       const edge = buildEdge(meta.className, prop);
       if (edge !== null) edges.push(edge);
     }
-
   }
 
   return edges;

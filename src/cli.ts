@@ -21,7 +21,7 @@ async function run(opts: CliOptions): Promise<void> {
   let ormOptions: Options;
   try {
     const mod = (await import(configPath)) as { default?: unknown };
-    ormOptions = (mod.default ?? mod);
+    ormOptions = mod.default ?? mod;
   } catch (err) {
     const hint = configPath.endsWith('.ts')
       ? '\nHint: TypeScript configs require tsx or ts-node:\n  npx tsx ./node_modules/.bin/mikro-orm-markdown ...'
@@ -41,7 +41,12 @@ async function run(opts: CliOptions): Promise<void> {
       ...(opts.description !== undefined && { description: opts.description }),
     });
   } catch (err) {
-    const msg = err instanceof MetadataLoadError ? err.message : (err instanceof Error ? err.message : String(err));
+    const msg =
+      err instanceof MetadataLoadError
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : String(err);
     process.stderr.write(`Error: ${msg}\n`);
     process.exit(1);
   }

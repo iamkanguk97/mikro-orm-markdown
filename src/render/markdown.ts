@@ -48,9 +48,7 @@ function renderEntitySection(entity: EnrichedEntity): string {
 
   // STI metadata note
   if (entity.model.discriminatorColumn) {
-    parts.push(
-      `*STI root — discriminator column: \`${entity.model.discriminatorColumn}\`*`,
-    );
+    parts.push(`*STI root — discriminator column: \`${entity.model.discriminatorColumn}\`*`);
   } else if (entity.model.extendsEntity) {
     parts.push(`*Extends \`${entity.model.extendsEntity}\` (Single Table Inheritance)*`);
   }
@@ -91,7 +89,6 @@ function resolveColumnKey(col: ColumnModel): string {
   if (col.embeddedIn !== undefined) return `[${col.embeddedIn}]`;
   return '';
 }
-
 
 function renderConstraints(constraints: ConstraintModel[]): string {
   const lines = ['**Constraints:**', ''];

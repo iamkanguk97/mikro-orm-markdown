@@ -35,14 +35,14 @@ All four must pass before opening a PR.
 
 This project follows [Conventional Commits](https://www.conventionalcommits.org/).
 
-| Prefix | When to use |
-|--------|-------------|
-| `feat:` | New feature |
-| `fix:` | Bug fix |
-| `docs:` | Documentation only |
-| `test:` | Tests only |
+| Prefix      | When to use        |
+| ----------- | ------------------ |
+| `feat:`     | New feature        |
+| `fix:`      | Bug fix            |
+| `docs:`     | Documentation only |
+| `test:`     | Tests only         |
 | `refactor:` | No behavior change |
-| `chore:` | CI, deps, config |
+| `chore:`    | CI, deps, config   |
 
 ## Pull Request Process
 

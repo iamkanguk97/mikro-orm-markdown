@@ -7,7 +7,11 @@ const FIXTURES_GLOB = path.resolve(import.meta.dirname, '../fixtures/entities/*.
 
 describe('generateMarkdown', () => {
   it('returns a non-empty markdown string', async () => {
-    const md = await generateMarkdown({ orm: config, title: 'Integration Test', src: [FIXTURES_GLOB] });
+    const md = await generateMarkdown({
+      orm: config,
+      title: 'Integration Test',
+      src: [FIXTURES_GLOB],
+    });
     expect(typeof md).toBe('string');
     expect(md.length).toBeGreaterThan(0);
   });
@@ -36,7 +40,11 @@ describe('generateMarkdown', () => {
   });
 
   it('renders description paragraph below the H1 title', async () => {
-    const md = await generateMarkdown({ orm: config, title: 'T', description: '주문 도메인 스키마입니다.' });
+    const md = await generateMarkdown({
+      orm: config,
+      title: 'T',
+      description: '주문 도메인 스키마입니다.',
+    });
     expect(md).toContain('주문 도메인 스키마입니다.');
     const titleIndex = md.indexOf('# T');
     const descIndex = md.indexOf('주문 도메인 스키마입니다.');
