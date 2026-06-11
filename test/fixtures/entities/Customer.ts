@@ -2,9 +2,8 @@ import { Embedded, Entity, Formula, PrimaryKey, Property } from '@mikro-orm/core
 import { Address } from './Address.js';
 
 /**
- * 고객 엔티티 — @Embedded와 @Formula 데모용입니다.
+ * 고객 엔티티 — Embedded와 Formula 데모용입니다.
  * address 컬럼들은 DB에 address_street, address_city, address_zip_code로 저장됩니다.
- * nameLength는 @Formula로 계산되며 DB에 컬럼이 없습니다.
  * @namespace Shop
  */
 @Entity()
