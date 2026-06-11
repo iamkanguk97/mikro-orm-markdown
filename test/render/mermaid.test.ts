@@ -58,10 +58,10 @@ describe('buildDiagramModel', () => {
     expect(tagCol).toBeUndefined();
   });
 
-  it('produces 4 relation edges (Post m:1, Post m:n, Dog extends, Cat extends)', async () => {
+  it('produces 2 relation edges (Post m:1, Post m:n)', async () => {
     const model = await getModel();
-    // Post.author (m:1), Post.tags (m:n owner), Dog extends Animal, Cat extends Animal
-    expect(model.relations).toHaveLength(4);
+    // Post.author (m:1), Post.tags (m:n owner)
+    expect(model.relations).toHaveLength(2);
   });
 
   it('Post.author edge: many Posts → one Author (not nullable)', async () => {
@@ -208,18 +208,10 @@ describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
     expect(colNames).toContain('breed');
   });
 
-  it('STI inheritance edges exist for Dog and Cat', async () => {
+  it('STI entities produce no extends edges', async () => {
     const model = await getModel();
-    const dogEdge = model.relations.find(
-      (r) => r.fromEntity === 'Dog' && r.toEntity === 'Animal',
-    );
-    const catEdge = model.relations.find(
-      (r) => r.fromEntity === 'Cat' && r.toEntity === 'Animal',
-    );
-    expect(dogEdge).toBeDefined();
-    expect(dogEdge!.label).toBe('extends');
-    expect(catEdge).toBeDefined();
-    expect(catEdge!.label).toBe('extends');
+    const extendsEdge = model.relations.find((r) => r.label === 'extends');
+    expect(extendsEdge).toBeUndefined();
   });
 });
 

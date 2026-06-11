@@ -85,11 +85,11 @@ describe('buildDocumentModel — Animals group', () => {
     expect(names).toContain('Cat');
   });
 
-  it('Animals group has extends edges for Dog and Cat', async () => {
+  it('Animals group has no extends edges', async () => {
     const docModel = await getDocModel();
     const animals = docModel.groups.find((g) => g.name === 'Animals')!;
     const extendsEdges = animals.erdRelations.filter((r) => r.label === 'extends');
-    expect(extendsEdges).toHaveLength(2);
+    expect(extendsEdges).toHaveLength(0);
   });
 });
 

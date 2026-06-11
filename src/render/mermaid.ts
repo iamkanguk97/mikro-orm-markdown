@@ -203,16 +203,6 @@ function buildRelationEdges(metas: EntityMetadata[]): RelationEdge[] {
       if (edge !== null) edges.push(edge);
     }
 
-    // STI inheritance edge (Child ||--|| Root : "extends")
-    if (meta.extends && meta.discriminatorValue !== undefined) {
-      edges.push({
-        fromEntity: meta.className,
-        toEntity: meta.extends,
-        fromCardinality: '||',
-        toCardinality: '||',
-        label: 'extends',
-      });
-    }
   }
 
   return edges;
