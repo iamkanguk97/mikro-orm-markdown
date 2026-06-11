@@ -13,7 +13,7 @@ Generate **Mermaid ERD + Markdown documentation** from your [MikroORM](https://m
 This tool brings the same ERD + Markdown experience to MikroORM, with additional visualization for MikroORM-specific concepts that cannot be expressed in Prisma:
 
 - **Embeddable** — a value object whose fields are stored as flat columns inside the owning entity's table (e.g. `address_street`, `address_city`). No separate table is created.
-- **Single Table Inheritance (STI)** — subclasses like `Dog` and `Cat` share one `animals` table. A discriminator column (e.g. `type`) distinguishes which subclass each row belongs to. Requires `discriminatorColumn` in `@Entity`. Not recommended for most projects — only consider it if you have a deliberate reason to share a single table across multiple entity classes.
+- **Single Table Inheritance (STI)** — subclasses like `Dog` and `Cat` share one `animals` table. A discriminator column (e.g. `type`) distinguishes which subclass each row belongs to.
 - **@Formula** — a virtual column with no physical DB column. Its value is computed by a SQL expression at SELECT time (e.g. `LENGTH(name)`).
 - **Actual DB column names** derived from your NamingStrategy
 - **Indexes and constraints**
@@ -127,12 +127,12 @@ erDiagram
 
 > Blog post authored by a registered user.
 
-| Column | Type | Key | Description |
-|--------|------|-----|-------------|
-| id | integer | PK | |
-| title | string | | Post title |
-| body | text | | *(nullable)* |
-| author_id | integer | FK (author) | |
+| Column | Type | Key | Nullable | Description |
+|--------|------|-----|----------|-------------|
+| id | integer | PK | | |
+| title | string | | | Post title |
+| body | text | | Y | |
+| author_id | integer | FK (author) | | |
 ````
 
 MikroORM-specific annotations in the **Key** column:
@@ -142,6 +142,33 @@ MikroORM-specific annotations in the **Key** column:
 | `formula: <expr>` | `@Formula` computed column — no physical DB column |
 | `[EmbeddableType]` | Flat column inlined from an `@Embedded` value object |
 | `discriminator` | STI discriminator column |
+
+## Notes
+
+### Single Table Inheritance (STI)
+
+STI is a pattern where multiple entity classes share a single database table, using a discriminator column to tell rows apart.
+
+```typescript
+@Entity({ discriminatorColumn: 'type', abstract: true })
+export class Animal {
+  @PrimaryKey()
+  id!: number;
+
+  @Property()
+  name!: string;
+}
+
+@Entity({ discriminatorValue: 'dog' })
+export class Dog extends Animal {
+  @Property({ nullable: true })
+  breed?: string;
+}
+```
+
+When an entity uses `discriminatorColumn`, `mikro-orm-markdown` automatically detects it and marks the discriminator column in the output.
+
+> **Not recommended for most projects.** STI trades table simplicity for query complexity and sparse nullable columns. Use it only when you have a clear reason to store multiple entity types in one table.
 
 ## Advanced Usage
 

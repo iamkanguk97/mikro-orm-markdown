@@ -13,7 +13,7 @@
 MikroORM에서도 동일한 ERD + Markdown 경험을 제공하며, Prisma로는 표현할 수 없는 MikroORM 고유 개념도 함께 시각화합니다.
 
 - **Embeddable** — 별도 테이블 없이 소유 엔티티의 테이블 안에 컬럼을 펼쳐서 저장하는 값 객체입니다. 예를 들어 `Address` 값 객체는 `address_street`, `address_city` 등의 컬럼으로 저장됩니다. DDD의 Value Object와 같은 개념입니다.
-- **Single Table Inheritance (STI)** — `Dog`, `Cat` 같은 자식 클래스가 `animals` 테이블 하나를 공유합니다. `type` 같은 discriminator 컬럼으로 어떤 자식 클래스인지 구분합니다. `@Entity`에 `discriminatorColumn` 옵션이 필요합니다. 대부분의 프로젝트에는 권장하지 않습니다 — 하나의 테이블을 여러 엔티티 클래스가 공유해야 하는 명확한 이유가 있을 때만 고려하세요.
+- **Single Table Inheritance (STI)** — `Dog`, `Cat` 같은 자식 클래스가 `animals` 테이블 하나를 공유합니다. `type` 같은 discriminator 컬럼으로 어떤 자식 클래스인지 구분합니다.
 - **@Formula** — 실제 DB 컬럼 없이 SELECT 시 SQL 식으로 값을 계산하는 가상 컬럼입니다. 예를 들어 `LENGTH(name)`은 DB에 컬럼이 없지만 조회 시 이름의 길이를 반환합니다.
 - NamingStrategy가 적용된 **실제 DB 컬럼명**
 - **인덱스 및 제약 조건**
@@ -127,12 +127,12 @@ erDiagram
 
 > 등록된 사용자가 작성한 블로그 게시글입니다.
 
-| Column | Type | Key | Description |
-|--------|------|-----|-------------|
-| id | integer | PK | |
-| title | string | | 게시글 제목 |
-| body | text | | *(nullable)* |
-| author_id | integer | FK (author) | |
+| Column | Type | Key | Nullable | Description |
+|--------|------|-----|----------|-------------|
+| id | integer | PK | | |
+| title | string | | | 게시글 제목 |
+| body | text | | Y | |
+| author_id | integer | FK (author) | | |
 ````
 
 **Key 컬럼 주석 의미:**
@@ -142,6 +142,33 @@ erDiagram
 | `formula: <expr>` | `@Formula` 계산 컬럼 — 실제 DB 컬럼 없음 |
 | `[EmbeddableType]` | `@Embedded` 값 객체에서 flat으로 저장된 컬럼 |
 | `discriminator` | STI 구분자 컬럼 |
+
+## 참고 사항
+
+### Single Table Inheritance (STI)
+
+STI는 여러 엔티티 클래스가 하나의 DB 테이블을 공유하는 패턴으로, discriminator 컬럼으로 행을 구분합니다.
+
+```typescript
+@Entity({ discriminatorColumn: 'type', abstract: true })
+export class Animal {
+  @PrimaryKey()
+  id!: number;
+
+  @Property()
+  name!: string;
+}
+
+@Entity({ discriminatorValue: 'dog' })
+export class Dog extends Animal {
+  @Property({ nullable: true })
+  breed?: string;
+}
+```
+
+엔티티에 `discriminatorColumn`이 설정되어 있으면 `mikro-orm-markdown`이 자동으로 감지해 출력에 discriminator 컬럼을 표시합니다.
+
+> **대부분의 프로젝트에는 권장하지 않습니다.** STI는 테이블 단순화 대신 쿼리 복잡도 증가와 nullable 컬럼 낭비를 초래합니다. 여러 엔티티 타입을 하나의 테이블에 저장해야 하는 명확한 이유가 있을 때만 사용하세요.
 
 ## 고급 사용법
 
