@@ -29,6 +29,8 @@ export interface NamespaceGroup {
 /** Complete document model — input to the markdown renderer. */
 export interface DocumentModel {
   title: string;
+  /** Optional paragraph rendered below the H1 heading. */
+  description?: string;
   groups: NamespaceGroup[];
 }
 
@@ -44,6 +46,7 @@ export function buildDocumentModel(
   metas: EntityMetadata[],
   jsDocResult: JsDocResult,
   title: string,
+  description?: string,
 ): DocumentModel {
   const { entities: diagramEntities, relations: allRelations } = buildDiagramModel(metas);
 
@@ -100,7 +103,7 @@ export function buildDocumentModel(
     return a.name.localeCompare(b.name);
   });
 
-  return { title, groups };
+  return { title, groups, ...(description !== undefined && { description }) };
 }
 
 function hasNoNamespaceTags(jsDoc: EntityJsDocInfo | undefined): boolean {

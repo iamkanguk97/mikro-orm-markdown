@@ -58,7 +58,7 @@ describe('renderMarkdown — entity descriptions', () => {
 describe('renderMarkdown — column table', () => {
   it('column table header is present under Author', async () => {
     const md = await getMarkdown();
-    expect(md).toContain('| Column | Type | Key | Description |');
+    expect(md).toContain('| Column | Type | Key | Nullable | Description |');
   });
 
   it('Author id column appears with PK key', async () => {
@@ -78,8 +78,18 @@ describe('renderMarkdown — column table', () => {
 
   it('property JSDoc description appears in column table', async () => {
     const md = await getMarkdown();
-    // Author.name has JSDoc "작성자 이름" — empty Key cell has a space on each side
-    expect(md).toContain('| name | string |  | 작성자 이름 |');
+    expect(md).toContain('| name | string |  |  | 작성자 이름 |');
+  });
+
+  it('nullable column shows Y in Nullable cell', async () => {
+    const md = await getMarkdown();
+    // Post.body is nullable
+    expect(md).toContain('| body | text |  | Y |');
+  });
+
+  it('non-nullable column has empty Nullable cell', async () => {
+    const md = await getMarkdown();
+    expect(md).toContain('| id | integer | PK |  |');
   });
 });
 

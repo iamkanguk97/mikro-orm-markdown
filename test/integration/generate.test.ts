@@ -34,4 +34,12 @@ describe('generateMarkdown', () => {
     expect(md).toContain('## default');
     expect(md).toContain('### Author');
   });
+
+  it('renders description paragraph below the H1 title', async () => {
+    const md = await generateMarkdown({ orm: config, title: 'T', description: '주문 도메인 스키마입니다.' });
+    expect(md).toContain('주문 도메인 스키마입니다.');
+    const titleIndex = md.indexOf('# T');
+    const descIndex = md.indexOf('주문 도메인 스키마입니다.');
+    expect(descIndex).toBeGreaterThan(titleIndex);
+  });
 });

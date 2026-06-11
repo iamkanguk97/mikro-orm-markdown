@@ -10,6 +10,10 @@ import { renderErDiagram } from './mermaid.js';
 export function renderMarkdown(docModel: DocumentModel): string {
   const sections: string[] = [`# ${docModel.title}`];
 
+  if (docModel.description) {
+    sections.push(docModel.description);
+  }
+
   for (const group of docModel.groups) {
     sections.push(renderGroupSection(group));
   }
@@ -63,12 +67,13 @@ function renderEntitySection(entity: EnrichedEntity): string {
 }
 
 function renderColumnTable(entity: EnrichedEntity): string {
-  const header = '| Column | Type | Key | Description |';
-  const sep = '|--------|------|-----|-------------|';
+  const header = '| Column | Type | Key | Nullable | Description |';
+  const sep = '|--------|------|-----|----------|-------------|';
   const rows = entity.model.columns.map((col) => {
     const key = resolveColumnKey(col);
-    const desc = buildColumnDescription(col, entity);
-    return `| ${col.fieldName} | ${col.type} | ${key} | ${desc} |`;
+    const nullable = col.isNullable && !col.isPrimary ? 'Y' : '';
+    const desc = entity.propDocs.get(col.propName)?.description ?? '';
+    return `| ${col.fieldName} | ${col.type} | ${key} | ${nullable} | ${desc} |`;
   });
   return [header, sep, ...rows].join('\n');
 }
@@ -87,12 +92,6 @@ function resolveColumnKey(col: ColumnModel): string {
   return '';
 }
 
-/** Builds the "Description" cell — JSDoc description + nullable marker. */
-function buildColumnDescription(col: ColumnModel, entity: EnrichedEntity): string {
-  const jsDocDesc = entity.propDocs.get(col.propName)?.description ?? '';
-  const nullable = col.isNullable && !col.isPrimary ? ' *(nullable)*' : '';
-  return `${jsDocDesc}${nullable}`.trim();
-}
 
 function renderConstraints(constraints: ConstraintModel[]): string {
   const lines = ['**Constraints:**', ''];

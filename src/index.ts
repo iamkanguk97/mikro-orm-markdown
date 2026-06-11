@@ -13,6 +13,8 @@ export interface GenerateMarkdownOptions {
   orm: Options;
   /** Title shown as the H1 heading in the generated document. */
   title?: string;
+  /** Optional description paragraph rendered below the H1 heading. */
+  description?: string;
   /**
    * Glob patterns for TypeScript entity source files.
    * Used for JSDoc extraction (@namespace, @hidden, descriptions).
@@ -38,10 +40,10 @@ export interface GenerateMarkdownOptions {
  * ```
  */
 export async function generateMarkdown(options: GenerateMarkdownOptions): Promise<string> {
-  const { orm, title = 'Database Schema', src = [] } = options;
+  const { orm, title = 'Database Schema', description, src = [] } = options;
 
   const metas = await loadEntityMetadata(orm);
   const jsDocResult = loadJsDoc(src);
-  const docModel = buildDocumentModel(metas, jsDocResult, title);
+  const docModel = buildDocumentModel(metas, jsDocResult, title, description);
   return renderMarkdown(docModel);
 }

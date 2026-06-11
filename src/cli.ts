@@ -10,6 +10,7 @@ interface CliOptions {
   config: string;
   out: string;
   title: string;
+  description?: string;
   src: string[];
 }
 
@@ -33,7 +34,12 @@ async function run(opts: CliOptions): Promise<void> {
 
   let markdown: string;
   try {
-    markdown = await generateMarkdown({ orm: ormOptions, title: opts.title, src: opts.src });
+    markdown = await generateMarkdown({
+      orm: ormOptions,
+      title: opts.title,
+      src: opts.src,
+      ...(opts.description !== undefined && { description: opts.description }),
+    });
   } catch (err) {
     const msg = err instanceof MetadataLoadError ? err.message : (err instanceof Error ? err.message : String(err));
     process.stderr.write(`Error: ${msg}\n`);
@@ -50,6 +56,7 @@ const program = new Command()
   .requiredOption('-c, --config <path>', 'MikroORM config file path')
   .option('-o, --out <path>', 'Output markdown file path', './ERD.md')
   .option('-t, --title <string>', 'Document title', 'Database Schema')
+  .option('-d, --description <string>', 'Optional description paragraph shown below the title')
   .option(
     '-s, --src <glob>',
     'Glob pattern for entity source files, repeatable (for JSDoc extraction)',
