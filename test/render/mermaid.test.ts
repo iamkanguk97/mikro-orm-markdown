@@ -58,10 +58,10 @@ describe('buildDiagramModel', () => {
     expect(tagCol).toBeUndefined();
   });
 
-  it('produces exactly 2 relation edges (m:1 and m:n)', async () => {
+  it('produces 4 relation edges (Post m:1, Post m:n, Dog extends, Cat extends)', async () => {
     const model = await getModel();
-    // Post.author (m:1) and Post.tags (m:n owner)
-    expect(model.relations).toHaveLength(2);
+    // Post.author (m:1), Post.tags (m:n owner), Dog extends Animal, Cat extends Animal
+    expect(model.relations).toHaveLength(4);
   });
 
   it('Post.author edge: many Posts → one Author (not nullable)', async () => {
@@ -79,6 +79,240 @@ describe('buildDiagramModel', () => {
     expect(edge).toBeDefined();
     expect(edge!.fromCardinality).toBe('}o');
     expect(edge!.toCardinality).toBe('o{');
+  });
+});
+
+// ─── buildDiagramModel — M3 MikroORM-specific concepts ───────────────────────
+
+describe('buildDiagramModel — Embeddable', () => {
+  async function getModel(): Promise<DiagramModel> {
+    const metas = await loadEntityMetadata(config);
+    return buildDiagramModel(metas);
+  }
+
+  it('excludes @Embeddable classes from entity boxes', async () => {
+    const model = await getModel();
+    const classNames = model.entities.map((e) => e.className);
+    expect(classNames).not.toContain('Address');
+    expect(classNames).toContain('Customer');
+  });
+
+  it('Customer entity contains flattened embedded columns with embeddedIn set', async () => {
+    const model = await getModel();
+    const customer = model.entities.find((e) => e.className === 'Customer');
+    expect(customer).toBeDefined();
+
+    const embeddedCols = customer!.columns.filter((c) => c.embeddedIn === 'Address');
+    const fieldNames = embeddedCols.map((c) => c.fieldName);
+    expect(fieldNames).toContain('address_street');
+    expect(fieldNames).toContain('address_city');
+    expect(fieldNames).toContain('address_zip_code');
+  });
+
+  it('Customer embedded columns are NOT marked as PK/FK', async () => {
+    const model = await getModel();
+    const customer = model.entities.find((e) => e.className === 'Customer');
+    const embeddedCols = customer!.columns.filter((c) => c.embeddedIn !== undefined);
+    for (const col of embeddedCols) {
+      expect(col.isPrimary).toBe(false);
+      expect(col.isForeignKey).toBe(false);
+    }
+  });
+
+  it('EMBEDDED group reference property is not rendered as a column', async () => {
+    const model = await getModel();
+    const customer = model.entities.find((e) => e.className === 'Customer');
+    // "address" (kind=embedded) should not appear as a direct column
+    const addressGroupCol = customer!.columns.find((c) => c.fieldName === 'address');
+    expect(addressGroupCol).toBeUndefined();
+  });
+});
+
+describe('buildDiagramModel — @Formula', () => {
+  async function getModel(): Promise<DiagramModel> {
+    const metas = await loadEntityMetadata(config);
+    return buildDiagramModel(metas);
+  }
+
+  it('Customer nameLength column has formula set', async () => {
+    const model = await getModel();
+    const customer = model.entities.find((e) => e.className === 'Customer');
+    const nameLengthCol = customer!.columns.find((c) => c.propName === 'nameLength');
+    expect(nameLengthCol).toBeDefined();
+    expect(nameLengthCol!.formula).toBeDefined();
+  });
+
+  it('formula column SQL expression is resolved correctly', async () => {
+    const model = await getModel();
+    const customer = model.entities.find((e) => e.className === 'Customer');
+    const nameLengthCol = customer!.columns.find((c) => c.propName === 'nameLength');
+    // @Formula('LENGTH(name)') → should resolve to the SQL expression
+    expect(nameLengthCol!.formula).toBe('LENGTH(name)');
+  });
+
+  it('formula column fieldName follows NamingStrategy (camelCase → snake_case)', async () => {
+    const model = await getModel();
+    const customer = model.entities.find((e) => e.className === 'Customer');
+    const nameLengthCol = customer!.columns.find((c) => c.propName === 'nameLength');
+    // MikroORM applies NamingStrategy to formula properties too: nameLength → name_length
+    expect(nameLengthCol!.fieldName).toBe('name_length');
+  });
+});
+
+describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
+  async function getModel(): Promise<DiagramModel> {
+    const metas = await loadEntityMetadata(config);
+    return buildDiagramModel(metas);
+  }
+
+  it('STI root (Animal) has discriminatorColumn set', async () => {
+    const model = await getModel();
+    const animal = model.entities.find((e) => e.className === 'Animal');
+    expect(animal).toBeDefined();
+    expect(animal!.discriminatorColumn).toBe('type');
+  });
+
+  it('STI root (Animal) excludes child-only columns (breed, indoor)', async () => {
+    const model = await getModel();
+    const animal = model.entities.find((e) => e.className === 'Animal');
+    const colNames = animal!.columns.map((c) => c.propName);
+    expect(colNames).not.toContain('breed');
+    expect(colNames).not.toContain('indoor');
+    // but contains its own columns
+    expect(colNames).toContain('id');
+    expect(colNames).toContain('name');
+    expect(colNames).toContain('type');
+  });
+
+  it('STI root discriminator column is marked as isDiscriminator', async () => {
+    const model = await getModel();
+    const animal = model.entities.find((e) => e.className === 'Animal');
+    const typeCol = animal!.columns.find((c) => c.propName === 'type');
+    expect(typeCol).toBeDefined();
+    expect(typeCol!.isDiscriminator).toBe(true);
+  });
+
+  it('STI child (Dog) has extendsEntity pointing to Animal', async () => {
+    const model = await getModel();
+    const dog = model.entities.find((e) => e.className === 'Dog');
+    expect(dog).toBeDefined();
+    expect(dog!.extendsEntity).toBe('Animal');
+  });
+
+  it('STI child (Dog) includes all columns (own + inherited)', async () => {
+    const model = await getModel();
+    const dog = model.entities.find((e) => e.className === 'Dog');
+    const colNames = dog!.columns.map((c) => c.propName);
+    expect(colNames).toContain('id');
+    expect(colNames).toContain('name');
+    expect(colNames).toContain('breed');
+  });
+
+  it('STI inheritance edges exist for Dog and Cat', async () => {
+    const model = await getModel();
+    const dogEdge = model.relations.find(
+      (r) => r.fromEntity === 'Dog' && r.toEntity === 'Animal',
+    );
+    const catEdge = model.relations.find(
+      (r) => r.fromEntity === 'Cat' && r.toEntity === 'Animal',
+    );
+    expect(dogEdge).toBeDefined();
+    expect(dogEdge!.label).toBe('extends');
+    expect(catEdge).toBeDefined();
+    expect(catEdge!.label).toBe('extends');
+  });
+});
+
+describe('buildDiagramModel — Constraints', () => {
+  async function getModel(): Promise<DiagramModel> {
+    const metas = await loadEntityMetadata(config);
+    return buildDiagramModel(metas);
+  }
+
+  it('Animal entity has index constraint collected', async () => {
+    const model = await getModel();
+    const animal = model.entities.find((e) => e.className === 'Animal');
+    const indexConstraint = animal!.constraints.find((c) => c.type === 'index');
+    expect(indexConstraint).toBeDefined();
+    expect(indexConstraint!.name).toBe('animal_name_idx');
+    expect(indexConstraint!.properties).toContain('name');
+  });
+});
+
+describe('renderErDiagram — M3 rendering', () => {
+  function makeCol(overrides: Partial<ColumnModel> = {}): ColumnModel {
+    return {
+      propName: 'field',
+      fieldName: 'field',
+      type: 'string',
+      isPrimary: false,
+      isForeignKey: false,
+      isUnique: false,
+      isNullable: false,
+      ...overrides,
+    };
+  }
+
+  it('renders formula column with "formula: <expr>" comment', () => {
+    const model: DiagramModel = {
+      entities: [
+        {
+          className: 'Customer',
+          tableName: 'customer',
+          columns: [makeCol({ propName: 'nameLength', fieldName: 'nameLength', type: 'integer', formula: 'LENGTH(name)' })],
+          isPivot: false,
+          isEmbeddable: false,
+          constraints: [],
+        },
+      ],
+      relations: [],
+    };
+    expect(renderErDiagram(model)).toContain('integer nameLength "formula: LENGTH(name)"');
+  });
+
+  it('renders discriminator column with "discriminator" comment', () => {
+    const model: DiagramModel = {
+      entities: [
+        {
+          className: 'Animal',
+          tableName: 'animal',
+          columns: [makeCol({ propName: 'type', fieldName: 'type', type: 'string', isDiscriminator: true })],
+          isPivot: false,
+          isEmbeddable: false,
+          discriminatorColumn: 'type',
+          constraints: [],
+        },
+      ],
+      relations: [],
+    };
+    expect(renderErDiagram(model)).toContain('string type "discriminator"');
+  });
+
+  it('renders embedded column with "[EmbeddableType]" comment', () => {
+    const model: DiagramModel = {
+      entities: [
+        {
+          className: 'Customer',
+          tableName: 'customer',
+          columns: [makeCol({ propName: 'address_street', fieldName: 'address_street', type: 'string', embeddedIn: 'Address' })],
+          isPivot: false,
+          isEmbeddable: false,
+          constraints: [],
+        },
+      ],
+      relations: [],
+    };
+    expect(renderErDiagram(model)).toContain('string address_street "[Address]"');
+  });
+
+  it('renders STI extends edge correctly', () => {
+    const model: DiagramModel = {
+      entities: [],
+      relations: [
+        { fromEntity: 'Dog', toEntity: 'Animal', fromCardinality: '||', toCardinality: '||', label: 'extends' },
+      ],
+    };
+    expect(renderErDiagram(model)).toContain('Dog ||--|| Animal : "extends"');
   });
 });
 
@@ -123,6 +357,7 @@ describe('renderErDiagram', () => {
           columns: [makeCol({ propName: 'id', fieldName: 'id', type: 'integer', isPrimary: true })],
           isPivot: false,
           isEmbeddable: false,
+          constraints: [],
         },
       ],
       relations: [],
@@ -140,6 +375,7 @@ describe('renderErDiagram', () => {
           columns: [makeCol({ fieldName: 'email', type: 'string', isUnique: true })],
           isPivot: false,
           isEmbeddable: false,
+          constraints: [],
         },
       ],
       relations: [],
@@ -163,6 +399,7 @@ describe('renderErDiagram', () => {
           ],
           isPivot: false,
           isEmbeddable: false,
+          constraints: [],
         },
       ],
       relations: [],
@@ -181,6 +418,7 @@ describe('renderErDiagram', () => {
           columns: [makeCol({ propName: 'name', fieldName: 'name', type: 'string' })],
           isPivot: false,
           isEmbeddable: false,
+          constraints: [],
         },
       ],
       relations: [],
