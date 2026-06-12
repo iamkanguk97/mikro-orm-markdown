@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MetadataLoadError, loadEntityMetadata } from '../../src/metadata/load.js';
+import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
 
 describe('loadEntityMetadata', () => {
@@ -45,8 +45,6 @@ describe('loadEntityMetadata', () => {
   });
 
   it('throws MetadataLoadError when no entities are discovered', async () => {
-    await expect(loadEntityMetadata({ ...config, entities: [] })).rejects.toBeInstanceOf(
-      MetadataLoadError,
-    );
+    await expect(loadEntityMetadata({ ...config, entities: [] })).rejects.toBeInstanceOf(MetadataLoadError);
   });
 });

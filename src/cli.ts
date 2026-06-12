@@ -4,7 +4,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { Options } from '@mikro-orm/core';
 import { Command } from 'commander';
-import { MetadataLoadError, generateMarkdown } from './index.js';
+import { generateMarkdown, MetadataLoadError } from './index.js';
 
 interface CliOptions {
   config: string;
@@ -27,7 +27,7 @@ async function run(opts: CliOptions): Promise<void> {
       ? '\nHint: TypeScript configs require tsx or ts-node:\n  npx tsx ./node_modules/.bin/mikro-orm-markdown ...'
       : '';
     process.stderr.write(
-      `Error: Cannot load config: ${configPath}\n${err instanceof Error ? err.message : String(err)}${hint}\n`,
+      `Error: Cannot load config: ${configPath}\n${err instanceof Error ? err.message : String(err)}${hint}\n`
     );
     process.exit(1);
   }
@@ -41,12 +41,7 @@ async function run(opts: CliOptions): Promise<void> {
       ...(opts.description !== undefined && { description: opts.description }),
     });
   } catch (err) {
-    const msg =
-      err instanceof MetadataLoadError
-        ? err.message
-        : err instanceof Error
-          ? err.message
-          : String(err);
+    const msg = err instanceof MetadataLoadError ? err.message : err instanceof Error ? err.message : String(err);
     process.stderr.write(`Error: ${msg}\n`);
     process.exit(1);
   }
@@ -66,7 +61,7 @@ const program = new Command()
     '-s, --src <glob>',
     'Glob pattern for entity source files, repeatable (for JSDoc extraction)',
     (val: string, prev: string[]) => [...prev, val],
-    [] as string[],
+    [] as string[]
   )
   .action(run);
 

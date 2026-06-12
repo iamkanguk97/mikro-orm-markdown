@@ -1,12 +1,6 @@
-import { ReferenceKind } from '@mikro-orm/core';
 import type { EntityMetadata, EntityProperty, FormulaTable } from '@mikro-orm/core';
-import type {
-  ColumnModel,
-  ConstraintModel,
-  DiagramModel,
-  EntityModel,
-  RelationEdge,
-} from '../model/types.js';
+import { ReferenceKind } from '@mikro-orm/core';
+import type { ColumnModel, ConstraintModel, DiagramModel, EntityModel, RelationEdge } from '../model/types.js';
 
 // Dummy table descriptor used when resolving formula expressions for documentation.
 // String-based formulas ignore both arguments; function-based formulas use the alias.
@@ -36,10 +30,7 @@ export function buildDiagramModel(metas: EntityMetadata[]): DiagramModel {
   return { entities, relations };
 }
 
-function buildEntityModel(
-  meta: EntityMetadata,
-  metaByClass: Map<string, EntityMetadata>,
-): EntityModel {
+function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityMetadata>): EntityModel {
   // STI root: has discriminatorColumn, no discriminatorValue of its own.
   // Its properties list includes all child-only columns (marked inherited=true) — filter them out.
   const isStiRoot = meta.discriminatorColumn !== undefined && !meta.discriminatorValue;
@@ -47,9 +38,13 @@ function buildEntityModel(
 
   const columns: ColumnModel[] = [];
   for (const prop of Object.values(meta.properties)) {
-    if (isStiRoot && prop.inherited === true) continue;
+    if (isStiRoot && prop.inherited === true) {
+      continue;
+    }
     const col = buildColumn(prop, metaByClass, meta);
-    if (col !== null) columns.push(col);
+    if (col !== null) {
+      columns.push(col);
+    }
   }
 
   return {
@@ -68,18 +63,18 @@ function buildEntityModel(
 function buildColumn(
   prop: EntityProperty,
   metaByClass: Map<string, EntityMetadata>,
-  owningMeta: EntityMetadata,
+  owningMeta: EntityMetadata
 ): ColumnModel | null {
   // Skip the EMBEDDED group reference — individual flat columns appear as SCALAR entries
-  if (prop.kind === ReferenceKind.EMBEDDED) return null;
+  if (prop.kind === ReferenceKind.EMBEDDED) {
+    return null;
+  }
 
   if (prop.kind === ReferenceKind.SCALAR) {
     // For @Formula columns, formula is set on a SCALAR-kinded property
     const formulaExpr: string | undefined =
       prop.formula !== undefined
-        ? resolveFormulaExpr(
-            prop.formula as (table: FormulaTable, cols: Record<string, string>) => string,
-          )
+        ? resolveFormulaExpr(prop.formula as (table: FormulaTable, cols: Record<string, string>) => string)
         : undefined;
 
     // Flat embedded columns carry `embedded: [ownerPropName, embeddedPropName]`
@@ -107,10 +102,7 @@ function buildColumn(
   }
 
   // FK columns: m:1 always owns the FK; 1:1 only when owner === true
-  if (
-    prop.kind === ReferenceKind.MANY_TO_ONE ||
-    (prop.kind === ReferenceKind.ONE_TO_ONE && prop.owner === true)
-  ) {
+  if (prop.kind === ReferenceKind.MANY_TO_ONE || (prop.kind === ReferenceKind.ONE_TO_ONE && prop.owner === true)) {
     const fkType = resolveFkType(prop.type, metaByClass);
     return {
       propName: prop.name,
@@ -133,15 +125,13 @@ function buildColumn(
  * Function-based formulas use the alias/column names from the dummy objects.
  * Returns empty string on unexpected errors.
  */
-function resolveFormulaExpr(
-  cb: (table: FormulaTable, cols: Record<string, string>) => string,
-): string {
+function resolveFormulaExpr(cb: (table: FormulaTable, cols: Record<string, string>) => string): string {
   try {
-    const cols = new Proxy(
+    const cols = new Proxy<Record<string, string>>(
       {},
       {
-        get: (_target, key: string | symbol) => (typeof key === 'string' ? key : ''),
-      },
+        get: (_target: Record<string, string>, key: string | symbol): string => (typeof key === 'string' ? key : ''),
+      }
     );
     return cb(FORMULA_DUMMY_TABLE, cols);
   } catch {
@@ -150,12 +140,11 @@ function resolveFormulaExpr(
 }
 
 /** Looks up the PK type of the referenced entity to use as FK column type. */
-function resolveFkType(
-  referencedClassName: string,
-  metaByClass: Map<string, EntityMetadata>,
-): string {
+function resolveFkType(referencedClassName: string, metaByClass: Map<string, EntityMetadata>): string {
   const refMeta = metaByClass.get(referencedClassName);
-  if (!refMeta) return 'integer';
+  if (!refMeta) {
+    return 'integer';
+  }
   const pkProp = Object.values(refMeta.properties).find((p) => p.primary === true);
   return pkProp ? normalizeType(pkProp.type) : 'integer';
 }
@@ -184,7 +173,9 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
 
   for (const check of meta.checks ?? []) {
     // Skip function-based check expressions (they require column reference objects at runtime)
-    if (typeof check.expression !== 'string') continue;
+    if (typeof check.expression !== 'string') {
+      continue;
+    }
     result.push({
       type: 'check',
       properties: [],
@@ -201,11 +192,15 @@ function buildRelationEdges(metas: EntityMetadata[]): RelationEdge[] {
   const edges: RelationEdge[] = [];
 
   for (const meta of metas) {
-    if (meta.pivotTable || meta.embeddable) continue;
+    if (meta.pivotTable || meta.embeddable) {
+      continue;
+    }
 
     for (const prop of Object.values(meta.properties)) {
       const edge = buildEdge(meta.className, prop);
-      if (edge !== null) edges.push(edge);
+      if (edge !== null) {
+        edges.push(edge);
+      }
     }
   }
 
@@ -265,9 +260,7 @@ export function renderErDiagram(model: DiagramModel): string {
   }
 
   for (const rel of model.relations) {
-    lines.push(
-      `  ${rel.fromEntity} ${rel.fromCardinality}--${rel.toCardinality} ${rel.toEntity} : "${rel.label}"`,
-    );
+    lines.push(`  ${rel.fromEntity} ${rel.fromCardinality}--${rel.toCardinality} ${rel.toEntity} : "${rel.label}"`);
   }
 
   return lines.join('\n');
@@ -276,9 +269,13 @@ export function renderErDiagram(model: DiagramModel): string {
 function renderColumnLine(col: ColumnModel): string {
   // Priority: PK > FK > UK
   let qualifier = '';
-  if (col.isPrimary) qualifier = ' PK';
-  else if (col.isForeignKey) qualifier = ' FK';
-  else if (col.isUnique) qualifier = ' UK';
+  if (col.isPrimary) {
+    qualifier = ' PK';
+  } else if (col.isForeignKey) {
+    qualifier = ' FK';
+  } else if (col.isUnique) {
+    qualifier = ' UK';
+  }
 
   // Comment priority (v1 differentiators over prisma-markdown):
   //   1. @Formula SQL expression  — "formula: LENGTH(name)"

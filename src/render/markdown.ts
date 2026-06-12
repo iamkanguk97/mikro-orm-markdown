@@ -1,4 +1,4 @@
-import type { EnrichedEntity, DocumentModel, NamespaceGroup } from '../model/build.js';
+import type { DocumentModel, EnrichedEntity, NamespaceGroup } from '../model/build.js';
 import type { ColumnModel, ConstraintModel, DiagramModel } from '../model/types.js';
 import { renderErDiagram } from './mermaid.js';
 
@@ -78,15 +78,25 @@ function renderColumnTable(entity: EnrichedEntity): string {
 
 /** Returns the "Key" cell value for the column table. */
 function resolveColumnKey(col: ColumnModel): string {
-  if (col.isPrimary) return 'PK';
+  if (col.isPrimary) {
+    return 'PK';
+  }
   if (col.isForeignKey) {
     // Show TS property name in parentheses if it differs from the DB column name
     return col.fieldName !== col.propName ? `FK (${col.propName})` : 'FK';
   }
-  if (col.isUnique) return 'UK';
-  if (col.formula !== undefined) return `formula: ${col.formula}`;
-  if (col.isDiscriminator) return 'discriminator';
-  if (col.embeddedIn !== undefined) return `[${col.embeddedIn}]`;
+  if (col.isUnique) {
+    return 'UK';
+  }
+  if (col.formula !== undefined) {
+    return `formula: ${col.formula}`;
+  }
+  if (col.isDiscriminator) {
+    return 'discriminator';
+  }
+  if (col.embeddedIn !== undefined) {
+    return `[${col.embeddedIn}]`;
+  }
   return '';
 }
 

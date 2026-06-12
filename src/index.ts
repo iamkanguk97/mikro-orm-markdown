@@ -4,8 +4,8 @@ import { loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel } from './model/build.js';
 import { renderMarkdown } from './render/markdown.js';
 
-export type { GenerateOptions } from './model/types.js';
 export { MetadataLoadError } from './metadata/load.js';
+export type { GenerateOptions } from './model/types.js';
 
 /** Options for the programmatic API. */
 export interface GenerateMarkdownOptions {

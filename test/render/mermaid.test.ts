@@ -275,9 +275,7 @@ describe('renderErDiagram — M3 rendering', () => {
         {
           className: 'Animal',
           tableName: 'animal',
-          columns: [
-            makeCol({ propName: 'type', fieldName: 'type', type: 'string', isDiscriminator: true }),
-          ],
+          columns: [makeCol({ propName: 'type', fieldName: 'type', type: 'string', isDiscriminator: true })],
           isPivot: false,
           isEmbeddable: false,
           discriminatorColumn: 'type',

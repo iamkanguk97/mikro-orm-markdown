@@ -147,7 +147,9 @@ describe('renderMarkdown — namespace isolation', () => {
 /** Extracts the content of a level-2 section (from ## heading to next ## or end). */
 function extractSection(md: string, sectionName: string): string {
   const start = md.indexOf(`## ${sectionName}`);
-  if (start === -1) return '';
+  if (start === -1) {
+    return '';
+  }
   const nextSection = md.indexOf('\n## ', start + 1);
   return nextSection === -1 ? md.slice(start) : md.slice(start, nextSection);
 }

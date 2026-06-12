@@ -2,12 +2,12 @@ import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
-import { buildDocumentModel } from '../../src/model/build.js';
+import { buildDocumentModel, type DocumentModel } from '../../src/model/build.js';
 import config from '../fixtures/mikro-orm.config.js';
 
 const FIXTURES_GLOB = path.resolve(import.meta.dirname, '../fixtures/entities/*.ts');
 
-async function getDocModel() {
+async function getDocModel(): Promise<DocumentModel> {
   const metas = await loadEntityMetadata(config);
   const jsDocResult = loadJsDoc([FIXTURES_GLOB]);
   return buildDocumentModel(metas, jsDocResult, 'Test DB');

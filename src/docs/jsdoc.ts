@@ -44,7 +44,9 @@ export function loadJsDoc(srcGlobs: string[]): JsDocResult {
   const entities: EntityJsDocMap = new Map();
   const props: PropJsDocMap = new Map();
 
-  if (srcGlobs.length === 0) return { entities, props };
+  if (srcGlobs.length === 0) {
+    return { entities, props };
+  }
 
   const project = new Project({
     skipAddingFilesFromTsConfig: true,
@@ -60,7 +62,9 @@ export function loadJsDoc(srcGlobs: string[]): JsDocResult {
   for (const sourceFile of project.getSourceFiles()) {
     for (const cls of sourceFile.getClasses()) {
       const className = cls.getName();
-      if (!className) continue;
+      if (!className) {
+        continue;
+      }
 
       const classDocs = cls.getJsDocs();
       if (classDocs.length > 0) {
@@ -70,7 +74,9 @@ export function loadJsDoc(srcGlobs: string[]): JsDocResult {
       const propMap = new Map<string, PropJsDocInfo>();
       for (const prop of cls.getProperties()) {
         const propDocs = prop.getJsDocs();
-        if (propDocs.length === 0) continue;
+        if (propDocs.length === 0) {
+          continue;
+        }
         const desc = extractDescription(propDocs);
         if (desc !== undefined) {
           propMap.set(prop.getName(), { description: desc });
@@ -94,16 +100,23 @@ function parseEntityJsDoc(jsDocs: JSDoc[]): EntityJsDocInfo {
 
   for (const doc of jsDocs) {
     const desc = doc.getDescription().trim();
-    if (desc && description === undefined) description = desc;
+    if (desc && description === undefined) {
+      description = desc;
+    }
 
     for (const tag of doc.getTags()) {
       const tagName = tag.getTagName();
       const comment = tag.getCommentText()?.trim();
 
-      if (tagName === 'namespace' && comment) namespaces.push(comment);
-      else if (tagName === 'erd' && comment) erdNamespaces.push(comment);
-      else if (tagName === 'describe' && comment) describeNamespaces.push(comment);
-      else if (tagName === 'hidden') hidden = true;
+      if (tagName === 'namespace' && comment) {
+        namespaces.push(comment);
+      } else if (tagName === 'erd' && comment) {
+        erdNamespaces.push(comment);
+      } else if (tagName === 'describe' && comment) {
+        describeNamespaces.push(comment);
+      } else if (tagName === 'hidden') {
+        hidden = true;
+      }
     }
   }
 
@@ -119,7 +132,9 @@ function parseEntityJsDoc(jsDocs: JSDoc[]): EntityJsDocInfo {
 function extractDescription(jsDocs: JSDoc[]): string | undefined {
   for (const doc of jsDocs) {
     const desc = doc.getDescription().trim();
-    if (desc) return desc;
+    if (desc) {
+      return desc;
+    }
   }
   return undefined;
 }
