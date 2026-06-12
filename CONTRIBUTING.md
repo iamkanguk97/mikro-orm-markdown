@@ -43,6 +43,19 @@ This project follows [Conventional Commits](https://www.conventionalcommits.org/
 | `test:`     | Tests only         |
 | `refactor:` | No behavior change |
 | `chore:`    | CI, deps, config   |
+| `ci:`       | CI configuration   |
+| `build:`    | Build system       |
+| `perf:`     | Performance        |
+| `style:`    | Formatting only    |
+| `revert:`   | Revert a commit    |
+| `wip:`      | Work in progress   |
+
+Commit subjects must not include issue or ticket IDs. Add references in the footer instead:
+
+```text
+Refs: #123
+Refs: ECOM-123
+```
 
 ## Pull Request Process
 

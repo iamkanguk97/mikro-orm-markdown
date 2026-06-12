@@ -65,6 +65,8 @@
     "*.{ts,js,json,yml,yaml,md}": "prettier --write"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
     "@mikro-orm/core": "^6.0.0",
     "@mikro-orm/sqlite": "^6.0.0",
     "@types/node": "^22.0.0",
