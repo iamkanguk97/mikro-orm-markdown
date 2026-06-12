@@ -1,0 +1,95 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.12/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "ignoreUnknown": true,
+    "includes": ["**", "!!**/node_modules", "!!**/coverage", "!!**/dist"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120,
+    "lineEnding": "lf"
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "es5",
+      "semicolons": "always",
+      "arrowParentheses": "always",
+      "bracketSpacing": true,
+      "bracketSameLine": true,
+      "attributePosition": "multiline"
+    },
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
+  "json": {
+    "formatter": {
+      "trailingCommas": "none"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": false,
+      "correctness": {
+        // There is an exception to this rule
+        // parameters that starts with underscore
+        // ex. function foo(_a, _b) {}
+        "noConstAssign": "error",
+        "noUnusedImports": "error",
+        "noUnusedFunctionParameters": "error",
+        "noUnusedVariables": "error",
+        "useIsNan": "error"
+      },
+      "complexity": {
+        // (bad) foo && foo.bar && foo.bar.baz
+        // (good) foo?.bar?.baz
+        "useOptionalChain": "warn"
+      },
+      "style": {
+        "useConst": "error",
+        "useBlockStatements": "error", // if, for, while -> always {} ?
+        "noNamespace": "off"
+      },
+      "suspicious": {
+        "noImportAssign": "error",
+        "noDuplicateObjectKeys": "error",
+        "noDuplicateCase": "error",
+        "noConsole": "warn",
+        "noVar": "error",
+        "noExplicitAny": "error",
+        "noDoubleEquals": {
+          "level": "error",
+          "options": {
+            "ignoreNull": false
+          }
+        }
+      },
+      "nursery": {
+        "useExplicitType": "warn",
+        "useNullishCoalescing": "warn"
+      }
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [[":URL:", ":NODE:", ":PACKAGE:"], ":ALIAS:", ":PATH:"]
+          }
+        }
+      }
+    }
+  }
+}
