@@ -15,6 +15,9 @@ This tool brings the same ERD + Markdown experience to MikroORM, with additional
 - **Embeddable** — a value object whose fields are stored as flat columns inside the owning entity's table (e.g. `address_street`, `address_city`). No separate table is created.
 - **Single Table Inheritance (STI)** — subclasses like `Dog` and `Cat` share one `animals` table. A discriminator column (e.g. `type`) distinguishes which subclass each row belongs to.
 - **@Formula** — a virtual column with no physical DB column. Its value is computed by a SQL expression at SELECT time (e.g. `LENGTH(name)`).
+
+> These features are fully supported by MikroORM but are less commonly used in practice. In particular, Embeddable is most relevant when MikroORM entities double as domain objects — if you separate your ORM layer from your domain model, you likely won't need it.
+
 - **Actual DB column names** derived from your NamingStrategy
 - **Indexes and constraints**
 

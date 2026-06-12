@@ -27,7 +27,7 @@ module.exports = {
 
           return [
             !SUBJECT_ISSUE_REFERENCE_PATTERN.test(subject),
-            '이슈나 티켓 ID는 커밋 제목에 넣지 말고 footer에 `Refs: #123` 또는 `Refs: ECOM-123` 형식으로 작성하세요.',
+            'Commit subjects must not include issue or ticket IDs. Add references in the footer instead: `Refs: #123` or `Refs: ECOM-123`.',
           ];
         },
         'footer-issue-reference-format': ({ footer, subject }) => {
@@ -47,7 +47,7 @@ module.exports = {
 
           return [
             issueLines.every((line) => ISSUE_FOOTER_PATTERN.test(line)),
-            `이슈 참조는 footer에 \`Refs: #123\` 또는 \`Refs: ECOM-123\` 형식으로 작성하세요. 현재 subject: ${
+            `Issue references must use the footer format \`Refs: #123\` or \`Refs: ECOM-123\`. Current subject: ${
               subject ?? ''
             }`,
           ];
