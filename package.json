@@ -1,6 +1,6 @@
 {
   "name": "mikro-orm-markdown",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "description": "Generate Mermaid ERD and Markdown documentation from MikroORM entities",
   "keywords": [
     "mikro-orm",
