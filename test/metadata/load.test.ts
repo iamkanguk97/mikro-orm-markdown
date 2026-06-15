@@ -1,8 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { SqliteDriver } from '@mikro-orm/sqlite';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
 
 describe('loadEntityMetadata', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('returns EntityMetadata for all fixture entities', async () => {
     const metas = await loadEntityMetadata(config);
     const classNames = metas.map((m) => m.className);
@@ -46,5 +51,13 @@ describe('loadEntityMetadata', () => {
 
   it('throws MetadataLoadError when no entities are discovered', async () => {
     await expect(loadEntityMetadata({ ...config, entities: [] })).rejects.toBeInstanceOf(MetadataLoadError);
+  });
+
+  it('discovers metadata without connecting to the database', async () => {
+    const connectSpy = vi.spyOn(SqliteDriver.prototype, 'connect');
+
+    await loadEntityMetadata({ ...config, connect: true });
+
+    expect(connectSpy).not.toHaveBeenCalled();
   });
 });

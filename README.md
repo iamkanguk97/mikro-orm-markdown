@@ -21,12 +21,13 @@ This tool brings the same ERD + Markdown experience to MikroORM, with additional
 - **Actual DB column names** derived from your NamingStrategy
 - **Indexes and constraints**
 
-Works with all databases supported by MikroORM (PostgreSQL, MySQL, SQLite, MSSQL, and more) — no database connection required.
+Works with MikroORM SQL drivers such as PostgreSQL, MySQL/MariaDB, SQLite, and MSSQL. It reads entity metadata from your MikroORM config, so no live database connection is required.
 
 ## Requirements
 
 - Node.js >= 18
 - `@mikro-orm/core` >= 6 (peer dependency)
+- A MikroORM config with the matching database driver package installed
 - TypeScript config files require `tsx` or `ts-node`
 
 ## Installation

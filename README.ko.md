@@ -21,12 +21,13 @@ MikroORM에서도 동일한 ERD + Markdown 경험을 제공하며, Prisma로는 
 - NamingStrategy가 적용된 **실제 DB 컬럼명**
 - **인덱스 및 제약 조건**
 
-DB에 연결하지 않으므로 MikroORM이 지원하는 모든 DB(PostgreSQL, MySQL, SQLite, MSSQL 등)에서 동작합니다.
+PostgreSQL, MySQL/MariaDB, SQLite, MSSQL 같은 MikroORM SQL 드라이버에서 동작합니다. 기존 DB 스키마를 직접 introspection하지 않고 MikroORM 설정에서 엔티티 메타데이터를 읽기 때문에 실행 중인 DB 연결이 필요하지 않습니다.
 
 ## 요구사항
 
 - Node.js >= 18
 - `@mikro-orm/core` >= 6 (peer dependency)
+- 사용할 DB에 맞는 MikroORM 드라이버 패키지가 설치된 MikroORM 설정 파일
 - TypeScript 설정 파일 사용 시 `tsx` 또는 `ts-node` 필요
 
 ## 설치
