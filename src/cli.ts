@@ -11,7 +11,7 @@ interface CliOptions {
   out: string;
   title: string;
   description?: string;
-  src: string[];
+  src?: string[];
 }
 
 async function run(opts: CliOptions): Promise<void> {
@@ -37,7 +37,7 @@ async function run(opts: CliOptions): Promise<void> {
     markdown = await generateMarkdown({
       orm: ormOptions,
       title: opts.title,
-      src: opts.src,
+      src: opts.src ?? [],
       ...(opts.description !== undefined && { description: opts.description }),
     });
   } catch (err) {
@@ -57,12 +57,7 @@ const program = new Command()
   .option('-o, --out <path>', 'Output markdown file path', './ERD.md')
   .option('-t, --title <string>', 'Document title', 'Database Schema')
   .option('-d, --description <string>', 'Optional description paragraph shown below the title')
-  .option(
-    '-s, --src <glob>',
-    'Glob pattern for entity source files, repeatable (for JSDoc extraction)',
-    (val: string, prev: string[]) => [...prev, val],
-    [] as string[]
-  )
+  .option('-s, --src <glob>', 'JSDoc source glob (repeatable)', (val: string, prev: string[] = []) => [...prev, val])
   .action(run);
 
 program.parseAsync(process.argv).catch((err: unknown) => {
