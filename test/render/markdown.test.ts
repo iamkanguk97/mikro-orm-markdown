@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
+import type { DocumentModel } from '../../src/model/build.js';
 import { buildDocumentModel } from '../../src/model/build.js';
 import { renderMarkdown } from '../../src/render/markdown.js';
 import config from '../fixtures/mikro-orm.config.js';
@@ -151,6 +152,83 @@ describe('renderMarkdown — namespace isolation', () => {
     const blogSection = extractSection(md, 'Blog');
     // Animal belongs to Animals namespace, not Blog
     expect(blogSection).not.toContain('Animal {');
+  });
+});
+
+describe('renderMarkdown — escaping', () => {
+  it('escapes markdown syntax that would break headings, tables, and blockquotes', () => {
+    const docModel: DocumentModel = {
+      title: 'Unsafe | <Title>\nNext',
+      description: 'Summary | <script>\nsecond line',
+      groups: [
+        {
+          name: 'Group | <A>\nNext',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'Entity | <One>\nNext',
+                tableName: 'entity',
+                columns: [
+                  {
+                    propName: 'name',
+                    fieldName: 'name|raw',
+                    type: 'string',
+                    isPrimary: false,
+                    isForeignKey: false,
+                    isUnique: false,
+                    isNullable: false,
+                    comment: 'visible | internal\n<script>',
+                  },
+                  {
+                    propName: 'score',
+                    fieldName: 'score',
+                    type: 'integer',
+                    isPrimary: false,
+                    isForeignKey: false,
+                    isUnique: false,
+                    isNullable: false,
+                    formula: 'sum(`score` | 1)',
+                  },
+                ],
+                isPivot: false,
+                isEmbeddable: false,
+                discriminatorColumn: 'kind`type',
+                constraints: [
+                  {
+                    type: 'check',
+                    name: 'check`name',
+                    properties: [],
+                    expression: 'score > `min`',
+                  },
+                ],
+              },
+              jsDoc: {
+                description: 'First | line\n# not heading',
+                namespaces: [],
+                erdNamespaces: [],
+                describeNamespaces: [],
+                hidden: false,
+              },
+              propDocs: new Map([['name', { description: 'doc | desc\n<b>raw</b>', atLeastOne: false }]]),
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+
+    expect(md).toContain('# Unsafe \\| &lt;Title&gt; Next');
+    expect(md).toContain('Summary \\| &lt;script&gt; second line');
+    expect(md).toContain('## Group \\| &lt;A&gt; Next');
+    expect(md).toContain('### Entity \\| &lt;One&gt; Next');
+    expect(md).toContain('> First \\| line\n> \\# not heading');
+    expect(md).toContain('| name\\|raw | string |  |  | doc \\| desc<br>&lt;b&gt;raw&lt;/b&gt; |');
+    expect(md).toContain('| score | integer | formula: sum(\\`score\\` \\| 1) |  |  |');
+    expect(md).toContain('*STI root — discriminator column: ``kind`type``*');
+    expect(md).toContain('- Check ``check`name``: `` score > `min` ``');
   });
 });
 

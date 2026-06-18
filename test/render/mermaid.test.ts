@@ -497,4 +497,39 @@ describe('renderErDiagram', () => {
     };
     expect(renderErDiagram(model)).toContain('Post }o--o{ Tag : "tags"');
   });
+
+  it('sanitizes Mermaid identifiers and escapes quoted labels/comments', () => {
+    const model: DiagramModel = {
+      entities: [
+        {
+          className: 'Order Item',
+          tableName: 'order_item',
+          columns: [
+            makeCol({
+              propName: 'full"name',
+              fieldName: 'full name|raw',
+              type: 'string',
+              formula: 'concat("first", "last")\nline',
+            }),
+          ],
+          isPivot: false,
+          isEmbeddable: false,
+          constraints: [],
+        },
+      ],
+      relations: [
+        makeEdge({
+          fromEntity: 'Order Item',
+          toEntity: 'User Account',
+          label: 'created "by"\nuser',
+        }),
+      ],
+    };
+
+    const result = renderErDiagram(model);
+
+    expect(result).toContain('Order_Item {');
+    expect(result).toContain('string full_name_raw "formula: concat(\\"first\\", \\"last\\") line"');
+    expect(result).toContain('Order_Item }o--|| User_Account : "created \\"by\\" user"');
+  });
 });

@@ -1,5 +1,11 @@
 import type { DocumentModel, EnrichedEntity, NamespaceGroup } from '../model/build.js';
 import type { ColumnModel, ConstraintModel, DiagramModel } from '../model/types.js';
+import {
+  escapeMarkdownInline,
+  escapeMarkdownTableCell,
+  renderMarkdownBlockQuote,
+  renderMarkdownInlineCode,
+} from './escape.js';
 import { renderErDiagram } from './mermaid.js';
 
 /**
@@ -8,10 +14,10 @@ import { renderErDiagram } from './mermaid.js';
  * followed by per-entity column tables.
  */
 export function renderMarkdown(docModel: DocumentModel): string {
-  const sections: string[] = [`# ${docModel.title}`];
+  const sections: string[] = [`# ${escapeMarkdownInline(docModel.title)}`];
 
   if (docModel.description) {
-    sections.push(docModel.description);
+    sections.push(escapeMarkdownInline(docModel.description));
   }
 
   for (const group of docModel.groups) {
@@ -22,7 +28,7 @@ export function renderMarkdown(docModel: DocumentModel): string {
 }
 
 function renderGroupSection(group: NamespaceGroup): string {
-  const parts: string[] = [`## ${group.name}`];
+  const parts: string[] = [`## ${escapeMarkdownInline(group.name)}`];
 
   if (group.erdEntities.length > 0) {
     const diagramModel: DiagramModel = {
@@ -40,17 +46,17 @@ function renderGroupSection(group: NamespaceGroup): string {
 }
 
 function renderEntitySection(entity: EnrichedEntity): string {
-  const parts: string[] = [`### ${entity.model.className}`];
+  const parts: string[] = [`### ${escapeMarkdownInline(entity.model.className)}`];
 
   if (entity.jsDoc?.description) {
-    parts.push(`> ${entity.jsDoc.description}`);
+    parts.push(renderMarkdownBlockQuote(entity.jsDoc.description));
   }
 
   // STI metadata note
   if (entity.model.discriminatorColumn) {
-    parts.push(`*STI root — discriminator column: \`${entity.model.discriminatorColumn}\`*`);
+    parts.push(`*STI root — discriminator column: ${renderMarkdownInlineCode(entity.model.discriminatorColumn)}*`);
   } else if (entity.model.extendsEntity) {
-    parts.push(`*Extends \`${entity.model.extendsEntity}\` (Single Table Inheritance)*`);
+    parts.push(`*Extends ${renderMarkdownInlineCode(entity.model.extendsEntity)} (Single Table Inheritance)*`);
   }
 
   if (entity.model.columns.length > 0) {
@@ -72,7 +78,7 @@ function renderColumnTable(entity: EnrichedEntity): string {
     const nullable = col.isNullable && !col.isPrimary ? 'Y' : '';
     // JSDoc property description wins; fall back to the @Property({ comment }) DDL comment.
     const desc = entity.propDocs.get(col.propName)?.description ?? col.comment ?? '';
-    return `| ${col.fieldName} | ${col.type} | ${key} | ${nullable} | ${desc} |`;
+    return `| ${escapeMarkdownTableCell(col.fieldName)} | ${escapeMarkdownTableCell(col.type)} | ${escapeMarkdownTableCell(key)} | ${nullable} | ${escapeMarkdownTableCell(desc)} |`;
   });
   return [header, sep, ...rows].join('\n');
 }
@@ -104,13 +110,14 @@ function resolveColumnKey(col: ColumnModel): string {
 function renderConstraints(constraints: ConstraintModel[]): string {
   const lines = ['**Constraints:**', ''];
   for (const c of constraints) {
-    const name = c.name ? ` \`${c.name}\`` : '';
+    const name = c.name ? ` ${renderMarkdownInlineCode(c.name)}` : '';
+    const properties = c.properties.map(escapeMarkdownInline).join(', ');
     if (c.type === 'index') {
-      lines.push(`- Index${name}: (${c.properties.join(', ')})`);
+      lines.push(`- Index${name}: (${properties})`);
     } else if (c.type === 'unique') {
-      lines.push(`- Unique${name}: (${c.properties.join(', ')})`);
+      lines.push(`- Unique${name}: (${properties})`);
     } else if (c.type === 'check') {
-      lines.push(`- Check${name}: \`${c.expression ?? ''}\``);
+      lines.push(`- Check${name}: ${renderMarkdownInlineCode(c.expression ?? '')}`);
     }
   }
   return lines.join('\n');

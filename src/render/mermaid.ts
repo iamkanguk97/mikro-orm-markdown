@@ -1,6 +1,7 @@
 import type { EntityMetadata, EntityProperty, FormulaTable } from '@mikro-orm/core';
 import { ReferenceKind } from '@mikro-orm/core';
 import type { ColumnModel, ConstraintModel, DiagramModel, EntityModel, RelationEdge } from '../model/types.js';
+import { escapeMermaidQuotedText, toMermaidIdentifier } from './escape.js';
 
 // Dummy table descriptor used when resolving formula expressions for documentation.
 // String-based formulas ignore both arguments; function-based formulas use the alias.
@@ -260,7 +261,7 @@ export function renderErDiagram(model: DiagramModel): string {
   const lines: string[] = ['erDiagram'];
 
   for (const entity of model.entities) {
-    lines.push(`  ${entity.className} {`);
+    lines.push(`  ${toMermaidIdentifier(entity.className)} {`);
     for (const col of entity.columns) {
       lines.push(`    ${renderColumnLine(col)}`);
     }
@@ -268,7 +269,9 @@ export function renderErDiagram(model: DiagramModel): string {
   }
 
   for (const rel of model.relations) {
-    lines.push(`  ${rel.fromEntity} ${rel.fromCardinality}--${rel.toCardinality} ${rel.toEntity} : "${rel.label}"`);
+    lines.push(
+      `  ${toMermaidIdentifier(rel.fromEntity)} ${rel.fromCardinality}--${rel.toCardinality} ${toMermaidIdentifier(rel.toEntity)} : "${escapeMermaidQuotedText(rel.label)}"`
+    );
   }
 
   return lines.join('\n');
@@ -301,8 +304,8 @@ function renderColumnLine(col: ColumnModel): string {
     comment = col.propName;
   }
 
-  const commentStr = comment !== undefined ? ` "${comment}"` : '';
-  return `${col.type} ${col.fieldName}${qualifier}${commentStr}`;
+  const commentStr = comment !== undefined ? ` "${escapeMermaidQuotedText(comment)}"` : '';
+  return `${toMermaidIdentifier(col.type)} ${toMermaidIdentifier(col.fieldName)}${qualifier}${commentStr}`;
 }
 
 /** Strips characters that are invalid in Mermaid type identifiers. */
