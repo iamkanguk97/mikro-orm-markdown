@@ -6,3 +6,5 @@ coverage/
 .env.*
 !.env.example
 ERD.md
+# The committed example output is intentionally tracked.
+!examples/ERD.md

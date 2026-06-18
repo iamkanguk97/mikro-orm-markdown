@@ -51,6 +51,7 @@
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
+    "example:erd": "npm run build && cd examples && node ../dist/cli.js -c mikro-orm.config.ts -o ERD.md -t \"Example Schema\" -d \"Generated from the entities in examples/entities - a tour of every feature mikro-orm-markdown can render.\"",
     "typecheck": "tsc --project tsconfig.test.json --noEmit",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
