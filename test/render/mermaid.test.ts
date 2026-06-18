@@ -257,6 +257,70 @@ describe('buildDiagramModel — Constraints', () => {
   });
 });
 
+describe('buildDiagramModel — composite foreign keys', () => {
+  it('expands every FK fieldName and preserves referenced PK types', () => {
+    const tenantMeta = Object.assign({} as EntityMetadata, {
+      className: 'TenantAccount',
+      tableName: 'tenant_account',
+      primaryKeys: ['regionCode', 'accountId'],
+      properties: {
+        regionCode: {
+          name: 'regionCode',
+          fieldNames: ['region_code'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          primary: true,
+        },
+        accountId: {
+          name: 'accountId',
+          fieldNames: ['account_id'],
+          type: 'integer',
+          kind: ReferenceKind.SCALAR,
+          primary: true,
+        },
+      },
+    });
+    const auditLogMeta = Object.assign({} as EntityMetadata, {
+      className: 'AuditLog',
+      tableName: 'audit_log',
+      properties: {
+        tenant: {
+          name: 'tenant',
+          type: 'TenantAccount',
+          kind: ReferenceKind.MANY_TO_ONE,
+          fieldNames: ['tenant_region_code', 'tenant_account_id'],
+          referencedColumnNames: ['region_code', 'account_id'],
+          primary: true,
+          nullable: false,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([tenantMeta, auditLogMeta]);
+    const auditLog = model.entities.find((entity) => entity.className === 'AuditLog');
+
+    expect(auditLog?.columns).toEqual([
+      expect.objectContaining({
+        propName: 'tenant',
+        fieldName: 'tenant_region_code',
+        type: 'string',
+        isPrimary: true,
+        isForeignKey: true,
+      }),
+      expect.objectContaining({
+        propName: 'tenant',
+        fieldName: 'tenant_account_id',
+        type: 'integer',
+        isPrimary: true,
+        isForeignKey: true,
+      }),
+    ]);
+
+    expect(renderErDiagram(model)).toContain('string tenant_region_code PK "tenant"');
+    expect(renderErDiagram(model)).toContain('integer tenant_account_id PK "tenant"');
+  });
+});
+
 describe('renderErDiagram — M3 rendering', () => {
   function makeCol(overrides: Partial<ColumnModel> = {}): ColumnModel {
     return {

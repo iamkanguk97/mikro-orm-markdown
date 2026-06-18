@@ -85,12 +85,17 @@ function renderColumnTable(entity: EnrichedEntity): string {
 
 /** Returns the "Key" cell value for the column table. */
 function resolveColumnKey(col: ColumnModel): string {
+  const fkKey = col.fieldName !== col.propName ? `FK (${col.propName})` : 'FK';
+
+  if (col.isPrimary && col.isForeignKey) {
+    return `PK, ${fkKey}`;
+  }
   if (col.isPrimary) {
     return 'PK';
   }
   if (col.isForeignKey) {
     // Show TS property name in parentheses if it differs from the DB column name
-    return col.fieldName !== col.propName ? `FK (${col.propName})` : 'FK';
+    return fkKey;
   }
   if (col.isUnique) {
     return 'UK';

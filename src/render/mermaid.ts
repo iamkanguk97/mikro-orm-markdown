@@ -44,10 +44,7 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
     if (isStiRoot && prop.inherited === true) {
       continue;
     }
-    const col = buildColumn(prop, metaByClass, meta);
-    if (col !== null) {
-      columns.push(col);
-    }
+    columns.push(...buildColumns(prop, metaByClass, meta));
   }
 
   return {
@@ -62,15 +59,15 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
   };
 }
 
-/** Returns a ColumnModel for renderable properties, or null to skip. */
-function buildColumn(
+/** Returns ColumnModels for renderable properties, or an empty array to skip. */
+function buildColumns(
   prop: EntityProperty,
   metaByClass: Map<string, EntityMetadata>,
   owningMeta: EntityMetadata
-): ColumnModel | null {
+): ColumnModel[] {
   // Skip the EMBEDDED group reference — individual flat columns appear as SCALAR entries
   if (prop.kind === ReferenceKind.EMBEDDED) {
-    return null;
+    return [];
   }
 
   if (prop.kind === ReferenceKind.SCALAR) {
@@ -90,38 +87,30 @@ function buildColumn(
     const isDiscriminator =
       owningMeta.discriminatorColumn !== undefined && prop.name === owningMeta.discriminatorColumn;
 
-    return {
-      propName: prop.name,
-      fieldName: prop.fieldNames?.[0] ?? prop.name,
-      type: normalizeType(prop.type),
-      isPrimary: prop.primary === true,
-      isForeignKey: false,
-      isUnique: prop.unique === true,
-      isNullable: prop.nullable === true,
-      ...(prop.comment !== undefined && { comment: prop.comment }),
-      ...(formulaExpr !== undefined && { formula: formulaExpr }),
-      ...(embeddedIn !== undefined && { embeddedIn }),
-      ...(isDiscriminator && { isDiscriminator: true }),
-    };
+    return [
+      {
+        propName: prop.name,
+        fieldName: prop.fieldNames?.[0] ?? prop.name,
+        type: normalizeType(prop.type),
+        isPrimary: prop.primary === true,
+        isForeignKey: false,
+        isUnique: prop.unique === true,
+        isNullable: prop.nullable === true,
+        ...(prop.comment !== undefined && { comment: prop.comment }),
+        ...(formulaExpr !== undefined && { formula: formulaExpr }),
+        ...(embeddedIn !== undefined && { embeddedIn }),
+        ...(isDiscriminator && { isDiscriminator: true }),
+      },
+    ];
   }
 
   // FK columns: m:1 always owns the FK; 1:1 only when owner === true
   if (prop.kind === ReferenceKind.MANY_TO_ONE || (prop.kind === ReferenceKind.ONE_TO_ONE && prop.owner === true)) {
-    const fkType = resolveFkType(prop.type, metaByClass);
-    return {
-      propName: prop.name,
-      fieldName: prop.fieldNames?.[0] ?? `${prop.name}_id`,
-      type: fkType,
-      isPrimary: false,
-      isForeignKey: true,
-      isUnique: prop.unique === true,
-      isNullable: prop.nullable === true,
-      ...(prop.comment !== undefined && { comment: prop.comment }),
-    };
+    return buildForeignKeyColumns(prop, metaByClass);
   }
 
   // ONE_TO_MANY, MANY_TO_MANY (both owner and inverse) → no physical column
-  return null;
+  return [];
 }
 
 /**
@@ -145,14 +134,57 @@ function resolveFormulaExpr(cb: (table: FormulaTable, cols: Record<string, strin
   }
 }
 
-/** Looks up the PK type of the referenced entity to use as FK column type. */
-function resolveFkType(referencedClassName: string, metaByClass: Map<string, EntityMetadata>): string {
-  const refMeta = metaByClass.get(referencedClassName);
+function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, EntityMetadata>): ColumnModel[] {
+  const fieldNames = prop.fieldNames.length > 0 ? prop.fieldNames : [`${prop.name}_id`];
+  const fkTypes = resolveFkTypes(prop, metaByClass, fieldNames.length);
+
+  return fieldNames.map((fieldName, index) => ({
+    propName: prop.name,
+    fieldName,
+    type: fkTypes[index] ?? fkTypes[0] ?? 'integer',
+    isPrimary: prop.primary === true,
+    isForeignKey: true,
+    isUnique: prop.unique === true,
+    isNullable: prop.nullable === true,
+    ...(prop.comment !== undefined && { comment: prop.comment }),
+  }));
+}
+
+/** Looks up referenced PK types to use as FK column types, preserving composite key order. */
+function resolveFkTypes(
+  prop: EntityProperty,
+  metaByClass: Map<string, EntityMetadata>,
+  fieldNameCount: number
+): string[] {
+  const refMeta = metaByClass.get(prop.type);
   if (!refMeta) {
-    return 'integer';
+    return Array.from({ length: fieldNameCount }, () => 'integer');
   }
-  const pkProp = Object.values(refMeta.properties).find((p) => p.primary === true);
-  return pkProp ? normalizeType(pkProp.type) : 'integer';
+
+  const primaryProps = getPrimaryProps(refMeta);
+  const referencedColumnNames = prop.referencedColumnNames ?? [];
+  return Array.from({ length: fieldNameCount }, (_value, index) => {
+    const referencedColumnName = referencedColumnNames[index];
+    const pkProp =
+      referencedColumnName !== undefined
+        ? primaryProps.find((candidate) => candidate.fieldNames.includes(referencedColumnName))
+        : undefined;
+
+    return normalizeType((pkProp ?? primaryProps[index] ?? primaryProps[0])?.type ?? 'integer');
+  });
+}
+
+function getPrimaryProps(meta: EntityMetadata): EntityProperty[] {
+  const primaryKeys = meta.primaryKeys ?? [];
+  const orderedPrimaryProps = primaryKeys
+    .map((key) => meta.properties[String(key)])
+    .filter((prop): prop is EntityProperty => prop !== undefined);
+
+  if (orderedPrimaryProps.length > 0) {
+    return orderedPrimaryProps;
+  }
+
+  return Object.values(meta.properties).filter((prop) => prop.primary === true);
 }
 
 /** Collects indexes, unique constraints, and check constraints from entity-level metadata. */

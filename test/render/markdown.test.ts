@@ -232,6 +232,47 @@ describe('renderMarkdown — escaping', () => {
   });
 });
 
+describe('renderMarkdown — composite keys', () => {
+  it('shows a relation column that is both PK and FK', () => {
+    const docModel: DocumentModel = {
+      title: 'Composite Keys',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'AuditLog',
+                tableName: 'audit_log',
+                columns: [
+                  {
+                    propName: 'tenant',
+                    fieldName: 'tenant_region_code',
+                    type: 'string',
+                    isPrimary: true,
+                    isForeignKey: true,
+                    isUnique: false,
+                    isNullable: false,
+                  },
+                ],
+                isPivot: false,
+                isEmbeddable: false,
+                constraints: [],
+              },
+              jsDoc: undefined,
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(renderMarkdown(docModel)).toContain('| tenant_region_code | string | PK, FK (tenant) |  |  |');
+  });
+});
+
 /** Extracts the content of a level-2 section (from ## heading to next ## or end). */
 function extractSection(md: string, sectionName: string): string {
   const start = md.indexOf(`## ${sectionName}`);
