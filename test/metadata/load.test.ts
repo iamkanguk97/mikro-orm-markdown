@@ -1,4 +1,5 @@
 import { SqliteDriver } from '@mikro-orm/sqlite';
+import * as path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
@@ -9,7 +10,7 @@ describe('loadEntityMetadata', () => {
   });
 
   it('returns EntityMetadata for all fixture entities', async () => {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     const classNames = metas.map((m) => m.className);
 
     expect(classNames).toContain('Author');
@@ -18,7 +19,7 @@ describe('loadEntityMetadata', () => {
   });
 
   it('each entity has a tableName', async () => {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     const byName = Object.fromEntries(metas.map((m) => [m.className, m]));
 
     expect(byName['Author']?.tableName).toBeDefined();
@@ -27,7 +28,7 @@ describe('loadEntityMetadata', () => {
   });
 
   it('Author entity has expected properties', async () => {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     const author = metas.find((m) => m.className === 'Author');
 
     expect(author).toBeDefined();
@@ -39,7 +40,7 @@ describe('loadEntityMetadata', () => {
   });
 
   it('Post.author is a many-to-one relation (owns the FK)', async () => {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     const post = metas.find((m) => m.className === 'Post');
 
     expect(post).toBeDefined();
@@ -59,5 +60,27 @@ describe('loadEntityMetadata', () => {
     await loadEntityMetadata({ ...config, connect: true });
 
     expect(connectSpy).not.toHaveBeenCalled();
+  });
+
+  it('returns absolute source file paths derived from entity metadata', async () => {
+    const { sourcePaths } = await loadEntityMetadata(config);
+
+    expect(sourcePaths.length).toBeGreaterThan(0);
+    for (const p of sourcePaths) {
+      expect(path.isAbsolute(p)).toBe(true);
+    }
+    expect(sourcePaths.some((p) => p.endsWith(path.join('fixtures', 'entities', 'Author.ts')))).toBe(true);
+  });
+
+  it('sourcePaths excludes pivot tables that have no declared file', async () => {
+    const { sourcePaths } = await loadEntityMetadata(config);
+
+    expect(sourcePaths.some((p) => p.includes('post_tags'))).toBe(false);
+  });
+
+  it('sourcePaths has no duplicates', async () => {
+    const { sourcePaths } = await loadEntityMetadata(config);
+
+    expect(sourcePaths.length).toBe(new Set(sourcePaths).size);
   });
 });

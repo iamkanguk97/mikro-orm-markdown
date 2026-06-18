@@ -19,6 +19,7 @@ export class Author {
   @Property({ type: 'string', unique: true })
   email!: string;
 
+  /** @atLeastOne */
   @OneToMany({ entity: () => 'Post', mappedBy: 'author' })
   posts = new Collection<Post>(this);
 }

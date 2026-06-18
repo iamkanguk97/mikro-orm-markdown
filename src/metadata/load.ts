@@ -1,3 +1,4 @@
+import * as path from 'node:path';
 import type { EntityMetadata, Options } from '@mikro-orm/core';
 import { MikroORM } from '@mikro-orm/core';
 
@@ -12,14 +13,21 @@ export class MetadataLoadError extends Error {
   }
 }
 
+export interface LoadedEntityMetadata {
+  metas: EntityMetadata[];
+  /** Absolute paths to the source files each entity class was declared in, deduped. */
+  sourcePaths: string[];
+}
+
 /**
  * Runs MikroORM entity discovery without connecting to the database,
- * and returns all discovered EntityMetadata objects.
+ * and returns all discovered EntityMetadata objects along with the
+ * absolute source file paths they were declared in (for JSDoc extraction).
  *
  * The caller is responsible for filtering (e.g. excluding abstract,
  * embeddable, or pivot entities) based on rendering needs.
  */
-export async function loadEntityMetadata(options: Options): Promise<EntityMetadata[]> {
+export async function loadEntityMetadata(options: Options): Promise<LoadedEntityMetadata> {
   let orm: MikroORM;
   try {
     orm = await MikroORM.init({
@@ -43,5 +51,8 @@ export async function loadEntityMetadata(options: Options): Promise<EntityMetada
     );
   }
 
-  return all;
+  const baseDir = orm.config.get('baseDir');
+  const sourcePaths = [...new Set(all.filter((m) => m.path).map((m) => path.resolve(baseDir, m.path)))];
+
+  return { metas: all, sourcePaths };
 }

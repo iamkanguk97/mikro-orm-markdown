@@ -1,7 +1,11 @@
-import type { EntityMetadata } from '@mikro-orm/core';
-import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo } from '../docs/jsdoc.js';
+import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
+import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo, PropJsDocMap } from '../docs/jsdoc.js';
 import { buildDiagramModel } from '../render/mermaid.js';
 import type { EntityModel, RelationEdge } from './types.js';
+
+// Mermaid cardinality tokens upgrading the "many" side from zero-or-more to one-or-more.
+const FROM_ONE_OR_MORE = '}|';
+const TO_ONE_OR_MORE = '|{';
 
 /** An entity with its structural model and JSDoc info merged together. */
 export interface EnrichedEntity {
@@ -48,7 +52,8 @@ export function buildDocumentModel(
   title: string,
   description?: string
 ): DocumentModel {
-  const { entities: diagramEntities, relations: allRelations } = buildDiagramModel(metas);
+  const { entities: diagramEntities, relations } = buildDiagramModel(metas);
+  const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props);
 
   // Build enriched entity map, filtering out @hidden entities.
   const enrichedByClass = new Map<string, EnrichedEntity>();
@@ -108,6 +113,63 @@ export function buildDocumentModel(
   });
 
   return { title, groups, ...(description !== undefined && { description }) };
+}
+
+/**
+ * Upgrades the "many" side of a relation edge to one-or-more for collection
+ * properties tagged with @atLeastOne. The edge is always built from the owning
+ * side, so a collection on the inverse side is matched back via its mappedBy.
+ * Returns a new array; input edges are not mutated.
+ */
+function applyAtLeastOne(relations: RelationEdge[], metas: EntityMetadata[], props: PropJsDocMap): RelationEdge[] {
+  const adjusted = relations.map((edge) => ({ ...edge }));
+  const metaByClass = new Map(metas.map((m) => [m.className, m]));
+
+  for (const [className, propMap] of props) {
+    const meta = metaByClass.get(className);
+    if (!meta) {
+      continue;
+    }
+    for (const [propName, info] of propMap) {
+      if (!info.atLeastOne) {
+        continue;
+      }
+      const prop = meta.properties[propName];
+      if (!prop) {
+        continue;
+      }
+
+      // 1:N collection — the edge comes from the m:1 owning side; bump its "many" (from) side.
+      if (prop.kind === ReferenceKind.ONE_TO_MANY && prop.mappedBy) {
+        const edge = adjusted.find(
+          (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
+        );
+        if (edge) {
+          edge.fromCardinality = FROM_ONE_OR_MORE;
+        }
+      }
+      // M:N owning collection — edge built from this prop; the other (to) side becomes one-or-more.
+      else if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.owner === true) {
+        const edge = adjusted.find(
+          (e) => e.fromEntity === className && e.toEntity === prop.type && e.label === propName
+        );
+        if (edge) {
+          edge.toCardinality = TO_ONE_OR_MORE;
+        }
+      }
+      // M:N inverse collection — edge built from the owner; this (from) side becomes one-or-more.
+      else if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.mappedBy) {
+        const edge = adjusted.find(
+          (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
+        );
+        if (edge) {
+          edge.fromCardinality = FROM_ONE_OR_MORE;
+        }
+      }
+    }
+  }
+
+  return adjusted;
 }
 
 function hasNoNamespaceTags(jsDoc: EntityJsDocInfo | undefined): boolean {

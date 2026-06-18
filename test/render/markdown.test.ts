@@ -1,4 +1,3 @@
-import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
@@ -6,11 +5,9 @@ import { buildDocumentModel } from '../../src/model/build.js';
 import { renderMarkdown } from '../../src/render/markdown.js';
 import config from '../fixtures/mikro-orm.config.js';
 
-const FIXTURES_GLOB = path.resolve(import.meta.dirname, '../fixtures/entities/*.ts');
-
 async function getMarkdown(): Promise<string> {
-  const metas = await loadEntityMetadata(config);
-  const jsDocResult = loadJsDoc([FIXTURES_GLOB]);
+  const { metas, sourcePaths } = await loadEntityMetadata(config);
+  const jsDocResult = loadJsDoc(sourcePaths);
   const docModel = buildDocumentModel(metas, jsDocResult, 'Test DB');
   return renderMarkdown(docModel);
 }
@@ -79,6 +76,19 @@ describe('renderMarkdown — column table', () => {
   it('property JSDoc description appears in column table', async () => {
     const md = await getMarkdown();
     expect(md).toContain('| name | string |  |  | 작성자 이름 |');
+  });
+
+  it('falls back to @Property({ comment }) when a column has no JSDoc', async () => {
+    const md = await getMarkdown();
+    // Customer.name has no JSDoc, only a comment
+    expect(md).toContain('| name | string |  |  | 고객 이름 |');
+  });
+
+  it('JSDoc description wins over @Property({ comment }) when both exist', async () => {
+    const md = await getMarkdown();
+    // Post.body has both a JSDoc comment and a DDL comment — JSDoc must win
+    expect(md).toContain('게시글 본문');
+    expect(md).not.toContain('DB 본문 코멘트');
   });
 
   it('nullable column shows Y in Nullable cell', async () => {

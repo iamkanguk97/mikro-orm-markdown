@@ -11,7 +11,7 @@ export class Customer {
   @PrimaryKey({ type: 'integer' })
   id!: number;
 
-  @Property({ type: 'string' })
+  @Property({ type: 'string', comment: '고객 이름' })
   name!: string;
 
   @Embedded(() => Address)

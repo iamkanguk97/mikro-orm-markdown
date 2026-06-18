@@ -16,7 +16,7 @@ export class Post {
   title!: string;
 
   /** 게시글 본문 */
-  @Property({ type: 'text', nullable: true })
+  @Property({ type: 'text', nullable: true, comment: 'DB 본문 코멘트' })
   body?: string;
 
   /** 작성자 */

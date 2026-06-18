@@ -55,7 +55,13 @@
     "prepare": "husky"
   },
   "peerDependencies": {
-    "@mikro-orm/core": ">=6.0.0"
+    "@mikro-orm/core": ">=6.0.0",
+    "tsx": ">=4.0.0"
+  },
+  "peerDependenciesMeta": {
+    "tsx": {
+      "optional": true
+    }
   },
   "dependencies": {
     "commander": "^12.0.0",

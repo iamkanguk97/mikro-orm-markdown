@@ -8,7 +8,7 @@ import config from '../fixtures/mikro-orm.config.js';
 
 describe('buildDiagramModel', () => {
   async function getModel(): Promise<DiagramModel> {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     return buildDiagramModel(metas);
   }
 
@@ -86,7 +86,7 @@ describe('buildDiagramModel', () => {
 
 describe('buildDiagramModel — Embeddable', () => {
   async function getModel(): Promise<DiagramModel> {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     return buildDiagramModel(metas);
   }
 
@@ -130,7 +130,7 @@ describe('buildDiagramModel — Embeddable', () => {
 
 describe('buildDiagramModel — @Formula', () => {
   async function getModel(): Promise<DiagramModel> {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     return buildDiagramModel(metas);
   }
 
@@ -161,7 +161,7 @@ describe('buildDiagramModel — @Formula', () => {
 
 describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
   async function getModel(): Promise<DiagramModel> {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     return buildDiagramModel(metas);
   }
 
@@ -217,7 +217,7 @@ describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
 
 describe('buildDiagramModel — Constraints', () => {
   async function getModel(): Promise<DiagramModel> {
-    const metas = await loadEntityMetadata(config);
+    const { metas } = await loadEntityMetadata(config);
     return buildDiagramModel(metas);
   }
 

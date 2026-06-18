@@ -19,6 +19,8 @@ export interface EntityJsDocInfo {
 export interface PropJsDocInfo {
   /** Property description text. */
   description?: string;
+  /** True when the @atLeastOne tag is present — a collection relation that must hold ≥1 elements. */
+  atLeastOne: boolean;
 }
 
 /** Keyed by entity class name. */
@@ -33,18 +35,18 @@ export interface JsDocResult {
 }
 
 /**
- * Parses TypeScript source files matched by the provided globs and extracts
- * JSDoc descriptions and custom tags (@namespace, @erd, @describe, @hidden)
- * from entity classes and their properties.
+ * Parses the given TypeScript source files and extracts JSDoc descriptions
+ * and custom tags (@namespace, @erd, @describe, @hidden) from entity classes
+ * and their properties.
  *
- * Returns empty maps if no source files are matched or no JSDoc is found.
+ * Returns empty maps if no source files are given or no JSDoc is found.
  * Never throws — errors are silently ignored so missing docs don't block generation.
  */
-export function loadJsDoc(srcGlobs: string[]): JsDocResult {
+export function loadJsDoc(filePaths: string[]): JsDocResult {
   const entities: EntityJsDocMap = new Map();
   const props: PropJsDocMap = new Map();
 
-  if (srcGlobs.length === 0) {
+  if (filePaths.length === 0) {
     return { entities, props };
   }
 
@@ -57,7 +59,7 @@ export function loadJsDoc(srcGlobs: string[]): JsDocResult {
     },
   });
 
-  project.addSourceFilesAtPaths(srcGlobs);
+  project.addSourceFilesAtPaths(filePaths);
 
   for (const sourceFile of project.getSourceFiles()) {
     for (const cls of sourceFile.getClasses()) {
@@ -77,9 +79,9 @@ export function loadJsDoc(srcGlobs: string[]): JsDocResult {
         if (propDocs.length === 0) {
           continue;
         }
-        const desc = extractDescription(propDocs);
-        if (desc !== undefined) {
-          propMap.set(prop.getName(), { description: desc });
+        const info = parsePropJsDoc(propDocs);
+        if (info.description !== undefined || info.atLeastOne) {
+          propMap.set(prop.getName(), info);
         }
       }
       if (propMap.size > 0) {
@@ -129,12 +131,21 @@ function parseEntityJsDoc(jsDocs: JSDoc[]): EntityJsDocInfo {
   };
 }
 
-function extractDescription(jsDocs: JSDoc[]): string | undefined {
+function parsePropJsDoc(jsDocs: JSDoc[]): PropJsDocInfo {
+  let description: string | undefined;
+  let atLeastOne = false;
+
   for (const doc of jsDocs) {
     const desc = doc.getDescription().trim();
-    if (desc) {
-      return desc;
+    if (desc && description === undefined) {
+      description = desc;
+    }
+    for (const tag of doc.getTags()) {
+      if (tag.getTagName() === 'atLeastOne') {
+        atLeastOne = true;
+      }
     }
   }
-  return undefined;
+
+  return { ...(description !== undefined && { description }), atLeastOne };
 }

@@ -95,6 +95,7 @@ function buildColumn(
       isForeignKey: false,
       isUnique: prop.unique === true,
       isNullable: prop.nullable === true,
+      ...(prop.comment !== undefined && { comment: prop.comment }),
       ...(formulaExpr !== undefined && { formula: formulaExpr }),
       ...(embeddedIn !== undefined && { embeddedIn }),
       ...(isDiscriminator && { isDiscriminator: true }),
@@ -112,6 +113,7 @@ function buildColumn(
       isForeignKey: true,
       isUnique: prop.unique === true,
       isNullable: prop.nullable === true,
+      ...(prop.comment !== undefined && { comment: prop.comment }),
     };
   }
 
@@ -187,7 +189,10 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
   return result;
 }
 
-/** Builds edges only from owning sides to avoid duplicate arrows. Includes STI inheritance. */
+/**
+ * Builds edges only from owning sides to avoid duplicate arrows.
+ * STI inheritance is not drawn as an edge — it is conveyed through table captions instead.
+ */
 function buildRelationEdges(metas: EntityMetadata[]): RelationEdge[] {
   const edges: RelationEdge[] = [];
 

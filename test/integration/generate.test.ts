@@ -1,23 +1,19 @@
-import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 import { generateMarkdown } from '../../src/index.js';
 import config from '../fixtures/mikro-orm.config.js';
-
-const FIXTURES_GLOB = path.resolve(import.meta.dirname, '../fixtures/entities/*.ts');
 
 describe('generateMarkdown', () => {
   it('returns a non-empty markdown string', async () => {
     const md = await generateMarkdown({
       orm: config,
       title: 'Integration Test',
-      src: [FIXTURES_GLOB],
     });
     expect(typeof md).toBe('string');
     expect(md.length).toBeGreaterThan(0);
   });
 
   it('includes the provided title as H1', async () => {
-    const md = await generateMarkdown({ orm: config, title: 'My Schema', src: [FIXTURES_GLOB] });
+    const md = await generateMarkdown({ orm: config, title: 'My Schema' });
     expect(md.startsWith('# My Schema')).toBe(true);
   });
 
@@ -27,16 +23,17 @@ describe('generateMarkdown', () => {
   });
 
   it('generates valid-looking Mermaid blocks', async () => {
-    const md = await generateMarkdown({ orm: config, src: [FIXTURES_GLOB] });
+    const md = await generateMarkdown({ orm: config });
     expect(md).toContain('```mermaid');
     expect(md).toContain('erDiagram');
     expect(md).toContain('```');
   });
 
-  it('without src, all entities fall into "default" section', async () => {
-    const md = await generateMarkdown({ orm: config, title: 'No JSDoc' });
-    expect(md).toContain('## default');
+  it('automatically derives JSDoc namespaces from entity source files without extra config', async () => {
+    const md = await generateMarkdown({ orm: config, title: 'Auto JSDoc' });
+    expect(md).toContain('## Blog');
     expect(md).toContain('### Author');
+    expect(md).toContain('> 글 작성자');
   });
 
   it('renders description paragraph below the H1 title', async () => {

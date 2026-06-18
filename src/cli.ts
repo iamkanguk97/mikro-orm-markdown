@@ -11,7 +11,40 @@ interface CliOptions {
   out: string;
   title: string;
   description?: string;
-  src?: string[];
+}
+
+/**
+ * Loads the MikroORM Options object from a config file.
+ *
+ * For `.ts` config files, registers the `tsx` loader at runtime so plain
+ * `node` can import TypeScript — the user only needs `tsx` installed,
+ * not a special invocation (`node --import tsx ...`).
+ */
+async function loadOrmOptions(configPath: string): Promise<Options> {
+  if (configPath.endsWith('.ts')) {
+    try {
+      const { register } = await import('tsx/esm/api');
+      register();
+    } catch {
+      throw new Error('TypeScript config files require the "tsx" package.\nInstall it with: npm install -D tsx');
+    }
+  }
+
+  const mod = (await import(configPath)) as { default?: unknown };
+
+  if (mod.default === undefined) {
+    throw new Error('Config file must use a default export, e.g. `export default defineConfig({ ... })`.');
+  }
+
+  const config = mod.default;
+  if (typeof config === 'function' || config instanceof Promise) {
+    throw new Error(
+      'Config file default export must be a configuration object, not a function or Promise.\n' +
+        'Resolve it first, or use the programmatic API instead (see README).'
+    );
+  }
+
+  return config as Options;
 }
 
 async function run(opts: CliOptions): Promise<void> {
@@ -20,14 +53,10 @@ async function run(opts: CliOptions): Promise<void> {
 
   let ormOptions: Options;
   try {
-    const mod = (await import(configPath)) as { default?: unknown };
-    ormOptions = mod.default ?? mod;
+    ormOptions = await loadOrmOptions(configPath);
   } catch (err) {
-    const hint = configPath.endsWith('.ts')
-      ? '\nHint: TypeScript configs require tsx or ts-node:\n  npx tsx ./node_modules/.bin/mikro-orm-markdown ...'
-      : '';
     process.stderr.write(
-      `Error: Cannot load config: ${configPath}\n${err instanceof Error ? err.message : String(err)}${hint}\n`
+      `Error: Cannot load config: ${configPath}\n${err instanceof Error ? err.message : String(err)}\n`
     );
     process.exit(1);
   }
@@ -37,7 +66,6 @@ async function run(opts: CliOptions): Promise<void> {
     markdown = await generateMarkdown({
       orm: ormOptions,
       title: opts.title,
-      src: opts.src ?? [],
       ...(opts.description !== undefined && { description: opts.description }),
     });
   } catch (err) {
@@ -57,7 +85,6 @@ const program = new Command()
   .option('-o, --out <path>', 'Output markdown file path', './ERD.md')
   .option('-t, --title <string>', 'Document title', 'Database Schema')
   .option('-d, --description <string>', 'Optional description paragraph shown below the title')
-  .option('-s, --src <glob>', 'JSDoc source glob (repeatable)', (val: string, prev: string[] = []) => [...prev, val])
   .action(run);
 
 program.parseAsync(process.argv).catch((err: unknown) => {

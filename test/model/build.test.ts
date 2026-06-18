@@ -1,15 +1,12 @@
-import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDocumentModel, type DocumentModel } from '../../src/model/build.js';
 import config from '../fixtures/mikro-orm.config.js';
 
-const FIXTURES_GLOB = path.resolve(import.meta.dirname, '../fixtures/entities/*.ts');
-
 async function getDocModel(): Promise<DocumentModel> {
-  const metas = await loadEntityMetadata(config);
-  const jsDocResult = loadJsDoc([FIXTURES_GLOB]);
+  const { metas, sourcePaths } = await loadEntityMetadata(config);
+  const jsDocResult = loadJsDoc(sourcePaths);
   return buildDocumentModel(metas, jsDocResult, 'Test DB');
 }
 
@@ -29,8 +26,8 @@ describe('buildDocumentModel — groups', () => {
   });
 
   it('"default" is sorted last when it exists', async () => {
-    const metas = await loadEntityMetadata(config);
-    // Pass empty globs so no JSDoc loaded → all entities fall into "default"
+    const { metas } = await loadEntityMetadata(config);
+    // Pass empty jsDocResult so no JSDoc loaded → all entities fall into "default"
     const docModel = buildDocumentModel(metas, { entities: new Map(), props: new Map() }, 'T');
     const groupNames = docModel.groups.map((g) => g.name);
     expect(groupNames[groupNames.length - 1]).toBe('default');
@@ -73,6 +70,20 @@ describe('buildDocumentModel — Blog group', () => {
     const hasExtendsEdge = blog.erdRelations.some((r) => r.label === 'extends');
     expect(hasExtendsEdge).toBe(false);
   });
+
+  it('@atLeastOne on Author.posts upgrades the Post→Author edge to one-or-more', async () => {
+    const docModel = await getDocModel();
+    const blog = docModel.groups.find((g) => g.name === 'Blog')!;
+    const authorEdge = blog.erdRelations.find((r) => r.label === 'author')!;
+    expect(authorEdge.fromCardinality).toBe('}|');
+  });
+
+  it('edges without @atLeastOne keep zero-or-more on the many side', async () => {
+    const docModel = await getDocModel();
+    const blog = docModel.groups.find((g) => g.name === 'Blog')!;
+    const tagsEdge = blog.erdRelations.find((r) => r.label === 'tags')!;
+    expect(tagsEdge.fromCardinality).toBe('}o');
+  });
 });
 
 describe('buildDocumentModel — Animals group', () => {
@@ -95,8 +106,8 @@ describe('buildDocumentModel — Animals group', () => {
 
 describe('buildDocumentModel — @hidden', () => {
   it('hidden entities are excluded from all groups', async () => {
-    const metas = await loadEntityMetadata(config);
-    const jsDocResult = loadJsDoc([FIXTURES_GLOB]);
+    const { metas, sourcePaths } = await loadEntityMetadata(config);
+    const jsDocResult = loadJsDoc(sourcePaths);
     // Manually set Author as hidden
     jsDocResult.entities.set('Author', {
       namespaces: ['Blog'],

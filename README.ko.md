@@ -10,25 +10,31 @@
 
 > [@samchon](https://github.com/samchon)의 [prisma-markdown](https://github.com/samchon/prisma-markdown)에서 큰 영감을 받았습니다. 좋은 아이디어에 감사드립니다.
 
-MikroORM에서도 동일한 ERD + Markdown 경험을 제공하며, Prisma로는 표현할 수 없는 MikroORM 고유 개념도 함께 시각화합니다.
+## 주요 기능
+
+- **Mermaid ERD 다이어그램** — JSDoc 태그로 원하는 섹션에 묶어서 표현
+  - 엔티티별 컬럼 테이블 (타입, 키, nullable 여부, 설명 포함)
+  - NamingStrategy가 적용된 실제 DB 컬럼명
+  - 인덱스 및 제약 조건
+- **실행 중인 DB 연결 불필요** — MikroORM 설정에서 엔티티 메타데이터를 직접 읽습니다
+- PostgreSQL, MySQL/MariaDB, SQLite, MSSQL 등 MikroORM SQL 드라이버 지원
+
+### MikroORM 고유 개념
+
+Prisma 기반 도구로는 표현할 수 없는 MikroORM 고유 개념도 함께 시각화합니다.
 
 - **Embeddable** — 별도 테이블 없이 소유 엔티티의 테이블 안에 컬럼을 펼쳐서 저장하는 값 객체입니다. 예를 들어 `Address` 값 객체는 `address_street`, `address_city` 등의 컬럼으로 저장됩니다. DDD의 Value Object와 같은 개념입니다.
 - **Single Table Inheritance (STI)** — `Dog`, `Cat` 같은 자식 클래스가 `animals` 테이블 하나를 공유합니다. `type` 같은 discriminator 컬럼으로 어떤 자식 클래스인지 구분합니다.
 - **@Formula** — 실제 DB 컬럼 없이 SELECT 시 SQL 식으로 값을 계산하는 가상 컬럼입니다. 예를 들어 `LENGTH(name)`은 DB에 컬럼이 없지만 조회 시 이름의 길이를 반환합니다.
 
-> 이 기능들은 MikroORM에서 완전히 지원하지만 실무에서는 자주 쓰이지 않을 수 있습니다. 특히 Embeddable은 MikroORM Entity를 Domain Entity로 함께 사용하는 구조에서 주로 활용되며, ORM 레이어와 도메인 모델을 분리해서 관리한다면 사용할 일이 거의 없습니다.
-
-- NamingStrategy가 적용된 **실제 DB 컬럼명**
-- **인덱스 및 제약 조건**
-
-PostgreSQL, MySQL/MariaDB, SQLite, MSSQL 같은 MikroORM SQL 드라이버에서 동작합니다. 기존 DB 스키마를 직접 introspection하지 않고 MikroORM 설정에서 엔티티 메타데이터를 읽기 때문에 실행 중인 DB 연결이 필요하지 않습니다.
+> 이 기능들은 MikroORM에서 완전히 지원하지만 실무에서는 자주 쓰이지 않을 수 있습니다. 특히 Embeddable은 값 객체(예: `Address`를 `address_*` 컬럼들로 묶기)에 가장 자연스러워 MikroORM Entity를 Domain Entity로 함께 사용하는 구조에서 흔히 쓰이지만, 반복되는 컬럼 묶음을 중복 제거하거나 값을 JSON 컬럼으로 저장하는 등 순수 ORM 용도로도 유용합니다.
 
 ## 요구사항
 
 - Node.js >= 18
 - `@mikro-orm/core` >= 6 (peer dependency)
 - 사용할 DB에 맞는 MikroORM 드라이버 패키지가 설치된 MikroORM 설정 파일
-- TypeScript 설정 파일 사용 시 `tsx` 또는 `ts-node` 필요
+- 데코레이터 기반 엔티티 (`@Entity()`) — `EntitySchema`로 정의한 엔티티는 현재 지원하지 않습니다
 
 ## 설치
 
@@ -40,25 +46,18 @@ pnpm add -D mikro-orm-markdown
 
 ## 빠른 시작
 
-`package.json`에 스크립트를 한 번 등록합니다:
+`package.json`에 스크립트를 추가하고, `--config`에 MikroORM config 파일 경로를 지정하세요:
 
 ```json
 {
   "scripts": {
-    "erd": "mikro-orm-markdown --config ./mikro-orm.config.js --out ./ERD.md --title 'My Database' --src 'src/entities/**/*.ts'"
+    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title 'My Database'"
   }
 }
 ```
 
-TypeScript 설정 파일을 사용한다면 `tsx`를 앞에 붙입니다:
-
-```json
-{
-  "scripts": {
-    "erd": "tsx ./node_modules/.bin/mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title 'My Database' --src 'src/entities/**/*.ts'"
-  }
-}
-```
+- **`.ts` config** — `tsx`를 devDependency로 설치하세요 (`npm install -D tsx`). CLI가 자동으로 로드합니다.
+- **`.js` config** — 추가 패키지 불필요. 직접 작성한 파일이든, 빌드 결과물(예: `./dist/mikro-orm.config.js`)이든 상관없습니다.
 
 이후에는 아래 명령어 하나로 실행합니다:
 
@@ -73,11 +72,13 @@ npm run erd
 | `-c, --config <path>`  | _(필수)_          | MikroORM 설정 파일 경로                                               |
 | `-o, --out <path>`     | `./ERD.md`        | 출력 Markdown 파일 경로                                               |
 | `-t, --title <string>` | `Database Schema` | 문서 H1 제목                                                          |
-| `-s, --src <glob>`     | —                 | 엔티티 소스 파일 glob 패턴 (반복 가능). JSDoc 태그 추출에 사용됩니다. |
+| `-d, --description <string>` | —           | 제목 아래에 표시할 설명 문단 (선택)                                   |
+
+> 설명이 길거나 여러 줄이라면 CLI 대신 [프로그래밍 API](#프로그래밍-api)를 사용하세요 — 쉘 인용 부호 제약 없이 문자열을 그대로 전달할 수 있습니다.
 
 ## JSDoc 태그
 
-엔티티 클래스에 JSDoc 태그를 추가해 문서의 섹션과 노출 여부를 제어합니다.
+엔티티 클래스에 JSDoc 태그를 추가해 문서의 섹션과 노출 여부를 제어합니다. JSDoc 주석은 데코레이터 기반 엔티티 소스 파일에서 직접 읽어오며, 별도 설정이 필요 없습니다.
 
 ```typescript
 /**
@@ -92,6 +93,8 @@ export class Post {
 }
 ```
 
+태그가 없는 일반 JSDoc 텍스트는 설명이 됩니다. **클래스** 위 텍스트는 엔티티 설명, **프로퍼티** 위 텍스트는 해당 컬럼 설명이 됩니다. 프로퍼티에 JSDoc이 없으면 `@Property({ comment })` 값(DDL 컬럼 코멘트)을 컬럼 설명으로 대신 사용합니다.
+
 | 태그                | 설명                                  |
 | ------------------- | ------------------------------------- |
 | `@namespace <Name>` | `Name` 섹션에 포함 (ERD + 본문 표)    |
@@ -102,14 +105,77 @@ export class Post {
 태그가 없는 엔티티는 `default` 섹션에 들어갑니다.
 하나의 엔티티에 여러 태그를 지정할 수 있습니다.
 
+### 관계 카디널리티: `@atLeastOne`
+
+컬렉션 관계(`1:N` 또는 `M:N`)는 기본적으로 _0개 이상_으로 렌더링됩니다. 컬렉션 프로퍼티에 `@atLeastOne`를 붙이면 _1개 이상_으로 표시됩니다:
+
+```typescript
+@Entity()
+export class Author {
+  /** @atLeastOne */
+  @OneToMany(() => Post, (post) => post.author)
+  posts = new Collection<Post>(this);
+}
+```
+
+이렇게 하면 ERD 관계선이 `Post }o--|| Author`에서 `Post }|--|| Author`로 바뀝니다. 이는 문서용 힌트일 뿐이며 — MikroORM에는 스키마 레벨의 최소 개수 개념이 없어 실제로 강제되지는 않습니다. (Mermaid는 0개 이상 / 1개 이상만 구분하므로 그보다 큰 최소값은 표현할 수 없습니다.)
+
+하나의 관계선은 **양 끝이 따로 결정**됩니다:
+
+- **단수(1) 쪽** (`@ManyToOne`, 또는 소유 측 `@OneToOne`) — 스키마에서 자동으로 읽으며 태그가 필요 없습니다: 기본 _정확히 1_ (`||`), `nullable: true`이면 _0 또는 1_ (`o|`).
+- **컬렉션(N) 쪽** (`@OneToMany` / `@ManyToMany`) — 기본 _0개 이상_ (`}o`), `@atLeastOne`을 붙이면 _1개 이상_ (`}|`).
+
+네 가지 조합 (`Post` ↔ `Author`):
+
+```text
+Post }o--|| Author   →  작성자 글 0개+,  글은 작성자 정확히 1명   (기본)
+Post }o--o| Author   →  작성자 글 0개+,  글은 작성자 0~1명        (nullable: true)
+Post }|--|| Author   →  작성자 글 1개+,  글은 작성자 정확히 1명   (@atLeastOne)
+Post }|--o| Author   →  작성자 글 1개+,  글은 작성자 0~1명        (둘 다)
+```
+
 > **NestJS Swagger Plugin**: `@namespace`, `@erd`, `@describe`, `@hidden`은 Swagger가 인식하지 못하는 커스텀 태그이므로 무시됩니다. 엔티티 클래스를 DTO로 직접 사용하는 구조라면 JSDoc 설명이 Swagger 문서에도 함께 표시될 수 있지만, 기능적인 충돌은 없습니다.
 
 ## 출력 예시
 
-네임스페이스마다 섹션이 생성되고, 각 섹션에는 Mermaid ERD 블록과 엔티티별 컬럼 표가 포함됩니다.
+다음과 같은 엔티티가 있다고 가정합니다:
 
-````markdown
-## Blog
+```typescript
+/**
+ * 등록된 사용자가 작성한 블로그 게시글입니다.
+ * @namespace Blog
+ */
+@Entity()
+export class Post {
+  @PrimaryKey()
+  id!: number;
+
+  /** 게시글 제목 */
+  @Property()
+  title!: string;
+
+  @Property({ type: 'text', nullable: true })
+  body?: string;
+
+  @ManyToOne(() => Author)
+  author!: Author;
+}
+
+/** @namespace Blog */
+@Entity()
+export class Author {
+  @PrimaryKey()
+  id!: number;
+
+  @Property()
+  name!: string;
+
+  @Property({ unique: true })
+  email!: string;
+}
+```
+
+두 엔티티 모두 `@namespace Blog` 태그를 가지므로 하나의 `## Blog` 섹션에 묶입니다. 이 섹션의 ERD는 GitHub에서 다음과 같이 렌더링됩니다:
 
 ```mermaid
 erDiagram
@@ -127,6 +193,16 @@ erDiagram
   Post }o--|| Author : "author"
 ```
 
+**코드가 출력으로 어떻게 매핑되는가:**
+
+- `@namespace Blog` → 두 엔티티가 `## Blog` 섹션 아래로 묶임
+- `@ManyToOne(() => Author)` → `Post }o--|| Author` 관계선과 `author_id FK` 컬럼
+- `email`의 `@Property({ unique: true })` → `email`이 `UK`로 표시됨
+- `/** 게시글 제목 */` → `title`의 **Description** 칸을 채움
+
+각 엔티티는 생성된 `ERD.md`에서 컬럼 표로도 표현됩니다:
+
+```markdown
 ### Post
 
 > 등록된 사용자가 작성한 블로그 게시글입니다.
@@ -137,7 +213,7 @@ erDiagram
 | title     | string  |             |          | 게시글 제목 |
 | body      | text    |             | Y        |             |
 | author_id | integer | FK (author) |          |             |
-````
+```
 
 **Key 컬럼 주석 의미:**
 
@@ -170,9 +246,52 @@ export class Dog extends Animal {
 }
 ```
 
-엔티티에 `discriminatorColumn`이 설정되어 있으면 `mikro-orm-markdown`이 자동으로 감지해 출력에 discriminator 컬럼을 표시합니다.
+엔티티에 `discriminatorColumn`이 설정되어 있으면 `mikro-orm-markdown`이 자동으로 감지합니다. 서브클래스들은 물리적으로 하나의 테이블을 공유하지만, 다이어그램에서는 **각 클래스가 별도 박스**로 그려져 서브클래스마다 실제 컬럼 구성을 보여줍니다:
+
+```mermaid
+erDiagram
+  Animal {
+    integer id PK
+    string name
+    string type "discriminator"
+  }
+  Dog {
+    integer id PK
+    string name
+    string type
+    string breed
+  }
+```
+
+루트(`Animal`)는 공유 컬럼만 나열하고 discriminator(`type`)를 표시하며, 각 서브클래스(`Dog`)는 상속 컬럼을 반복한 뒤 자기 컬럼을 추가합니다.
 
 > **대부분의 프로젝트에는 권장하지 않습니다.** STI는 테이블 단순화 대신 쿼리 복잡도 증가와 nullable 컬럼 낭비를 초래합니다. 여러 엔티티 타입을 하나의 테이블에 저장해야 하는 명확한 이유가 있을 때만 사용하세요.
+
+## 문제 해결
+
+**"엔티티가 발견되지 않았습니다" (No entities were discovered)**
+
+MikroORM config가 엔티티를 0개 찾은 경우입니다. 보통 CLI가 config를 로드하는 방식과 엔티티 경로가 맞지 않아 발생합니다.
+
+- `.ts` config를 사용 중이라면(CLI가 `tsx`를 자동으로 로드합니다), `entitiesTs`가 TypeScript 소스 파일을 가리키는지 확인하세요.
+- 빌드된 `.js` config를 사용 중이라면, `entities`가 **빌드 결과물**(예: `./dist/**/*.entity.js`)을 가리키고 빌드를 먼저 실행했는지 확인하세요.
+- MikroORM은 TypeScript 모드에서는 `entitiesTs`를, 그 외에는 `entities`를 사용합니다. 폴더/파일 기반 discovery를 쓴다면 두 옵션을 모두 지정하세요.
+
+**"Cannot find module '@/...'" (경로 alias)**
+
+config나 엔티티에서 `tsconfig`의 경로 alias(예: `@/entities/user`)를 사용한다면, config 파일의 위치에 따라 `tsx`가 이를 해석하지 못할 수 있습니다. config 파일을 `tsconfig.json`과 같은 프로젝트 루트에 두면 이 문제를 피할 수 있습니다.
+
+**Config 파일 요구사항**
+
+config 파일은 일반 설정 객체를 **default export** 해야 합니다.
+
+```typescript
+export default defineConfig({ ... }); // ✅
+export const config = defineConfig({ ... }); // ❌ named export 미지원
+export default async () => defineConfig({ ... }); // ❌ 함수/Promise 미지원
+```
+
+config를 비동기적으로 만들어야 한다면, 아래 프로그래밍 API를 사용하세요.
 
 ## 고급 사용법
 
@@ -181,16 +300,16 @@ export class Dog extends Animal {
 커스텀 빌드 스크립트에 통합하거나 출력 결과를 직접 가공해야 할 때 사용합니다:
 
 ```typescript
+import { writeFile } from 'node:fs/promises';
 import { generateMarkdown } from 'mikro-orm-markdown';
 import ormConfig from './mikro-orm.config.js';
 
 const markdown = await generateMarkdown({
   orm: ormConfig,
   title: 'My Database',
-  src: ['src/entities/**/*.ts'],
 });
 
-await fs.writeFile('./ERD.md', markdown, 'utf-8');
+await writeFile('./ERD.md', markdown, 'utf-8');
 ```
 
 ## 라이선스

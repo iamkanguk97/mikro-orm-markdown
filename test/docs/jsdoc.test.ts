@@ -91,6 +91,20 @@ describe('loadJsDoc — property descriptions', () => {
   });
 });
 
+describe('loadJsDoc — @atLeastOne', () => {
+  it('parses @atLeastOne on a collection property', () => {
+    const result = loadJsDoc([FIXTURES_GLOB]);
+    const authorProps = result.props.get('Author');
+    expect(authorProps!.get('posts')?.atLeastOne).toBe(true);
+  });
+
+  it('properties without @atLeastOne have atLeastOne=false', () => {
+    const result = loadJsDoc([FIXTURES_GLOB]);
+    const authorProps = result.props.get('Author');
+    expect(authorProps!.get('name')?.atLeastOne).toBe(false);
+  });
+});
+
 describe('loadJsDoc — @hidden and @erd/@describe', () => {
   it('parses @hidden tag correctly', () => {
     // Use inline source via a temp glob that matches a known hidden entity.

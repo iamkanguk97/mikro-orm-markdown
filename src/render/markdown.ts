@@ -70,7 +70,8 @@ function renderColumnTable(entity: EnrichedEntity): string {
   const rows = entity.model.columns.map((col) => {
     const key = resolveColumnKey(col);
     const nullable = col.isNullable && !col.isPrimary ? 'Y' : '';
-    const desc = entity.propDocs.get(col.propName)?.description ?? '';
+    // JSDoc property description wins; fall back to the @Property({ comment }) DDL comment.
+    const desc = entity.propDocs.get(col.propName)?.description ?? col.comment ?? '';
     return `| ${col.fieldName} | ${col.type} | ${key} | ${nullable} | ${desc} |`;
   });
   return [header, sep, ...rows].join('\n');
