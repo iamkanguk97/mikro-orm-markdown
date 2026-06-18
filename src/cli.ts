@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 
+import * as syncFs from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command } from 'commander';
 import { generateMarkdown, MetadataLoadError } from './index.js';
@@ -13,6 +15,10 @@ interface CliOptions {
   description?: string;
 }
 
+export function toConfigImportSpecifier(configPath: string): string {
+  return pathToFileURL(path.resolve(configPath)).href;
+}
+
 /**
  * Loads the MikroORM Options object from a config file.
  *
@@ -20,7 +26,7 @@ interface CliOptions {
  * `node` can import TypeScript — the user only needs `tsx` installed,
  * not a special invocation (`node --import tsx ...`).
  */
-async function loadOrmOptions(configPath: string): Promise<Options> {
+export async function loadOrmOptions(configPath: string): Promise<Options> {
   if (configPath.endsWith('.ts')) {
     try {
       const { register } = await import('tsx/esm/api');
@@ -30,7 +36,8 @@ async function loadOrmOptions(configPath: string): Promise<Options> {
     }
   }
 
-  const mod = (await import(configPath)) as { default?: unknown };
+  const configUrl = toConfigImportSpecifier(configPath);
+  const mod = (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
 
   if (mod.default === undefined) {
     throw new Error('Config file must use a default export, e.g. `export default defineConfig({ ... })`.');
@@ -45,6 +52,24 @@ async function loadOrmOptions(configPath: string): Promise<Options> {
   }
 
   return config as Options;
+}
+
+function formatFileSystemError(cause: unknown): string {
+  if (cause instanceof Error) {
+    const code = 'code' in cause && typeof cause.code === 'string' ? ` (${cause.code})` : '';
+    return `${cause.message}${code}`;
+  }
+
+  return String(cause);
+}
+
+export async function writeMarkdownFile(outPath: string, markdown: string): Promise<void> {
+  try {
+    await fs.mkdir(path.dirname(outPath), { recursive: true });
+    await fs.writeFile(outPath, markdown, 'utf-8');
+  } catch (cause) {
+    throw new Error(`Cannot write output file: ${outPath}\n${formatFileSystemError(cause)}`, { cause });
+  }
 }
 
 async function run(opts: CliOptions): Promise<void> {
@@ -74,7 +99,13 @@ async function run(opts: CliOptions): Promise<void> {
     process.exit(1);
   }
 
-  await fs.writeFile(outPath, markdown, 'utf-8');
+  try {
+    await writeMarkdownFile(outPath, markdown);
+  } catch (err) {
+    process.stderr.write(`Error: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  }
+
   process.stdout.write(`✓ Written to ${path.relative(process.cwd(), outPath)}\n`);
 }
 
@@ -87,7 +118,23 @@ const program = new Command()
   .option('-d, --description <string>', 'Optional description paragraph shown below the title')
   .action(run);
 
-program.parseAsync(process.argv).catch((err: unknown) => {
-  process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
-  process.exit(1);
-});
+function isDirectCliExecution(): boolean {
+  const entryPoint = process.argv[1];
+
+  if (entryPoint === undefined) {
+    return false;
+  }
+
+  try {
+    return syncFs.realpathSync(path.resolve(entryPoint)) === syncFs.realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
+if (isDirectCliExecution()) {
+  program.parseAsync(process.argv).catch((err: unknown) => {
+    process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    process.exit(1);
+  });
+}
