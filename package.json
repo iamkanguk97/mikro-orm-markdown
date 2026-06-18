@@ -13,10 +13,15 @@
   ],
   "author": "iamkanguk97",
   "license": "MIT",
+  "packageManager": "npm@10.9.2",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/iamkanguk97/mikro-orm-markdown.git"
   },
+  "bugs": {
+    "url": "https://github.com/iamkanguk97/mikro-orm-markdown/issues"
+  },
+  "homepage": "https://github.com/iamkanguk97/mikro-orm-markdown#readme",
   "engines": {
     "node": ">=18.0.0"
   },
@@ -37,8 +42,11 @@
   "files": [
     "dist",
     "README.md",
+    "README.ko.md",
     "LICENSE",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "SECURITY.md",
+    "CODE_OF_CONDUCT.md"
   ],
   "scripts": {
     "build": "tsup",

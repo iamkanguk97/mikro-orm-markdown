@@ -11,6 +11,8 @@ const FORMULA_DUMMY_TABLE: FormulaTable = {
   toString: () => 'e0',
 };
 
+const UNRESOLVED_FORMULA = '<unresolved>';
+
 /**
  * Converts raw MikroORM EntityMetadata array into a DiagramModel.
  *
@@ -125,7 +127,8 @@ function buildColumn(
  * Calls the FormulaCallback with a dummy table and column proxy to extract the SQL expression.
  * String-based formulas (most common) ignore their arguments and return the literal string.
  * Function-based formulas use the alias/column names from the dummy objects.
- * Returns empty string on unexpected errors.
+ * Returns a visible fallback on unexpected errors so generated docs do not hide
+ * that the expression could not be resolved.
  */
 function resolveFormulaExpr(cb: (table: FormulaTable, cols: Record<string, string>) => string): string {
   try {
@@ -137,7 +140,7 @@ function resolveFormulaExpr(cb: (table: FormulaTable, cols: Record<string, strin
     );
     return cb(FORMULA_DUMMY_TABLE, cols);
   } catch {
-    return '';
+    return UNRESOLVED_FORMULA;
   }
 }
 

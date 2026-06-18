@@ -1,3 +1,4 @@
+import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
 import { describe, expect, it } from 'vitest';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import type { ColumnModel, DiagramModel, RelationEdge } from '../../src/model/types.js';
@@ -156,6 +157,31 @@ describe('buildDiagramModel — @Formula', () => {
     const nameLengthCol = customer!.columns.find((c) => c.propName === 'nameLength');
     // MikroORM applies NamingStrategy to formula properties too: nameLength → name_length
     expect(nameLengthCol!.fieldName).toBe('name_length');
+  });
+
+  it('uses a visible fallback when formula resolution fails', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'Report',
+      tableName: 'report',
+      properties: {
+        brokenFormula: {
+          name: 'brokenFormula',
+          fieldNames: ['broken_formula'],
+          type: 'integer',
+          kind: ReferenceKind.SCALAR,
+          formula: () => {
+            throw new Error('Cannot resolve formula');
+          },
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const report = model.entities.find((e) => e.className === 'Report');
+    const brokenFormula = report!.columns.find((c) => c.propName === 'brokenFormula');
+
+    expect(brokenFormula!.formula).toBe('<unresolved>');
+    expect(renderErDiagram(model)).toContain('integer broken_formula "formula: <unresolved>"');
   });
 });
 
