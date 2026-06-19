@@ -268,6 +268,37 @@ describe('buildDiagramModel — Constraints', () => {
   });
 });
 
+describe('buildDiagramModel — non-abstract STI root (M1)', () => {
+  // A non-abstract STI root is assigned its own discriminatorValue by MikroORM,
+  // and its property list includes the child-only columns marked inherited=true.
+  function makeNonAbstractStiRoot(): EntityMetadata {
+    return Object.assign({} as EntityMetadata, {
+      className: 'Vehicle',
+      tableName: 'vehicle',
+      discriminatorColumn: 'type',
+      discriminatorValue: 'vehicle',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
+        type: { name: 'type', fieldNames: ['type'], type: 'string', kind: ReferenceKind.SCALAR },
+        // child-only column that MikroORM surfaces on the root as inherited
+        doors: { name: 'doors', fieldNames: ['doors'], type: 'string', kind: ReferenceKind.SCALAR, inherited: true },
+      },
+    });
+  }
+
+  it('marks the root as an STI root and excludes inherited child columns', () => {
+    const model = buildDiagramModel([makeNonAbstractStiRoot()]);
+    const root = model.entities.find((e) => e.className === 'Vehicle')!;
+
+    expect(root.discriminatorColumn).toBe('type');
+    const fieldNames = root.columns.map((c) => c.fieldName);
+    expect(fieldNames).toEqual(['id', 'name', 'type']);
+    expect(fieldNames).not.toContain('doors');
+  });
+});
+
 describe('buildDiagramModel — composite foreign keys', () => {
   it('expands every FK fieldName and preserves referenced PK types', () => {
     const tenantMeta = Object.assign({} as EntityMetadata, {

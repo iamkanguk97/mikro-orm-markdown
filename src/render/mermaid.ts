@@ -34,9 +34,12 @@ export function buildDiagramModel(metas: EntityMetadata[]): DiagramModel {
 }
 
 function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityMetadata>): EntityModel {
-  // STI root: has discriminatorColumn, no discriminatorValue of its own.
-  // Its properties list includes all child-only columns (marked inherited=true) — filter them out.
-  const isStiRoot = meta.discriminatorColumn !== undefined && !meta.discriminatorValue;
+  // STI root: defines the discriminatorColumn and does not itself extend a parent.
+  // A *non-abstract* root is also assigned its own discriminatorValue by MikroORM,
+  // so we must not key off the absence of discriminatorValue here — that would
+  // misclassify non-abstract roots and leak every subclass column into them.
+  // The root's properties list includes all child-only columns (inherited=true) — filter them out.
+  const isStiRoot = meta.discriminatorColumn !== undefined && !meta.extends;
   const isStiChild = Boolean(meta.extends) && meta.discriminatorValue !== undefined;
 
   const columns: ColumnModel[] = [];

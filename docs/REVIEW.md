@@ -61,10 +61,11 @@
 
 ## 🟡 MEDIUM
 
-### [ ] M1. 비추상 STI 루트 오분류 → 자식 컬럼 누수 + discriminator 표기 누락
-- **위치:** `src/model/build.ts:39` (`isStiRoot`/`isStiChild`)
+### [x] M1. 비추상 STI 루트 오분류 → 자식 컬럼 누수 + discriminator 표기 누락
+- **위치:** `src/model/build.ts:39` (`isStiRoot`/`isStiChild`) — *실제로는 드리프트로 `src/render/mermaid.ts:37`에 있었음*
 - **문제:** `abstract:true` 없는 STI 루트는 MikroORM이 루트에도 `discriminatorValue` 부여 → `isStiRoot`가 false → `prop.inherited` 필터 미작동으로 모든 서브클래스 컬럼이 루트에 나오고 STI 노트/마커 사라짐(README 249–266 정반대).
 - **Fix:** 루트 판별을 `discriminatorColumn` 존재 + (자체 미상속) 기준으로 보강.
+- **완료(`다음 커밋`):** `isStiRoot`를 `discriminatorColumn !== undefined && !meta.extends`로 변경. 비추상 루트(`Vehicle`/`Car`) 재현으로 자식 컬럼 `doors` 누수 + 마커 누락 확인 → 수정 후 루트 컬럼 `[id,name,type]`, `discriminatorColumn='type'` 정상. 신규 테스트 1건, `npm test` 129 pass, `examples/ERD.md` 무변경.
 
 ### [ ] M2. `object:true`/`array:true` 임베디드가 단일 JSON 컬럼에 중복 행 생성
 - **위치:** `src/render/mermaid.ts:83` (`buildColumns`)
