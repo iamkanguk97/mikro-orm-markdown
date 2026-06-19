@@ -52,3 +52,16 @@ export function toMermaidIdentifier(value: string): string {
 export function escapeMermaidQuotedText(value: string): string {
   return normalizeInlineText(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
+
+/**
+ * Builds a GitHub-style heading anchor slug for in-document links.
+ * Lowercases, drops characters other than word chars / spaces / hyphens, then
+ * turns spaces into hyphens. Exact for identifier-style headings (e.g. namespace
+ * names), which is the only place this is used.
+ */
+export function toMarkdownAnchor(value: string): string {
+  return normalizeInlineText(value)
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-');
+}

@@ -24,6 +24,11 @@ export interface ColumnModel {
    * (e.g. "Address"). Enables grouping in the rendered output.
    */
   embeddedIn?: string;
+  /**
+   * For embedded flat columns: the original property name on the @Embeddable
+   * class (e.g. "street"). Used to look up that class's own JSDoc.
+   */
+  embeddedPropName?: string;
   /** True when this column is the STI discriminator column on the root entity. */
   isDiscriminator?: boolean;
 }

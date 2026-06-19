@@ -2,6 +2,13 @@
 
 Generated from the entities in examples/entities - a tour of every feature mikro-orm-markdown can render.
 
+## Contents
+
+- [Animals](#animals)
+- [Blog](#blog)
+- [Reporting](#reporting)
+- [Shop](#shop)
+
 ## Animals
 
 ```mermaid
@@ -85,8 +92,8 @@ erDiagram
     integer id PK
     string username UK
     string email UK
-    datetime created_at "createdAt"
-    integer profile_id FK "profile"
+    datetime created_at
+    integer profile_id FK
   }
   Tag {
     integer id PK
@@ -95,22 +102,22 @@ erDiagram
   Profile {
     integer id PK
     text bio
-    string avatar_url "avatarUrl"
+    string avatar_url
   }
   Post {
     integer id PK
     string title
     string status
     text body
-    integer author_id FK "author"
+    integer author_id FK
     integer body_length "formula: LENGTH(body)"
   }
   Comment {
     integer id PK
     text content
-    integer post_id FK "post"
-    integer author_id FK "author"
-    integer parent_id FK "parent"
+    integer post_id FK
+    integer author_id FK
+    integer parent_id FK
   }
   User ||--o| Profile : "profile"
   Post }o--|| User : "author"
@@ -162,7 +169,11 @@ erDiagram
 | status | string |  |  | One of: draft, published, archived |
 | body | text |  | Y | Full article body. |
 | author_id | integer | FK (author) |  | Author of the post (required — non-null relation). |
-| body_length | integer | formula: LENGTH(body) |  | Character length of the body, computed in SQL at query time (no physical column). |
+| body_length | integer |  |  | Character length of the body, computed in SQL at query time (no physical column). |
+
+**Computed columns:**
+
+- `body_length`: `LENGTH(body)`
 
 ### Comment
 
@@ -206,19 +217,19 @@ erDiagram
     integer id PK
     string sku UK
     string name
-    integer price_cents "priceCents"
+    integer price_cents
   }
   OrderItem {
     integer id PK
     integer quantity
-    integer order_id FK "order"
-    integer product_id FK "product"
+    integer order_id FK
+    integer product_id FK
   }
   Order {
     integer id PK
-    integer total_cents "totalCents"
-    datetime placed_at "placedAt"
-    integer customer_id FK "customer"
+    integer total_cents
+    datetime placed_at
+    integer customer_id FK
   }
   Customer {
     integer id PK
@@ -284,12 +295,16 @@ erDiagram
 | id | integer | PK |  |  |
 | name | string |  |  | Full legal name |
 | email | string |  |  | Billing email. |
-| name_length | integer | formula: LENGTH(name) |  | Number of characters in the name, computed in SQL (no physical column). |
-| address_street | string | [Address] |  |  |
-| address_city | string | [Address] |  |  |
-| address_zip_code | string | [Address] | Y |  |
+| name_length | integer |  |  | Number of characters in the name, computed in SQL (no physical column). |
+| address_street | string | [Address] |  | Street line. |
+| address_city | string | [Address] |  | City name. |
+| address_zip_code | string | [Address] | Y | Optional postal / ZIP code. |
 
 **Constraints:**
 
 - Index `customer_name_idx`: (name)
 - Unique `customer_email_uq`: (email)
+
+**Computed columns:**
+
+- `name_length`: `LENGTH(name)`

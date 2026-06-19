@@ -5,6 +5,7 @@ import {
   escapeMarkdownTableCell,
   renderMarkdownBlockQuote,
   renderMarkdownInlineCode,
+  toMarkdownAnchor,
 } from './escape.js';
 import { renderErDiagram } from './mermaid.js';
 
@@ -20,11 +21,25 @@ export function renderMarkdown(docModel: DocumentModel): string {
     sections.push(escapeMarkdownInline(docModel.description));
   }
 
+  // A table of contents only helps when there is more than one namespace section.
+  if (docModel.groups.length > 1) {
+    sections.push(renderTableOfContents(docModel.groups));
+  }
+
   for (const group of docModel.groups) {
     sections.push(renderGroupSection(group));
   }
 
   return sections.join('\n\n');
+}
+
+/** Renders a namespace-level table of contents linking to each group's H2 section. */
+function renderTableOfContents(groups: NamespaceGroup[]): string {
+  const lines = ['## Contents', ''];
+  for (const group of groups) {
+    lines.push(`- [${escapeMarkdownInline(group.name)}](#${toMarkdownAnchor(group.name)})`);
+  }
+  return lines.join('\n');
 }
 
 function renderGroupSection(group: NamespaceGroup): string {
@@ -67,6 +82,11 @@ function renderEntitySection(entity: EnrichedEntity): string {
     parts.push(renderConstraints(entity.model.constraints));
   }
 
+  const computedColumns = entity.model.columns.filter((col) => col.formula !== undefined);
+  if (computedColumns.length > 0) {
+    parts.push(renderComputedColumns(computedColumns));
+  }
+
   return parts.join('\n\n');
 }
 
@@ -100,9 +120,6 @@ function resolveColumnKey(col: ColumnModel): string {
   if (col.isUnique) {
     return 'UK';
   }
-  if (col.formula !== undefined) {
-    return `formula: ${col.formula}`;
-  }
   if (col.isDiscriminator) {
     return 'discriminator';
   }
@@ -110,6 +127,14 @@ function resolveColumnKey(col: ColumnModel): string {
     return `[${col.embeddedIn}]`;
   }
   return '';
+}
+
+function renderComputedColumns(columns: ColumnModel[]): string {
+  const lines = ['**Computed columns:**', ''];
+  for (const col of columns) {
+    lines.push(`- ${renderMarkdownInlineCode(col.fieldName)}: ${renderMarkdownInlineCode(col.formula ?? '')}`);
+  }
+  return lines.join('\n');
 }
 
 function renderConstraints(constraints: ConstraintModel[]): string {

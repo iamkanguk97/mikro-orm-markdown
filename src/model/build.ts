@@ -1,7 +1,7 @@
 import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
 import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo, PropJsDocMap } from '../docs/jsdoc.js';
 import { buildDiagramModel } from '../render/mermaid.js';
-import type { EntityModel, RelationEdge } from './types.js';
+import type { ColumnModel, EntityModel, RelationEdge } from './types.js';
 
 // Mermaid cardinality tokens upgrading the "many" side from zero-or-more to one-or-more.
 const FROM_ONE_OR_MORE = '}|';
@@ -62,7 +62,8 @@ export function buildDocumentModel(
     if (jsDoc?.hidden) {
       continue;
     }
-    const propDocs = jsDocResult.props.get(model.className) ?? new Map<string, PropJsDocInfo>();
+    const ownPropDocs = jsDocResult.props.get(model.className) ?? new Map<string, PropJsDocInfo>();
+    const propDocs = withEmbeddedPropDocs(ownPropDocs, model.columns, jsDocResult.props);
     enrichedByClass.set(model.className, { model, jsDoc, propDocs });
   }
 
@@ -113,6 +114,30 @@ export function buildDocumentModel(
   });
 
   return { title, groups, ...(description !== undefined && { description }) };
+}
+
+/**
+ * Falls back to the @Embeddable class's own JSDoc for flattened embedded columns
+ * (e.g. Customer's "address_street" picks up Address.street's JSDoc), since the
+ * owning entity's source file never declares that synthetic property name.
+ * Returns a new map; the input map is not mutated.
+ */
+function withEmbeddedPropDocs(
+  ownPropDocs: Map<string, PropJsDocInfo>,
+  columns: ColumnModel[],
+  allPropDocs: PropJsDocMap
+): Map<string, PropJsDocInfo> {
+  const merged = new Map(ownPropDocs);
+  for (const col of columns) {
+    if (merged.has(col.propName) || col.embeddedIn === undefined || col.embeddedPropName === undefined) {
+      continue;
+    }
+    const info = allPropDocs.get(col.embeddedIn)?.get(col.embeddedPropName);
+    if (info) {
+      merged.set(col.propName, info);
+    }
+  }
+  return merged;
 }
 
 /**

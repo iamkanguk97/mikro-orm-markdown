@@ -41,6 +41,29 @@ describe('renderMarkdown — structure', () => {
   });
 });
 
+describe('renderMarkdown — table of contents', () => {
+  it('renders a Contents section linking each namespace', async () => {
+    const md = await getMarkdown();
+    expect(md).toContain('## Contents');
+    expect(md).toContain('- [Animals](#animals)');
+    expect(md).toContain('- [Blog](#blog)');
+    expect(md).toContain('- [Shop](#shop)');
+  });
+
+  it('places the Contents section before the first namespace section', async () => {
+    const md = await getMarkdown();
+    expect(md.indexOf('## Contents')).toBeLessThan(md.indexOf('## Blog'));
+  });
+
+  it('omits the Contents section when there is only one group', () => {
+    const docModel: DocumentModel = {
+      title: 'Single',
+      groups: [{ name: 'default', erdEntities: [], erdRelations: [], textEntities: [] }],
+    };
+    expect(renderMarkdown(docModel)).not.toContain('## Contents');
+  });
+});
+
 describe('renderMarkdown — entity descriptions', () => {
   it('Author description appears as blockquote', async () => {
     const md = await getMarkdown();
@@ -105,14 +128,20 @@ describe('renderMarkdown — column table', () => {
 });
 
 describe('renderMarkdown — MikroORM specific columns', () => {
-  it('formula column shows formula expression in Key column', async () => {
+  it('formula column is listed in the Computed columns section', async () => {
     const md = await getMarkdown();
-    expect(md).toContain('formula: LENGTH(name)');
+    expect(md).toContain('**Computed columns:**');
+    expect(md).toContain('`LENGTH(name)`');
   });
 
   it('embedded columns show [Address] in Key column', async () => {
     const md = await getMarkdown();
     expect(md).toContain('[Address]');
+  });
+
+  it('embedded column falls back to the @Embeddable class JSDoc for its Description', async () => {
+    const md = await getMarkdown();
+    expect(md).toContain('| address_street | string | [Address] |  | 도로명 주소. |');
   });
 
   it('discriminator column shows "discriminator" in Key column', async () => {
@@ -226,7 +255,8 @@ describe('renderMarkdown — escaping', () => {
     expect(md).toContain('### Entity \\| &lt;One&gt; Next');
     expect(md).toContain('> First \\| line\n> \\# not heading');
     expect(md).toContain('| name\\|raw | string |  |  | doc \\| desc<br>&lt;b&gt;raw&lt;/b&gt; |');
-    expect(md).toContain('| score | integer | formula: sum(\\`score\\` \\| 1) |  |  |');
+    expect(md).toContain('| score | integer |  |  |  |');
+    expect(md).toContain('- `score`: ``sum(`score` | 1)``');
     expect(md).toContain('*STI root — discriminator column: ``kind`type``*');
     expect(md).toContain('- Check ``check`name``: `` score > `min` ``');
   });

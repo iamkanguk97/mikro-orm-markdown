@@ -79,9 +79,11 @@ function buildColumns(
 
     // Flat embedded columns carry `embedded: [ownerPropName, embeddedPropName]`
     let embeddedIn: string | undefined;
+    let embeddedPropName: string | undefined;
     if (prop.embedded !== undefined) {
       const parentPropName = prop.embedded[0];
       embeddedIn = owningMeta.properties[parentPropName]?.type;
+      embeddedPropName = prop.embedded[1];
     }
 
     const isDiscriminator =
@@ -99,6 +101,7 @@ function buildColumns(
         ...(prop.comment !== undefined && { comment: prop.comment }),
         ...(formulaExpr !== undefined && { formula: formulaExpr }),
         ...(embeddedIn !== undefined && { embeddedIn }),
+        ...(embeddedPropName !== undefined && { embeddedPropName }),
         ...(isDiscriminator && { isDiscriminator: true }),
       },
     ];
@@ -320,11 +323,11 @@ function renderColumnLine(col: ColumnModel): string {
     qualifier = ' UK';
   }
 
-  // Comment priority (v1 differentiators over prisma-markdown):
+  // Comment priority (MikroORM-specific markers; the DB/TS name mapping is shown
+  // in the markdown column table instead, keeping the diagram uncluttered):
   //   1. @Formula SQL expression  — "formula: LENGTH(name)"
   //   2. STI discriminator column — "discriminator"
   //   3. Embedded source type     — "[Address]"
-  //   4. DB/TS name mismatch      — "<tsPropName>"
   let comment: string | undefined;
   if (col.formula !== undefined) {
     comment = col.formula ? `formula: ${col.formula}` : 'formula';
@@ -332,8 +335,6 @@ function renderColumnLine(col: ColumnModel): string {
     comment = 'discriminator';
   } else if (col.embeddedIn !== undefined) {
     comment = `[${col.embeddedIn}]`;
-  } else if (col.fieldName !== col.propName) {
-    comment = col.propName;
   }
 
   const commentStr = comment !== undefined ? ` "${escapeMermaidQuotedText(comment)}"` : '';

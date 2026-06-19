@@ -316,8 +316,8 @@ describe('buildDiagramModel — composite foreign keys', () => {
       }),
     ]);
 
-    expect(renderErDiagram(model)).toContain('string tenant_region_code PK "tenant"');
-    expect(renderErDiagram(model)).toContain('integer tenant_account_id PK "tenant"');
+    expect(renderErDiagram(model)).toContain('string tenant_region_code PK');
+    expect(renderErDiagram(model)).toContain('integer tenant_account_id PK');
   });
 });
 
@@ -485,7 +485,7 @@ describe('renderErDiagram', () => {
     expect(renderErDiagram(model)).toContain('string email UK');
   });
 
-  it('renders a FK column with propName comment when names differ', () => {
+  it('does NOT add a TS property-name comment when names differ (kept out of the diagram)', () => {
     const model: DiagramModel = {
       entities: [
         {
@@ -507,8 +507,9 @@ describe('renderErDiagram', () => {
       relations: [],
     };
     const result = renderErDiagram(model);
-    // Shows DB column name + FK qualifier + TS property name as comment
-    expect(result).toContain('integer author_id FK "author"');
+    // DB column name + FK qualifier only; the TS property name lives in the markdown table.
+    expect(result).toContain('integer author_id FK');
+    expect(result).not.toContain('"author"');
   });
 
   it('does NOT add comment when field name equals prop name', () => {

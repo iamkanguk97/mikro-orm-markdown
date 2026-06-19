@@ -6,6 +6,7 @@ import { Embeddable, Property } from '@mikro-orm/core';
  */
 @Embeddable()
 export class Address {
+  /** 도로명 주소. */
   @Property({ type: 'string' })
   street!: string;
 
