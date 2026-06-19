@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { generateMarkdown } from '../../src/index.js';
+import { describe, expect, it, vi } from 'vitest';
+import { generateMarkdown, resolveJsDocSources } from '../../src/index.js';
 import config from '../fixtures/mikro-orm.config.js';
 
 describe('generateMarkdown', () => {
@@ -46,5 +46,29 @@ describe('generateMarkdown', () => {
     const titleIndex = md.indexOf('# T');
     const descIndex = md.indexOf('주문 도메인 스키마입니다.');
     expect(descIndex).toBeGreaterThan(titleIndex);
+  });
+});
+
+describe('resolveJsDocSources', () => {
+  it('prefers explicit src paths over discovered source paths', () => {
+    const onWarn = vi.fn();
+    const result = resolveJsDocSources(['/build/User.js'], ['./src/**/*.ts'], onWarn);
+    expect(result).toEqual(['./src/**/*.ts']);
+    expect(onWarn).not.toHaveBeenCalled();
+  });
+
+  it('warns when entities were discovered from compiled JavaScript and no src is given', () => {
+    const onWarn = vi.fn();
+    const result = resolveJsDocSources(['/build/User.js', '/build/Post.cjs'], undefined, onWarn);
+    expect(result).toEqual(['/build/User.js', '/build/Post.cjs']);
+    expect(onWarn).toHaveBeenCalledOnce();
+    expect(String(onWarn.mock.calls[0]?.[0])).toContain('--src');
+  });
+
+  it('does not warn when discovered sources are TypeScript files', () => {
+    const onWarn = vi.fn();
+    const result = resolveJsDocSources(['/src/User.ts'], undefined, onWarn);
+    expect(result).toEqual(['/src/User.ts']);
+    expect(onWarn).not.toHaveBeenCalled();
   });
 });

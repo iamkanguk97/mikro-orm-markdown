@@ -95,6 +95,8 @@ export class Post {
 
 Plain JSDoc text (no tag) becomes a description: text above a **class** describes the entity, and text above a **property** describes its column. When a property has no JSDoc, its `@Property({ comment })` value (the DDL column comment) is used as the column description instead.
 
+> **Running from compiled JavaScript?** Build tools strip comments, so JSDoc descriptions and `@namespace`/`@hidden` tags cannot be read from `.js` entities — hidden entities may even be exposed. If your `entities` point at compiled output (e.g. `./dist/**/*.js`), pass `--src "<glob to your .ts sources>"` (or the `src` option in the programmatic API) so JSDoc is read from the original TypeScript. The CLI prints a warning when it detects this situation.
+
 | Tag                 | Description                                         |
 | ------------------- | --------------------------------------------------- |
 | `@namespace <Name>` | Include entity in section `Name` (ERD + text table) |

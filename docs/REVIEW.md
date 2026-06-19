@@ -45,10 +45,11 @@
 - **Fix:** discovery 실패 시 `cause.message`(또는 cause 체인)를 함께 출력.
 - **완료(`다음 커밋`):** `formatErrorChain` 헬퍼로 `cause` 체인을 따라가며 `↳ caused by:` 형태로 모두 출력(순환 가드 포함). 드라이버 미지정 재현 시 "No driver specified..." 실제 원인 노출 확인, 신규 테스트 3건, `npm test` 123 pass.
 
-### [ ] H3. 컴파일된 `.js` 엔티티에서 JSDoc/태그가 조용히 소실 — README가 그 경로를 권장
+### [x] H3. 컴파일된 `.js` 엔티티에서 JSDoc/태그가 조용히 소실 — README가 그 경로를 권장
 - **위치:** `src/docs/jsdoc.ts:62` (+ `README.md:60,277`, `src/metadata/load.ts:61`)
 - **문제:** JSDoc은 `m.path` 소스를 ts-morph로 파싱하는데 빌드 시 주석이 제거됨 → 모든 Description 공백, `@namespace`가 `default`로 붕괴, **`@hidden` 엔티티가 문서에 노출**(가장 위험). exit 0이라 실패 인지도 안 됨. 그런데 README는 프로덕션에서 `entities: ['./dist/**/*.js']`를 안내.
 - **Fix:** `--src`/programmatic `src` 옵션 부활, 또는 `.js` config 사용 시 JSDoc 손실 가능성을 명확히 경고.
+- **완료(`다음 커밋`):** 둘 다 적용. `resolveJsDocSources`로 ① `src`/`--src <paths...>` 지정 시 그 `.ts`에서 JSDoc 추출 ② 미지정 + discovery 경로가 `.js`면 `onWarn`으로 경고(CLI는 stderr). `generateMarkdown`에 `src`/`onWarn` 옵션 추가, README JSDoc 섹션에 주의 문구 추가. `--src` 스모크 성공, 신규 테스트 3건, `npm test` 126 pass.
 
 ### [ ] H4. 파라미터형 SQL 타입이 마크다운 표에서도 손상
 - **위치:** `src/render/mermaid.ts:96, 345` (`normalizeType`)

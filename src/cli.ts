@@ -14,6 +14,7 @@ interface CliOptions {
   title: string;
   description?: string;
   tsconfig?: string;
+  src?: string[];
 }
 
 export function toConfigImportSpecifier(configPath: string): string {
@@ -181,6 +182,8 @@ async function run(opts: CliOptions): Promise<void> {
       orm: ormOptions,
       title: opts.title,
       ...(opts.description !== undefined && { description: opts.description }),
+      ...(opts.src !== undefined && { src: opts.src }),
+      onWarn: (message: string): void => void process.stderr.write(`Warning: ${message}\n`),
     });
   } catch (err) {
     process.stderr.write(`Error: ${formatErrorChain(err)}\n`);
@@ -207,6 +210,10 @@ const program = new Command()
   .option(
     '--tsconfig <path>',
     'tsconfig.json to use when loading a .ts config (defaults to the nearest one beside the config file)'
+  )
+  .option(
+    '--src <paths...>',
+    'Source .ts file globs to read JSDoc from when entities run from compiled .js (comments are stripped at build time)'
   )
   .action(run);
 
