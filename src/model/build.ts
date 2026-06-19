@@ -56,6 +56,16 @@ export function buildDocumentModel(
   const { entities: diagramEntities, relations } = buildDiagramModel(metas);
   const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props, onWarn);
 
+  // Classes excluded via @hidden — FK columns pointing at them would otherwise
+  // dangle (their edge is dropped, but the column would still reference a target
+  // that no longer appears anywhere).
+  const hiddenClasses = new Set<string>();
+  for (const model of diagramEntities) {
+    if (jsDocResult.entities.get(model.className)?.hidden) {
+      hiddenClasses.add(model.className);
+    }
+  }
+
   // Build enriched entity map, filtering out @hidden entities.
   const enrichedByClass = new Map<string, EnrichedEntity>();
   for (const model of diagramEntities) {
@@ -63,9 +73,13 @@ export function buildDocumentModel(
     if (jsDoc?.hidden) {
       continue;
     }
+    const columns = model.columns.filter(
+      (col) => !(col.isForeignKey && col.referencedEntity !== undefined && hiddenClasses.has(col.referencedEntity))
+    );
+    const visibleModel = columns.length === model.columns.length ? model : { ...model, columns };
     const ownPropDocs = jsDocResult.props.get(model.className) ?? new Map<string, PropJsDocInfo>();
-    const propDocs = withEmbeddedPropDocs(ownPropDocs, model.columns, jsDocResult.props);
-    enrichedByClass.set(model.className, { model, jsDoc, propDocs });
+    const propDocs = withEmbeddedPropDocs(ownPropDocs, visibleModel.columns, jsDocResult.props);
+    enrichedByClass.set(model.className, { model: visibleModel, jsDoc, propDocs });
   }
 
   // Collect all unique namespace names referenced by any entity.

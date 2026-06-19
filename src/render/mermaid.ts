@@ -189,6 +189,7 @@ function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, E
     isUnique: prop.unique === true,
     isNullable: prop.nullable === true,
     ...(prop.comment !== undefined && { comment: prop.comment }),
+    referencedEntity: prop.type,
   }));
 }
 

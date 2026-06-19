@@ -37,6 +37,45 @@ describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
   });
 });
 
+describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
+  it('drops FK columns that reference a hidden entity', () => {
+    const order = Object.assign({} as EntityMetadata, {
+      className: 'Order',
+      tableName: 'order',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        secret: {
+          name: 'secret',
+          fieldNames: ['secret_id'],
+          type: 'Secret',
+          kind: ReferenceKind.MANY_TO_ONE,
+          referencedColumnNames: ['id'],
+        },
+      },
+    });
+    const secret = Object.assign({} as EntityMetadata, {
+      className: 'Secret',
+      tableName: 'secret',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
+      props: new Map(),
+    };
+
+    const docModel = buildDocumentModel([order, secret], jsDoc, 'T');
+    const orderEntity = docModel.groups.flatMap((g) => g.textEntities).find((e) => e.model.className === 'Order');
+
+    const fieldNames = orderEntity!.model.columns.map((c) => c.fieldName);
+    expect(fieldNames).toEqual(['id']);
+    expect(fieldNames).not.toContain('secret_id');
+  });
+});
+
 describe('buildDocumentModel — groups', () => {
   it('produces expected namespace groups from fixtures', async () => {
     const docModel = await getDocModel();

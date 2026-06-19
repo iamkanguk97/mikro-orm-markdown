@@ -123,9 +123,10 @@
 - **문제:** mappedBy 없는 `@OneToMany`에 태그하면 매칭 엣지를 못 찾아 카디널리티 그대로 남고 경고 없이 무시.
 - **완료(`다음 커밋`):** `onWarn`을 `buildDocumentModel`→`applyAtLeastOne`에 연결. 매칭 엣지를 못 찾으면 `@atLeastOne on X.y had no effect...` 경고(`generateMarkdown`이 stderr로 출력). 단방향 1:N 재현 테스트 1건, 138 pass, `examples/ERD.md` 불변.
 
-### [ ] L3. `@hidden` 엔티티로의 FK가 대상 없는 orphan 컬럼으로 남음
+### [x] L3. `@hidden` 엔티티로의 FK가 대상 없는 orphan 컬럼으로 남음
 - **위치:** `src/model/build.ts:60` (`buildDocumentModel`)
 - **문제:** 엣지는 제거되지만 FK 컬럼은 남아 문서에 없는 대상을 가리킴(크래시는 아님).
+- **완료(`다음 커밋`):** FK 컬럼에 `referencedEntity`(=`prop.type`) 기록, `buildDocumentModel`에서 hidden 클래스 집합 계산 후 hidden 대상 참조 FK 컬럼 제거(원본 모델 불변, 변경 시에만 복제). 신규 테스트 1건, 139 pass, `examples/ERD.md` 불변.
 
 ### [ ] L4. 잠재 크래시: 무방어 프로퍼티 접근 (방어적 비대칭)
 - **위치:** `src/render/mermaid.ts:141` (`prop.fieldNames.length`), `src/render/mermaid.ts:96` (`normalizeType(prop.type)`)

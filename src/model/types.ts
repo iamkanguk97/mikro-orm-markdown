@@ -33,6 +33,8 @@ export interface ColumnModel {
   isDiscriminator?: boolean;
   /** Allowed values for an @Enum column (e.g. ["active", "banned"]). */
   enumItems?: string[];
+  /** For FK columns: the className of the referenced entity (e.g. "Author"). */
+  referencedEntity?: string;
 }
 
 /** An index, unique, or check constraint extracted from EntityMetadata. */
