@@ -31,6 +31,8 @@ export interface ColumnModel {
   embeddedPropName?: string;
   /** True when this column is the STI discriminator column on the root entity. */
   isDiscriminator?: boolean;
+  /** Allowed values for an @Enum column (e.g. ["active", "banned"]). */
+  enumItems?: string[];
 }
 
 /** An index, unique, or check constraint extracted from EntityMetadata. */

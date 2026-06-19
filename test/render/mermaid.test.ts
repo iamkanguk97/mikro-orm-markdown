@@ -195,6 +195,27 @@ describe('buildDiagramModel — @Formula', () => {
     expect(renderErDiagram(model)).toContain('integer broken_formula "formula: <unresolved>"');
   });
 
+  it('captures @Enum allowed values on the column (M5)', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'Account',
+      tableName: 'account',
+      properties: {
+        status: {
+          name: 'status',
+          fieldNames: ['status'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          enum: true,
+          items: ['active', 'banned'],
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const status = model.entities[0]!.columns.find((c) => c.propName === 'status');
+    expect(status!.enumItems).toEqual(['active', 'banned']);
+  });
+
   it('coerces a non-string formula return value to a string (M4)', () => {
     const meta = Object.assign({} as EntityMetadata, {
       className: 'Rep',

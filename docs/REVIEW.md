@@ -85,10 +85,11 @@
 - **Fix:** `resolveFormulaExpr` 결과를 `String()` 강제 또는 `typeof` 검증.
 - **완료(`다음 커밋`):** 숫자 반환 formula로 `value.replace is not a function` 크래시 재현 → `typeof result === 'string' ? result : String(result)`로 강제. 신규 테스트 1건, `npm test` 132 pass.
 
-### [ ] M5. `@Enum` 허용값(`prop.items`)이 전혀 렌더링되지 않음
+### [x] M5. `@Enum` 허용값(`prop.items`)이 전혀 렌더링되지 않음
 - **위치:** `src/model/build.ts:73` (SCALAR 처리)
 - **문제:** `enum:true`/`items`를 안 읽어 타입명만 표시. 네이티브 enum 미지원(README 예제도 수기 JSDoc "One of: ..."로 우회).
 - **Fix:** enum이면 `prop.items`를 Description/Key 또는 별도 표기로 노출.
+- **완료(`다음 커밋`):** `ColumnModel.enumItems` 추가, `prop.enum && prop.items`에서 채움. 마크다운 표 Description에 `One of: a, b` 노출(표 셀 백틱 이스케이프 때문에 평문, 기존 설명과 줄바꿈 병합). 부수효과로 STI discriminator(`type`) 컬럼이 `One of: dog, cat` 표시 → L1 일부 자연 해소. 신규 테스트 2건, `npm test` 134 pass, `examples/ERD.md` 재생성(enum 라인만).
 
 ### [ ] M6. `loadJsDoc`의 "Never throws" 계약 위반
 - **위치:** `src/docs/jsdoc.ts:45`

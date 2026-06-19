@@ -223,6 +223,47 @@ describe('renderMarkdown — MikroORM specific columns', () => {
     expect(md).not.toContain('`computed`:');
   });
 
+  it('lists @Enum allowed values in the description (M5)', () => {
+    const docModel: DocumentModel = {
+      title: 'Enum',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'Account',
+                tableName: 'account',
+                columns: [
+                  {
+                    propName: 'status',
+                    fieldName: 'status',
+                    type: 'string',
+                    isPrimary: false,
+                    isForeignKey: false,
+                    isUnique: false,
+                    isNullable: false,
+                    enumItems: ['active', 'banned'],
+                  },
+                ],
+                isPivot: false,
+                isEmbeddable: false,
+                constraints: [],
+              },
+              jsDoc: undefined,
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+    expect(md).toContain('One of: active, banned');
+  });
+
   it('embedded columns show [Address] in Key column', async () => {
     const md = await getMarkdown();
     expect(md).toContain('[Address]');

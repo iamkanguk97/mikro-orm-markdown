@@ -115,7 +115,10 @@ function renderColumnTable(entity: EnrichedEntity): string {
     const key = resolveColumnKey(col);
     const nullable = col.isNullable && !col.isPrimary ? 'Y' : '';
     // JSDoc property description wins; fall back to the @Property({ comment }) DDL comment.
-    const desc = entity.propDocs.get(col.propName)?.description ?? col.comment ?? '';
+    const docDesc = entity.propDocs.get(col.propName)?.description ?? col.comment ?? '';
+    // Surface @Enum allowed values; the table cell escapes backticks, so plain text.
+    const enumDesc = col.enumItems !== undefined ? `One of: ${col.enumItems.join(', ')}` : '';
+    const desc = [docDesc, enumDesc].filter((part) => part !== '').join('\n');
     return `| ${escapeMarkdownTableCell(col.fieldName)} | ${escapeMarkdownTableCell(col.type)} | ${escapeMarkdownTableCell(key)} | ${nullable} | ${escapeMarkdownTableCell(desc)} |`;
   });
   return [header, sep, ...rows].join('\n');

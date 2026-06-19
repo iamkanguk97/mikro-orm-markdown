@@ -115,6 +115,11 @@ function buildColumns(
     const isDiscriminator =
       owningMeta.discriminatorColumn !== undefined && prop.name === owningMeta.discriminatorColumn;
 
+    const enumItems =
+      prop.enum === true && Array.isArray(prop.items) && prop.items.length > 0
+        ? prop.items.map((item) => String(item))
+        : undefined;
+
     return [
       {
         propName: prop.name,
@@ -132,6 +137,7 @@ function buildColumns(
         ...(embeddedIn !== undefined && { embeddedIn }),
         ...(embeddedPropName !== undefined && { embeddedPropName }),
         ...(isDiscriminator && { isDiscriminator: true }),
+        ...(enumItems !== undefined && { enumItems }),
       },
     ];
   }

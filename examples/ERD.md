@@ -46,7 +46,7 @@ erDiagram
 |--------|------|-----|----------|-------------|
 | id | integer | PK |  |  |
 | name | string |  |  | Display name. |
-| type | string | discriminator |  |  |
+| type | string | discriminator |  | One of: dog, cat |
 
 **Constraints:**
 
@@ -64,7 +64,7 @@ erDiagram
 |--------|------|-----|----------|-------------|
 | id | integer | PK |  |  |
 | name | string |  |  |  |
-| type | string |  |  |  |
+| type | string |  |  | One of: dog, cat |
 | breed | string |  | Y | Breed, if known. |
 
 **Constraints:**
@@ -83,7 +83,7 @@ erDiagram
 |--------|------|-----|----------|-------------|
 | id | integer | PK |  |  |
 | name | string |  |  |  |
-| type | string |  |  |  |
+| type | string |  |  | One of: dog, cat |
 | indoor | boolean |  | Y | Whether the cat is kept indoors. |
 
 **Constraints:**
