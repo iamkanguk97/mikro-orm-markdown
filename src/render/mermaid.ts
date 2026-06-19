@@ -323,8 +323,9 @@ function renderColumnLine(col: ColumnModel): string {
     qualifier = ' UK';
   }
 
-  // Comment priority (MikroORM-specific markers; the DB/TS name mapping is shown
-  // in the markdown column table instead, keeping the diagram uncluttered):
+  // Comment priority (MikroORM-specific markers only — keeps the diagram uncluttered).
+  // Renamed columns: FK columns surface their TS name in the markdown table's Key
+  // cell ("FK (propName)"); plain renamed scalars show only the DB column name.
   //   1. @Formula SQL expression  — "formula: LENGTH(name)"
   //   2. STI discriminator column — "discriminator"
   //   3. Embedded source type     — "[Address]"

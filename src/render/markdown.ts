@@ -33,13 +33,27 @@ export function renderMarkdown(docModel: DocumentModel): string {
   return sections.join('\n\n');
 }
 
-/** Renders a namespace-level table of contents linking to each group's H2 section. */
-function renderTableOfContents(groups: NamespaceGroup[]): string {
-  const lines = ['## Contents', ''];
-  for (const group of groups) {
-    lines.push(`- [${escapeMarkdownInline(group.name)}](#${toMarkdownAnchor(group.name)})`);
+/**
+ * Renders a bulleted markdown section: a header line, a blank line, then one
+ * line per item. Shared by the Contents / Computed columns / Constraints
+ * sections, which differ only in their header and per-item formatting.
+ */
+function renderBulletSection<T>(header: string, items: T[], renderItem: (item: T) => string): string {
+  const lines = [header, ''];
+  for (const item of items) {
+    lines.push(renderItem(item));
   }
   return lines.join('\n');
+}
+
+/** Renders a namespace-level table of contents linking to each group's H2 section. */
+function renderTableOfContents(groups: NamespaceGroup[]): string {
+  return renderBulletSection('## Contents', groups, (group) => {
+    // escapeMarkdownInline does not touch brackets; escape them here so a name
+    // containing `[` or `]` cannot prematurely close the link label `[...]`.
+    const label = escapeMarkdownInline(group.name).replace(/[[\]]/g, '\\$&');
+    return `- [${label}](#${toMarkdownAnchor(group.name)})`;
+  });
 }
 
 function renderGroupSection(group: NamespaceGroup): string {
@@ -130,25 +144,25 @@ function resolveColumnKey(col: ColumnModel): string {
 }
 
 function renderComputedColumns(columns: ColumnModel[]): string {
-  const lines = ['**Computed columns:**', ''];
-  for (const col of columns) {
-    lines.push(`- ${renderMarkdownInlineCode(col.fieldName)}: ${renderMarkdownInlineCode(col.formula ?? '')}`);
-  }
-  return lines.join('\n');
+  return renderBulletSection('**Computed columns:**', columns, (col) => {
+    // An empty/unresolved formula expression renders as just the column name —
+    // the "Computed columns" heading already conveys that it is computed, and
+    // an empty inline-code span would be broken output.
+    const expr = col.formula ? `: ${renderMarkdownInlineCode(col.formula)}` : '';
+    return `- ${renderMarkdownInlineCode(col.fieldName)}${expr}`;
+  });
 }
 
 function renderConstraints(constraints: ConstraintModel[]): string {
-  const lines = ['**Constraints:**', ''];
-  for (const c of constraints) {
+  return renderBulletSection('**Constraints:**', constraints, (c) => {
     const name = c.name ? ` ${renderMarkdownInlineCode(c.name)}` : '';
     const properties = c.properties.map(escapeMarkdownInline).join(', ');
     if (c.type === 'index') {
-      lines.push(`- Index${name}: (${properties})`);
-    } else if (c.type === 'unique') {
-      lines.push(`- Unique${name}: (${properties})`);
-    } else if (c.type === 'check') {
-      lines.push(`- Check${name}: ${renderMarkdownInlineCode(c.expression ?? '')}`);
+      return `- Index${name}: (${properties})`;
     }
-  }
-  return lines.join('\n');
+    if (c.type === 'unique') {
+      return `- Unique${name}: (${properties})`;
+    }
+    return `- Check${name}: ${renderMarkdownInlineCode(c.expression ?? '')}`;
+  });
 }

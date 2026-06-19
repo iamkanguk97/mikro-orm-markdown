@@ -55,13 +55,14 @@ export function escapeMermaidQuotedText(value: string): string {
 
 /**
  * Builds a GitHub-style heading anchor slug for in-document links.
- * Lowercases, drops characters other than word chars / spaces / hyphens, then
- * turns spaces into hyphens. Exact for identifier-style headings (e.g. namespace
- * names), which is the only place this is used.
+ * Lowercases, drops characters other than letters / numbers / underscores /
+ * spaces / hyphens, then turns spaces into hyphens. The letter/number classes
+ * are Unicode-aware (\p{L}, \p{N}), so non-ASCII headings such as a Korean
+ * namespace name keep their characters and match GitHub's generated anchor.
  */
 export function toMarkdownAnchor(value: string): string {
   return normalizeInlineText(value)
     .toLowerCase()
-    .replace(/[^\w\s-]/g, '')
+    .replace(/[^\p{L}\p{N}\s_-]/gu, '')
     .replace(/\s+/g, '-');
 }

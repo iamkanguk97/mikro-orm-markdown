@@ -62,6 +62,34 @@ describe('renderMarkdown — table of contents', () => {
     };
     expect(renderMarkdown(docModel)).not.toContain('## Contents');
   });
+
+  it('builds a Unicode-aware anchor matching the heading for a non-ASCII namespace', () => {
+    const docModel: DocumentModel = {
+      title: 'Multi',
+      groups: [
+        { name: '동물', erdEntities: [], erdRelations: [], textEntities: [] },
+        { name: 'Animals', erdEntities: [], erdRelations: [], textEntities: [] },
+      ],
+    };
+    const md = renderMarkdown(docModel);
+    // The TOC anchor must equal GitHub's anchor for the rendered "## 동물" heading;
+    // an ASCII-only slug would have stripped the Korean letters into an empty "#".
+    expect(md).toContain('## 동물');
+    expect(md).toContain('- [동물](#동물)');
+  });
+
+  it('escapes brackets in TOC link labels so an unbalanced bracket cannot break the link', () => {
+    const docModel: DocumentModel = {
+      title: 'Multi',
+      groups: [
+        { name: 'Archived]', erdEntities: [], erdRelations: [], textEntities: [] },
+        { name: 'Animals', erdEntities: [], erdRelations: [], textEntities: [] },
+      ],
+    };
+    const md = renderMarkdown(docModel);
+    // The ] is backslash-escaped so it does not close the label early.
+    expect(md).toContain('- [Archived\\]](#archived)');
+  });
 });
 
 describe('renderMarkdown — entity descriptions', () => {
@@ -132,6 +160,50 @@ describe('renderMarkdown — MikroORM specific columns', () => {
     const md = await getMarkdown();
     expect(md).toContain('**Computed columns:**');
     expect(md).toContain('`LENGTH(name)`');
+  });
+
+  it('renders an empty/unresolved formula as just the column name (no broken code span)', () => {
+    const docModel: DocumentModel = {
+      title: 'Computed',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'Widget',
+                tableName: 'widget',
+                columns: [
+                  {
+                    propName: 'computed',
+                    fieldName: 'computed',
+                    type: 'integer',
+                    isPrimary: false,
+                    isForeignKey: false,
+                    isUnique: false,
+                    isNullable: false,
+                    formula: '',
+                  },
+                ],
+                isPivot: false,
+                isEmbeddable: false,
+                constraints: [],
+              },
+              jsDoc: undefined,
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+    expect(md).toContain('**Computed columns:**');
+    expect(md).toContain('- `computed`');
+    // The empty expression must not produce a "`computed`: ``" broken inline-code span.
+    expect(md).not.toContain('`computed`:');
   });
 
   it('embedded columns show [Address] in Key column', async () => {
