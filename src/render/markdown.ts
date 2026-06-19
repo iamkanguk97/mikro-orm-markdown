@@ -89,7 +89,13 @@ function renderEntitySection(entity: EnrichedEntity): string {
   if (entity.model.discriminatorColumn) {
     parts.push(`*STI root — discriminator column: ${renderMarkdownInlineCode(entity.model.discriminatorColumn)}*`);
   } else if (entity.model.extendsEntity) {
-    parts.push(`*Extends ${renderMarkdownInlineCode(entity.model.extendsEntity)} (Single Table Inheritance)*`);
+    const discValue =
+      entity.model.discriminatorValue !== undefined
+        ? `, discriminator value: ${renderMarkdownInlineCode(entity.model.discriminatorValue)}`
+        : '';
+    parts.push(
+      `*Extends ${renderMarkdownInlineCode(entity.model.extendsEntity)} (Single Table Inheritance${discValue})*`
+    );
   }
 
   if (entity.model.columns.length > 0) {

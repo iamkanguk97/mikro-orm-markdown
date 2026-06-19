@@ -113,9 +113,10 @@
 
 ## 🟢 LOW
 
-### [ ] L1. STI discriminator 값/맵 미표시 + 다단계 STI는 직속 부모만 표기
+### [x] L1. STI discriminator 값/맵 미표시 + 다단계 STI는 직속 부모만 표기
 - **위치:** `src/model/build.ts:36`, `src/render/markdown.ts:84`
 - **문제:** `type='dog'` 같은 discriminator 값이 안 보이고, 3단계(A←B←C)는 직속 부모만 표기.
+- **완료(`다음 커밋`):** `EntityModel.discriminatorValue` 추가(자식의 `meta.discriminatorValue`, `0` 보존 위해 `String()`). Extends 노트를 `*Extends \`Animal\` (Single Table Inheritance, discriminator value: \`dog\`)*`로 확장. M5로 루트 discriminator 컬럼의 허용값(`One of: dog, cat`)도 이미 표시됨. 다단계 직속부모 표기는 M3의 `Table:`(실제 루트 테이블 명시)로 혼동 완화돼 직속 부모 유지. 신규 테스트 1건, 137 pass, `examples/ERD.md` 재생성.
 
 ### [ ] L2. `@atLeastOne`가 단방향 1:N/라벨 불일치 시 조용히 무효
 - **위치:** `src/model/build.ts:168` (`applyAtLeastOne`)

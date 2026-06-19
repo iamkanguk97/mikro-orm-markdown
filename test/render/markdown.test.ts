@@ -108,6 +108,11 @@ describe('renderMarkdown — entity descriptions', () => {
     // Author maps to the `author` table via the default naming strategy.
     expect(md).toContain('*Table: `author`*');
   });
+
+  it('shows the STI child discriminator value on the Extends note (L1)', async () => {
+    const md = await getMarkdown();
+    expect(md).toContain('Extends `Animal` (Single Table Inheritance, discriminator value: `dog`)');
+  });
 });
 
 describe('renderMarkdown — column table', () => {
@@ -286,7 +291,7 @@ describe('renderMarkdown — MikroORM specific columns', () => {
 
   it('STI child has extends note', async () => {
     const md = await getMarkdown();
-    expect(md).toContain('Extends `Animal` (Single Table Inheritance)');
+    expect(md).toContain('Extends `Animal` (Single Table Inheritance');
   });
 });
 

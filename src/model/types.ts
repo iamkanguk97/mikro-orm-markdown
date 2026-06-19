@@ -82,6 +82,11 @@ export interface EntityModel {
    * Populated from meta.extends for entities that have a discriminatorValue.
    */
   extendsEntity?: string;
+  /**
+   * STI child: the discriminator value identifying this subclass's rows
+   * (e.g. "dog"). Stringified so a numeric value like 0 is preserved.
+   */
+  discriminatorValue?: string;
   /** Indexes, unique constraints, and check constraints (used in Milestone 5 markdown). */
   constraints: ConstraintModel[];
 }

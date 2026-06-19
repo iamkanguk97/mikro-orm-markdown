@@ -58,7 +58,7 @@ erDiagram
 
 > A dog — stored in the Animal table with type = 'dog'.
 
-*Extends `Animal` (Single Table Inheritance)*
+*Extends `Animal` (Single Table Inheritance, discriminator value: `dog`)*
 
 | Column | Type | Key | Nullable | Description |
 |--------|------|-----|----------|-------------|
@@ -77,7 +77,7 @@ erDiagram
 
 > A cat — stored in the Animal table with type = 'cat'.
 
-*Extends `Animal` (Single Table Inheritance)*
+*Extends `Animal` (Single Table Inheritance, discriminator value: `cat`)*
 
 | Column | Type | Key | Nullable | Description |
 |--------|------|-----|----------|-------------|
