@@ -133,9 +133,10 @@
 - **문제:** 다른 경로는 `?.`/`?? 'integer'`로 가드하는데 이 둘만 무방어. fieldNames/type이 undefined면 크래시. discovery로는 재현 안 됐으나 비대칭은 실재.
 - **완료(`다음 커밋`):** scalar `type: prop.type ?? 'unknown'`, FK `prop.fieldNames && prop.fieldNames.length > 0 ? ... : [\`${name}_id\`]`로 가드. type 없는 scalar + fieldNames 없는 FK 메타로 크래시 없음 + 폴백값 검증. 신규 테스트 1건, 140 pass.
 
-### [ ] L5. CHANGELOG에 `alpha.2` 누락 + 잔존 `--src` 참조
+### [x] L5. CHANGELOG에 `alpha.2` 누락 + 잔존 `--src` 참조
 - **위치:** `CHANGELOG.md:8,12`
 - **문제:** package.json은 `0.1.0-alpha.2`인데 CHANGELOG는 `alpha.1`만 있고, `CHANGELOG.md:12`가 제거된 `--src` 옵션을 나열. 릴리스 추적성 저하.
+- **완료(`다음 커밋`):** 이번 리뷰 작업 전체를 담은 `## [Unreleased]` 섹션(Added/Fixed/Changed) 추가로 공백 해소. `--src`는 H3에서 재추가됐으므로 alpha.1 기재가 다시 유효(잔존 참조 문제 자연 해소).
 
 ### [ ] L6. multiline description이 inline escape에서 공백으로 정규화
 - **위치:** `README.md:77`, `src/render/markdown.ts:21`
