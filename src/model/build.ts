@@ -50,10 +50,11 @@ export function buildDocumentModel(
   metas: EntityMetadata[],
   jsDocResult: JsDocResult,
   title: string,
-  description?: string
+  description?: string,
+  onWarn?: (message: string) => void
 ): DocumentModel {
   const { entities: diagramEntities, relations } = buildDiagramModel(metas);
-  const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props);
+  const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props, onWarn);
 
   // Build enriched entity map, filtering out @hidden entities.
   const enrichedByClass = new Map<string, EnrichedEntity>();
@@ -146,7 +147,12 @@ function withEmbeddedPropDocs(
  * side, so a collection on the inverse side is matched back via its mappedBy.
  * Returns a new array; input edges are not mutated.
  */
-function applyAtLeastOne(relations: RelationEdge[], metas: EntityMetadata[], props: PropJsDocMap): RelationEdge[] {
+function applyAtLeastOne(
+  relations: RelationEdge[],
+  metas: EntityMetadata[],
+  props: PropJsDocMap,
+  onWarn?: (message: string) => void
+): RelationEdge[] {
   const adjusted = relations.map((edge) => ({ ...edge }));
   const metaByClass = new Map(metas.map((m) => [m.className, m]));
 
@@ -164,9 +170,10 @@ function applyAtLeastOne(relations: RelationEdge[], metas: EntityMetadata[], pro
         continue;
       }
 
+      let edge: RelationEdge | undefined;
       // 1:N collection — the edge comes from the m:1 owning side; bump its "many" (from) side.
       if (prop.kind === ReferenceKind.ONE_TO_MANY && prop.mappedBy) {
-        const edge = adjusted.find(
+        edge = adjusted.find(
           (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
         );
         if (edge) {
@@ -175,21 +182,28 @@ function applyAtLeastOne(relations: RelationEdge[], metas: EntityMetadata[], pro
       }
       // M:N owning collection — edge built from this prop; the other (to) side becomes one-or-more.
       else if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.owner === true) {
-        const edge = adjusted.find(
-          (e) => e.fromEntity === className && e.toEntity === prop.type && e.label === propName
-        );
+        edge = adjusted.find((e) => e.fromEntity === className && e.toEntity === prop.type && e.label === propName);
         if (edge) {
           edge.toCardinality = TO_ONE_OR_MORE;
         }
       }
       // M:N inverse collection — edge built from the owner; this (from) side becomes one-or-more.
       else if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.mappedBy) {
-        const edge = adjusted.find(
+        edge = adjusted.find(
           (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
         );
         if (edge) {
           edge.fromCardinality = FROM_ONE_OR_MORE;
         }
+      }
+
+      // No matching edge: a unidirectional @OneToMany (no mappedBy) or a label
+      // mismatch leaves the cardinality unchanged. Warn instead of failing silently.
+      if (!edge) {
+        onWarn?.(
+          `@atLeastOne on ${className}.${propName} had no effect: no matching relation edge was found. ` +
+            'It applies only to a @OneToMany/@ManyToMany with a mappedBy that pairs with an owning relation.'
+        );
       }
     }
   }

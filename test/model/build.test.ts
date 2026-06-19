@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
+import { describe, expect, it, vi } from 'vitest';
+import type { JsDocResult } from '../../src/docs/jsdoc.js';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDocumentModel, type DocumentModel } from '../../src/model/build.js';
@@ -9,6 +11,31 @@ async function getDocModel(): Promise<DocumentModel> {
   const jsDocResult = loadJsDoc(sourcePaths);
   return buildDocumentModel(metas, jsDocResult, 'Test DB');
 }
+
+describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
+  it('warns when @atLeastOne cannot be matched to a relation edge', () => {
+    // A unidirectional @OneToMany (no mappedBy) produces no edge to adjust.
+    const parent = Object.assign({} as EntityMetadata, {
+      className: 'Parent',
+      tableName: 'parent',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        children: { name: 'children', type: 'Child', kind: ReferenceKind.ONE_TO_MANY },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map(),
+      props: new Map([['Parent', new Map([['children', { atLeastOne: true }]])]]),
+    };
+
+    const onWarn = vi.fn();
+    buildDocumentModel([parent], jsDoc, 'T', undefined, onWarn);
+
+    expect(onWarn).toHaveBeenCalledOnce();
+    expect(String(onWarn.mock.calls[0]?.[0])).toContain('@atLeastOne on Parent.children');
+  });
+});
 
 describe('buildDocumentModel — groups', () => {
   it('produces expected namespace groups from fixtures', async () => {

@@ -82,6 +82,6 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
 
   const { metas, sourcePaths } = await loadEntityMetadata(orm);
   const jsDocResult = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn));
-  const docModel = buildDocumentModel(metas, jsDocResult, title, description);
+  const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn);
   return renderMarkdown(docModel);
 }
