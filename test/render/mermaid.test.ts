@@ -299,6 +299,61 @@ describe('buildDiagramModel — non-abstract STI root (M1)', () => {
   });
 });
 
+describe('buildDiagramModel — object/array embedded as single JSON column (M2)', () => {
+  function makeOrgWithObjectEmbeddeds(): EntityMetadata {
+    return Object.assign({} as EntityMetadata, {
+      className: 'Org',
+      tableName: 'org',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        // object embedded → single JSON column "addr"
+        addr: { name: 'addr', fieldNames: ['addr'], type: 'Addr', kind: ReferenceKind.EMBEDDED, object: true },
+        'addr~street': {
+          name: 'addr~street',
+          fieldNames: ['street'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          object: true,
+          embedded: ['addr', 'street'],
+        },
+        'addr~city': {
+          name: 'addr~city',
+          fieldNames: ['city'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          object: true,
+          embedded: ['addr', 'city'],
+        },
+        // array embedded → single JSON column "history"
+        history: {
+          name: 'history',
+          fieldNames: ['history'],
+          type: 'Addr',
+          kind: ReferenceKind.EMBEDDED,
+          object: true,
+          array: true,
+        },
+      },
+    });
+  }
+
+  it('renders one JSON column per object/array embedded and drops the leaf fields', () => {
+    const model = buildDiagramModel([makeOrgWithObjectEmbeddeds()]);
+    const org = model.entities.find((e) => e.className === 'Org')!;
+
+    expect(org.columns.map((c) => c.fieldName)).toEqual(['id', 'addr', 'history']);
+
+    const addr = org.columns.find((c) => c.fieldName === 'addr')!;
+    expect(addr.type).toBe('json');
+    expect(addr.embeddedIn).toBe('Addr');
+
+    const history = org.columns.find((c) => c.fieldName === 'history')!;
+    expect(history.type).toBe('json');
+    expect(history.embeddedIn).toBe('Addr[]');
+  });
+});
+
 describe('buildDiagramModel — composite foreign keys', () => {
   it('expands every FK fieldName and preserves referenced PK types', () => {
     const tenantMeta = Object.assign({} as EntityMetadata, {

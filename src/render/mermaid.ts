@@ -68,12 +68,35 @@ function buildColumns(
   metaByClass: Map<string, EntityMetadata>,
   owningMeta: EntityMetadata
 ): ColumnModel[] {
-  // Skip the EMBEDDED group reference — individual flat columns appear as SCALAR entries
   if (prop.kind === ReferenceKind.EMBEDDED) {
+    // An object/array embedded is stored as a single JSON column, so render one
+    // column for it. (`array: true` implies `object: true`.) A plain inline
+    // embedded has no column of its own — its fields surface as flat SCALARs.
+    if (prop.object === true || prop.array === true) {
+      return [
+        {
+          propName: prop.name,
+          fieldName: prop.fieldNames?.[0] ?? prop.name,
+          type: 'json',
+          isPrimary: false,
+          isForeignKey: false,
+          isUnique: prop.unique === true,
+          isNullable: prop.nullable === true,
+          ...(prop.comment !== undefined && { comment: prop.comment }),
+          embeddedIn: prop.array === true ? `${prop.type}[]` : prop.type,
+        },
+      ];
+    }
     return [];
   }
 
   if (prop.kind === ReferenceKind.SCALAR) {
+    // Flat leaf of an object/array embedded: it lives inside the single JSON
+    // column rendered above, so it is not a column of its own — skip it.
+    if (prop.object === true && prop.embedded !== undefined) {
+      return [];
+    }
+
     // For @Formula columns, formula is set on a SCALAR-kinded property
     const formulaExpr: string | undefined =
       prop.formula !== undefined

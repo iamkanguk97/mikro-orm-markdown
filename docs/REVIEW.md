@@ -67,10 +67,11 @@
 - **Fix:** 루트 판별을 `discriminatorColumn` 존재 + (자체 미상속) 기준으로 보강.
 - **완료(`다음 커밋`):** `isStiRoot`를 `discriminatorColumn !== undefined && !meta.extends`로 변경. 비추상 루트(`Vehicle`/`Car`) 재현으로 자식 컬럼 `doors` 누수 + 마커 누락 확인 → 수정 후 루트 컬럼 `[id,name,type]`, `discriminatorColumn='type'` 정상. 신규 테스트 1건, `npm test` 129 pass, `examples/ERD.md` 무변경.
 
-### [ ] M2. `object:true`/`array:true` 임베디드가 단일 JSON 컬럼에 중복 행 생성
+### [x] M2. `object:true`/`array:true` 임베디드가 단일 JSON 컬럼에 중복 행 생성
 - **위치:** `src/render/mermaid.ts:83` (`buildColumns`)
 - **문제:** 필드별 합성 leaf가 모두 같은 fieldName을 가리키는데 dedupe 안 함 → 동일 컬럼명 N개 행 출력. README:30이 JSON 컬럼 임베디드 지원 명시.
 - **Fix:** `prop.object`/`prop.array` 인지해 단일 JSON 컬럼으로 표현하거나 fieldName 기준 dedupe.
+- **완료(`다음 커밋`):** 재현 결과 이 버전에선 leaf가 실제 컬럼처럼 펼쳐지는 형태(`id,street,city`)였음 — 실제 스키마는 JSON 컬럼 1개. EMBEDDED 분기에서 `prop.object||prop.array`면 단일 `json` 컬럼(`embeddedIn`=`Addr` 또는 `Addr[]`) emit, SCALAR leaf(`object&&embedded`)는 skip. inline(비-object) 임베디드는 불변. 신규 테스트 1건, `npm test` 130 pass, `examples/ERD.md` 무변경.
 
 ### [ ] M3. 실제 `tableName`이 어디에도 렌더링되지 않음
 - **위치:** `src/model/types.ts:69`, `src/render/mermaid.ts:299`
