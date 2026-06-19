@@ -2,7 +2,13 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { findNearestTsconfig, loadOrmOptions, toConfigImportSpecifier, writeMarkdownFile } from '../src/cli.js';
+import {
+  findNearestTsconfig,
+  formatErrorChain,
+  loadOrmOptions,
+  toConfigImportSpecifier,
+  writeMarkdownFile,
+} from '../src/cli.js';
 
 describe('CLI helpers', () => {
   let tempDir: string | undefined;
@@ -66,6 +72,30 @@ describe('CLI helpers', () => {
     const missing = path.join(dir, 'nope.tsconfig.json');
 
     await expect(loadOrmOptions(configPath, missing)).rejects.toThrow(`--tsconfig file not found: ${missing}`);
+  });
+
+  it('surfaces the underlying cause chain, not just the top-level message', () => {
+    const root = new Error('No driver specified, fill in the `driver` option.');
+    const wrapped = new Error('Failed to initialize MikroORM and run entity discovery.', { cause: root });
+
+    const formatted = formatErrorChain(wrapped);
+
+    expect(formatted).toContain('Failed to initialize MikroORM');
+    expect(formatted).toContain('caused by: No driver specified');
+  });
+
+  it('appends a non-Error cause at the end of the chain', () => {
+    const formatted = formatErrorChain(new Error('top', { cause: 'raw string cause' }));
+    expect(formatted).toBe('top\n  ↳ caused by: raw string cause');
+  });
+
+  it('does not loop forever on a cyclic cause chain', () => {
+    const a = new Error('a');
+    const b = new Error('b', { cause: a });
+    (a as { cause?: unknown }).cause = b;
+
+    const formatted = formatErrorChain(a);
+    expect(formatted).toBe('a\n  ↳ caused by: b');
   });
 
   it('creates missing output parent directories before writing markdown', async () => {

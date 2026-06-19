@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command } from 'commander';
-import { generateMarkdown, MetadataLoadError } from './index.js';
+import { generateMarkdown } from './index.js';
 
 interface CliOptions {
   config: string;
@@ -116,6 +116,33 @@ export async function loadOrmOptions(configPath: string, tsconfigPath?: string):
   return config as Options;
 }
 
+/**
+ * Renders an error together with its `cause` chain, one cause per line.
+ *
+ * Discovery failures wrap the real MikroORM error (missing driver, bad entities
+ * glob, …) in `error.cause`. Printing only the top-level message hides the one
+ * piece of information that actually tells the user what went wrong, so we walk
+ * the chain and surface each underlying message.
+ */
+export function formatErrorChain(err: unknown): string {
+  const lines: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    lines.push(current.message);
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  // A non-Error cause at the end of the chain still carries information.
+  if (current !== undefined && !(current instanceof Error)) {
+    lines.push(String(current));
+  }
+
+  return lines.map((line, i) => (i === 0 ? line : `  ↳ caused by: ${line}`)).join('\n');
+}
+
 function formatFileSystemError(cause: unknown): string {
   if (cause instanceof Error) {
     const code = 'code' in cause && typeof cause.code === 'string' ? ` (${cause.code})` : '';
@@ -156,8 +183,7 @@ async function run(opts: CliOptions): Promise<void> {
       ...(opts.description !== undefined && { description: opts.description }),
     });
   } catch (err) {
-    const msg = err instanceof MetadataLoadError ? err.message : err instanceof Error ? err.message : String(err);
-    process.stderr.write(`Error: ${msg}\n`);
+    process.stderr.write(`Error: ${formatErrorChain(err)}\n`);
     process.exit(1);
   }
 

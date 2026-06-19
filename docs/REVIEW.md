@@ -39,10 +39,11 @@
 - **Fix:** config 파일 기준 nearest `tsconfig` 탐색 + `register({ tsconfig })`, decorator/tsconfig mismatch 전용 에러 메시지, 필요 시 `--tsconfig` 옵션.
 - **완료(`f244e6f`):** `findNearestTsconfig`로 config 파일 옆 tsconfig를 찾아 `register({ tsconfig })`에 명시 전달 + `--tsconfig` 옵션 + `.ts` 로드 실패 시 데코레이터/메타데이터 진단 힌트. 루트 cwd 스모크 성공 확인, 신규 테스트 3건, `npm test` 120 pass.
 
-### [ ] H2. 설정/메타데이터 실패 시 진짜 원인(cause)이 버려짐
+### [x] H2. 설정/메타데이터 실패 시 진짜 원인(cause)이 버려짐
 - **위치:** `src/cli.ts:97` (+ `src/metadata/load.ts:45`)
 - **문제:** `MetadataLoadError`가 MikroORM 실제 에러를 `cause`에 담지만 CLI는 `err.message`(일반 문구)만 출력. 가장 흔한 셋업 실수(entities glob 오타, 드라이버 미설치)에서 "Make sure your config is valid..."만 보여 진단 불가. H1과 함께 "안 되는데 왜인지 모름"을 만드는 핵심 쌍.
 - **Fix:** discovery 실패 시 `cause.message`(또는 cause 체인)를 함께 출력.
+- **완료(`다음 커밋`):** `formatErrorChain` 헬퍼로 `cause` 체인을 따라가며 `↳ caused by:` 형태로 모두 출력(순환 가드 포함). 드라이버 미지정 재현 시 "No driver specified..." 실제 원인 노출 확인, 신규 테스트 3건, `npm test` 123 pass.
 
 ### [ ] H3. 컴파일된 `.js` 엔티티에서 JSDoc/태그가 조용히 소실 — README가 그 경로를 권장
 - **위치:** `src/docs/jsdoc.ts:62` (+ `README.md:60,277`, `src/metadata/load.ts:61`)
