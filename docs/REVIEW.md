@@ -51,10 +51,11 @@
 - **Fix:** `--src`/programmatic `src` 옵션 부활, 또는 `.js` config 사용 시 JSDoc 손실 가능성을 명확히 경고.
 - **완료(`다음 커밋`):** 둘 다 적용. `resolveJsDocSources`로 ① `src`/`--src <paths...>` 지정 시 그 `.ts`에서 JSDoc 추출 ② 미지정 + discovery 경로가 `.js`면 `onWarn`으로 경고(CLI는 stderr). `generateMarkdown`에 `src`/`onWarn` 옵션 추가, README JSDoc 섹션에 주의 문구 추가. `--src` 스모크 성공, 신규 테스트 3건, `npm test` 126 pass.
 
-### [ ] H4. 파라미터형 SQL 타입이 마크다운 표에서도 손상
+### [x] H4. 파라미터형 SQL 타입이 마크다운 표에서도 손상
 - **위치:** `src/render/mermaid.ts:96, 345` (`normalizeType`)
 - **문제:** Mermaid 식별자용 `normalizeType`을 build 시점에 적용해 `ColumnModel.type`에 저장 → 표가 손상값을 그대로 사용. `varchar(255)`→`varchar_255_`, `numeric(10,2)`→`numeric_10_2_`. 사람이 읽는 문서 표(README:15 "types")가 깨짐. 흔한 케이스.
 - **Fix:** 원본 타입을 모델에 보존하고 Mermaid 출력 시점에만 새니타이즈(표는 원본 타입 표시).
+- **완료(`다음 커밋`):** build 시점 `normalizeType` 제거(원본 `prop.type` 저장), 미사용 함수 삭제. Mermaid는 기존대로 출력 시점 `toMermaidIdentifier`로 새니타이즈(출력 불변). 픽스처에 `varchar(255)` 컬럼 추가해 표=원본/머메이드=`varchar_255_` 검증, 신규 테스트 2건, `npm test` 128 pass, `examples/ERD.md` 무변경.
 
 ---
 

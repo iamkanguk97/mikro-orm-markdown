@@ -19,6 +19,10 @@ export class Author {
   @Property({ type: 'string', unique: true })
   email!: string;
 
+  /** 닉네임 */
+  @Property({ type: 'varchar(255)', nullable: true })
+  nickname?: string;
+
   /** @atLeastOne */
   @OneToMany({ entity: () => 'Post', mappedBy: 'author' })
   posts = new Collection<Post>(this);

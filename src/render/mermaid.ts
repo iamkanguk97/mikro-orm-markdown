@@ -93,7 +93,10 @@ function buildColumns(
       {
         propName: prop.name,
         fieldName: prop.fieldNames?.[0] ?? prop.name,
-        type: normalizeType(prop.type),
+        // Store the original type (e.g. `varchar(255)`); the Mermaid renderer
+        // sanitizes it for diagram identifiers, while the markdown table shows
+        // it verbatim.
+        type: prop.type,
         isPrimary: prop.primary === true,
         isForeignKey: false,
         isUnique: prop.unique === true,
@@ -173,7 +176,7 @@ function resolveFkTypes(
         ? primaryProps.find((candidate) => candidate.fieldNames.includes(referencedColumnName))
         : undefined;
 
-    return normalizeType((pkProp ?? primaryProps[index] ?? primaryProps[0])?.type ?? 'integer');
+    return (pkProp ?? primaryProps[index] ?? primaryProps[0])?.type ?? 'integer';
   });
 }
 
@@ -340,9 +343,4 @@ function renderColumnLine(col: ColumnModel): string {
 
   const commentStr = comment !== undefined ? ` "${escapeMermaidQuotedText(comment)}"` : '';
   return `${toMermaidIdentifier(col.type)} ${toMermaidIdentifier(col.fieldName)}${qualifier}${commentStr}`;
-}
-
-/** Strips characters that are invalid in Mermaid type identifiers. */
-function normalizeType(type: string): string {
-  return type.replace(/[^a-zA-Z0-9_]/g, '_');
 }

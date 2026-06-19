@@ -52,6 +52,17 @@ describe('buildDiagramModel', () => {
     expect(fkCol!.propName).toBe('author');
   });
 
+  it('keeps the original parameterized type on the model, sanitizing only at render (H4)', async () => {
+    const model = await getModel();
+    const author = model.entities.find((e) => e.className === 'Author');
+    const nickname = author!.columns.find((c) => c.fieldName === 'nickname');
+
+    // The model stores the raw type; the Mermaid identifier is sanitized only
+    // when the diagram line is rendered.
+    expect(nickname?.type).toBe('varchar(255)');
+    expect(renderErDiagram(model)).toContain('varchar_255_ nickname');
+  });
+
   it('Post m:n tags property does NOT produce a column', async () => {
     const model = await getModel();
     const post = model.entities.find((e) => e.className === 'Post');
