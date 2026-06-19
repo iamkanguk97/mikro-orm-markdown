@@ -8,3 +8,6 @@ coverage/
 ERD.md
 # The committed example output is intentionally tracked.
 !examples/ERD.md
+
+# Claude Code personal settings
+.claude/settings.local.json
