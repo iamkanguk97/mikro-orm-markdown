@@ -113,6 +113,18 @@ describe('renderMarkdown — entity descriptions', () => {
     const md = await getMarkdown();
     expect(md).toContain('Extends `Animal` (Single Table Inheritance, discriminator value: `dog`)');
   });
+
+  it('preserves line breaks in a multiline document description (L6)', () => {
+    const docModel: DocumentModel = {
+      title: 'Multiline',
+      description: 'First line.\nSecond line.',
+      groups: [],
+    };
+    const md = renderMarkdown(docModel);
+    // The newline is kept as a markdown hard break (two trailing spaces), not
+    // collapsed to a single space.
+    expect(md).toContain('First line.  \nSecond line.');
+  });
 });
 
 describe('renderMarkdown — column table', () => {
@@ -385,7 +397,8 @@ describe('renderMarkdown — escaping', () => {
     const md = renderMarkdown(docModel);
 
     expect(md).toContain('# Unsafe \\| &lt;Title&gt; Next');
-    expect(md).toContain('Summary \\| &lt;script&gt; second line');
+    // Special chars stay escaped; the newline is preserved as a hard break (L6).
+    expect(md).toContain('Summary \\| &lt;script&gt;  \nsecond line');
     expect(md).toContain('## Group \\| &lt;A&gt; Next');
     expect(md).toContain('### Entity \\| &lt;One&gt; Next');
     expect(md).toContain('> First \\| line\n> \\# not heading');

@@ -27,6 +27,18 @@ export function escapeMarkdownTableCell(value: string): string {
     .join('<br>');
 }
 
+/**
+ * Escapes a multi-line paragraph for markdown body text, preserving line breaks
+ * as hard breaks (two trailing spaces + newline) instead of collapsing them to
+ * a single space. Used for the document description, which the programmatic API
+ * accepts as free-form multi-line text.
+ */
+export function escapeMarkdownParagraph(value: string): string {
+  return splitNormalizedLines(value)
+    .map((line) => escapeMarkdownInline(line))
+    .join('  \n');
+}
+
 export function renderMarkdownBlockQuote(value: string): string {
   return splitNormalizedLines(value)
     .map((line) => `> ${escapeMarkdownInline(line)}`)

@@ -138,9 +138,10 @@
 - **문제:** package.json은 `0.1.0-alpha.2`인데 CHANGELOG는 `alpha.1`만 있고, `CHANGELOG.md:12`가 제거된 `--src` 옵션을 나열. 릴리스 추적성 저하.
 - **완료(`다음 커밋`):** 이번 리뷰 작업 전체를 담은 `## [Unreleased]` 섹션(Added/Fixed/Changed) 추가로 공백 해소. `--src`는 H3에서 재추가됐으므로 alpha.1 기재가 다시 유효(잔존 참조 문제 자연 해소).
 
-### [ ] L6. multiline description이 inline escape에서 공백으로 정규화
+### [x] L6. multiline description이 inline escape에서 공백으로 정규화
 - **위치:** `README.md:77`, `src/render/markdown.ts:21`
 - **문제:** README는 multiline description을 programmatic API로 쓰라 안내하지만 렌더러가 줄바꿈을 공백으로 정규화 → "multiline 보존" 기대 사용자 혼란.
+- **완료(`다음 커밋`):** `escapeMarkdownParagraph` 추가 — 줄 단위로 inline 이스케이프 후 markdown hard break(`  \n`)로 연결해 줄바꿈 보존. 문서 description 렌더를 이걸로 교체. 신규 테스트 1건 + 기존 이스케이프 테스트 갱신, 141 pass, `examples/ERD.md` 불변.
 
 ### [ ] L7. `npm audit` devDependency 경로 14건
 - **위치:** `package.json` (devDependencies)

@@ -2,6 +2,7 @@ import type { DocumentModel, EnrichedEntity, NamespaceGroup } from '../model/bui
 import type { ColumnModel, ConstraintModel, DiagramModel } from '../model/types.js';
 import {
   escapeMarkdownInline,
+  escapeMarkdownParagraph,
   escapeMarkdownTableCell,
   renderMarkdownBlockQuote,
   renderMarkdownInlineCode,
@@ -18,7 +19,7 @@ export function renderMarkdown(docModel: DocumentModel): string {
   const sections: string[] = [`# ${escapeMarkdownInline(docModel.title)}`];
 
   if (docModel.description) {
-    sections.push(escapeMarkdownInline(docModel.description));
+    sections.push(escapeMarkdownParagraph(docModel.description));
   }
 
   // A table of contents only helps when there is more than one namespace section.
