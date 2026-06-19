@@ -194,6 +194,30 @@ describe('buildDiagramModel — @Formula', () => {
     expect(brokenFormula!.formula).toBe('<unresolved>');
     expect(renderErDiagram(model)).toContain('integer broken_formula "formula: <unresolved>"');
   });
+
+  it('coerces a non-string formula return value to a string (M4)', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'Rep',
+      tableName: 'rep',
+      properties: {
+        score: {
+          name: 'score',
+          fieldNames: ['score'],
+          type: 'integer',
+          kind: ReferenceKind.SCALAR,
+          // misbehaving formula that returns a number instead of a SQL string
+          formula: () => 42 as unknown as string,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const score = model.entities[0]!.columns.find((c) => c.propName === 'score');
+
+    expect(score!.formula).toBe('42');
+    // Downstream string handling (markdown inline code) must not crash.
+    expect(() => renderErDiagram(model)).not.toThrow();
+  });
 });
 
 describe('buildDiagramModel — STI (Single Table Inheritance)', () => {

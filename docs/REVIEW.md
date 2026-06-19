@@ -79,10 +79,11 @@
 - **Fix:** 엔티티 섹션에 `Table: users` 표기 추가, 가능하면 Mermaid label에도 반영.
 - **완료(`다음 커밋`):** 엔티티 섹션 제목 아래에 `*Table: \`name\`*` 추가(Mermaid 식별자는 관계 참조 일관성 위해 className 유지). STI 자식은 루트 테이블명 표시. 신규 테스트 1건, `npm test` 131 pass, `examples/ERD.md` 재생성(Table 라인만 추가됨 확인).
 
-### [ ] M4. 비문자열 `@Formula` 반환값이 마크다운 렌더러를 크래시
+### [x] M4. 비문자열 `@Formula` 반환값이 마크다운 렌더러를 크래시
 - **위치:** `src/render/mermaid.ts:126` (`resolveFormulaExpr`)
 - **문제:** throw만 catch하고 비문자열 반환은 통과 → `renderMarkdownInlineCode→normalizeInlineText`의 `value.replace`에서 크래시(Mermaid는 생존).
 - **Fix:** `resolveFormulaExpr` 결과를 `String()` 강제 또는 `typeof` 검증.
+- **완료(`다음 커밋`):** 숫자 반환 formula로 `value.replace is not a function` 크래시 재현 → `typeof result === 'string' ? result : String(result)`로 강제. 신규 테스트 1건, `npm test` 132 pass.
 
 ### [ ] M5. `@Enum` 허용값(`prop.items`)이 전혀 렌더링되지 않음
 - **위치:** `src/model/build.ts:73` (SCALAR 처리)

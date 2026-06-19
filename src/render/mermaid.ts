@@ -160,7 +160,10 @@ function resolveFormulaExpr(cb: (table: FormulaTable, cols: Record<string, strin
         get: (_target: Record<string, string>, key: string | symbol): string => (typeof key === 'string' ? key : ''),
       }
     );
-    return cb(FORMULA_DUMMY_TABLE, cols);
+    const result = cb(FORMULA_DUMMY_TABLE, cols);
+    // The callback is typed to return a string, but a misbehaving formula can
+    // return anything; coerce so downstream string handling never crashes.
+    return typeof result === 'string' ? result : String(result);
   } catch {
     return UNRESOLVED_FORMULA;
   }
