@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'path';
 import { describe, expect, it } from 'vitest';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
@@ -9,6 +11,22 @@ describe('loadJsDoc', () => {
     const result = loadJsDoc([]);
     expect(result.entities.size).toBe(0);
     expect(result.props.size).toBe(0);
+  });
+
+  it('never throws on an unreadable file and still parses valid sources (M6)', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-m6-'));
+    const unreadable = path.join(dir, 'Unreadable.ts');
+    fs.writeFileSync(unreadable, 'export class Unreadable {}\n');
+    fs.chmodSync(unreadable, 0o000);
+
+    try {
+      const result = loadJsDoc([unreadable, FIXTURES_GLOB]);
+      // The bad path is absorbed; valid fixtures are still parsed.
+      expect(result.entities.get('Author')).toBeDefined();
+    } finally {
+      fs.chmodSync(unreadable, 0o644);
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 
   it('extracts @namespace tag from Author entity', () => {

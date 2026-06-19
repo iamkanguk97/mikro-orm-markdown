@@ -91,10 +91,11 @@
 - **Fix:** enum이면 `prop.items`를 Description/Key 또는 별도 표기로 노출.
 - **완료(`다음 커밋`):** `ColumnModel.enumItems` 추가, `prop.enum && prop.items`에서 채움. 마크다운 표 Description에 `One of: a, b` 노출(표 셀 백틱 이스케이프 때문에 평문, 기존 설명과 줄바꿈 병합). 부수효과로 STI discriminator(`type`) 컬럼이 `One of: dog, cat` 표시 → L1 일부 자연 해소. 신규 테스트 2건, `npm test` 134 pass, `examples/ERD.md` 재생성(enum 라인만).
 
-### [ ] M6. `loadJsDoc`의 "Never throws" 계약 위반
+### [x] M6. `loadJsDoc`의 "Never throws" 계약 위반
 - **위치:** `src/docs/jsdoc.ts:45`
 - **문제:** try/catch 부재로 읽기 불가 파일(EACCES, 경로가 디렉터리)에서 ts-morph가 throw → 전체 생성 중단. "문서 누락이 생성을 막지 않는다"는 설계 목표와 모순.
 - **Fix:** 파싱 루프를 try/catch로 감싸 파일 단위로 실패를 흡수.
+- **완료(`다음 커밋`):** 읽기 불가 파일(chmod 000)로 EACCES throw 재현 → 경로별 `addSourceFilesAtPaths` + 파일별 파싱을 각각 try/catch로 흡수(부분 성공 유지). 신규 테스트 1건(불가 파일+유효 글롭 혼합 시 throw 없이 정상 파싱), `npm test` 135 pass.
 
 ### [ ] M7. 빌드된 `dist/cli.js`를 실제 bin처럼 실행하는 e2e 스모크 테스트 부재
 - **위치:** `test/cli.test.ts:31`, `.github/workflows/ci.yml:28`

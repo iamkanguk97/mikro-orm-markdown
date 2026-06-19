@@ -59,34 +59,47 @@ export function loadJsDoc(filePaths: string[]): JsDocResult {
     },
   });
 
-  project.addSourceFilesAtPaths(filePaths);
+  // Add each path independently so one unreadable file or bad glob (EACCES, a
+  // directory, etc.) cannot abort the whole run — missing docs must never block
+  // generation (the "never throws" contract).
+  for (const filePath of filePaths) {
+    try {
+      project.addSourceFilesAtPaths(filePath);
+    } catch {
+      // Skip this path; other sources may still contribute JSDoc.
+    }
+  }
 
   for (const sourceFile of project.getSourceFiles()) {
-    for (const cls of sourceFile.getClasses()) {
-      const className = cls.getName();
-      if (!className) {
-        continue;
-      }
-
-      const classDocs = cls.getJsDocs();
-      if (classDocs.length > 0) {
-        entities.set(className, parseEntityJsDoc(classDocs));
-      }
-
-      const propMap = new Map<string, PropJsDocInfo>();
-      for (const prop of cls.getProperties()) {
-        const propDocs = prop.getJsDocs();
-        if (propDocs.length === 0) {
+    try {
+      for (const cls of sourceFile.getClasses()) {
+        const className = cls.getName();
+        if (!className) {
           continue;
         }
-        const info = parsePropJsDoc(propDocs);
-        if (info.description !== undefined || info.atLeastOne) {
-          propMap.set(prop.getName(), info);
+
+        const classDocs = cls.getJsDocs();
+        if (classDocs.length > 0) {
+          entities.set(className, parseEntityJsDoc(classDocs));
+        }
+
+        const propMap = new Map<string, PropJsDocInfo>();
+        for (const prop of cls.getProperties()) {
+          const propDocs = prop.getJsDocs();
+          if (propDocs.length === 0) {
+            continue;
+          }
+          const info = parsePropJsDoc(propDocs);
+          if (info.description !== undefined || info.atLeastOne) {
+            propMap.set(prop.getName(), info);
+          }
+        }
+        if (propMap.size > 0) {
+          props.set(className, propMap);
         }
       }
-      if (propMap.size > 0) {
-        props.set(className, propMap);
-      }
+    } catch {
+      // Skip this file; a single unparseable source must not block generation.
     }
   }
 
