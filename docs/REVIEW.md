@@ -128,9 +128,10 @@
 - **문제:** 엣지는 제거되지만 FK 컬럼은 남아 문서에 없는 대상을 가리킴(크래시는 아님).
 - **완료(`다음 커밋`):** FK 컬럼에 `referencedEntity`(=`prop.type`) 기록, `buildDocumentModel`에서 hidden 클래스 집합 계산 후 hidden 대상 참조 FK 컬럼 제거(원본 모델 불변, 변경 시에만 복제). 신규 테스트 1건, 139 pass, `examples/ERD.md` 불변.
 
-### [ ] L4. 잠재 크래시: 무방어 프로퍼티 접근 (방어적 비대칭)
+### [x] L4. 잠재 크래시: 무방어 프로퍼티 접근 (방어적 비대칭)
 - **위치:** `src/render/mermaid.ts:141` (`prop.fieldNames.length`), `src/render/mermaid.ts:96` (`normalizeType(prop.type)`)
 - **문제:** 다른 경로는 `?.`/`?? 'integer'`로 가드하는데 이 둘만 무방어. fieldNames/type이 undefined면 크래시. discovery로는 재현 안 됐으나 비대칭은 실재.
+- **완료(`다음 커밋`):** scalar `type: prop.type ?? 'unknown'`, FK `prop.fieldNames && prop.fieldNames.length > 0 ? ... : [\`${name}_id\`]`로 가드. type 없는 scalar + fieldNames 없는 FK 메타로 크래시 없음 + 폴백값 검증. 신규 테스트 1건, 140 pass.
 
 ### [ ] L5. CHANGELOG에 `alpha.2` 누락 + 잔존 `--src` 참조
 - **위치:** `CHANGELOG.md:8,12`

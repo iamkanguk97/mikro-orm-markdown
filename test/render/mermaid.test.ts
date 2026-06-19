@@ -195,6 +195,32 @@ describe('buildDiagramModel — @Formula', () => {
     expect(renderErDiagram(model)).toContain('integer broken_formula "formula: <unresolved>"');
   });
 
+  it('does not crash on a scalar with no type or an FK with no fieldNames (L4)', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'Loose',
+      tableName: 'loose',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        // scalar with no `type`
+        mystery: { name: 'mystery', fieldNames: ['mystery'], kind: ReferenceKind.SCALAR },
+        // FK with no `fieldNames`
+        owner: { name: 'owner', type: 'Loose', kind: ReferenceKind.MANY_TO_ONE },
+      },
+    });
+
+    let model: ReturnType<typeof buildDiagramModel>;
+    expect(() => {
+      model = buildDiagramModel([meta]);
+      renderErDiagram(model);
+    }).not.toThrow();
+
+    const cols = model!.entities[0]!.columns;
+    expect(cols.find((c) => c.propName === 'mystery')!.type).toBe('unknown');
+    // FK with no fieldNames falls back to `<prop>_id`.
+    expect(cols.find((c) => c.propName === 'owner')!.fieldName).toBe('owner_id');
+  });
+
   it('captures @Enum allowed values on the column (M5)', () => {
     const meta = Object.assign({} as EntityMetadata, {
       className: 'Account',

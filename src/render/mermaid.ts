@@ -127,8 +127,9 @@ function buildColumns(
         fieldName: prop.fieldNames?.[0] ?? prop.name,
         // Store the original type (e.g. `varchar(255)`); the Mermaid renderer
         // sanitizes it for diagram identifiers, while the markdown table shows
-        // it verbatim.
-        type: prop.type,
+        // it verbatim. Guard against a missing type so downstream string
+        // handling never sees undefined (matches the FK path's defaulting).
+        type: prop.type ?? 'unknown',
         isPrimary: prop.primary === true,
         isForeignKey: false,
         isUnique: prop.unique === true,
@@ -177,7 +178,7 @@ function resolveFormulaExpr(cb: (table: FormulaTable, cols: Record<string, strin
 }
 
 function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, EntityMetadata>): ColumnModel[] {
-  const fieldNames = prop.fieldNames.length > 0 ? prop.fieldNames : [`${prop.name}_id`];
+  const fieldNames = prop.fieldNames && prop.fieldNames.length > 0 ? prop.fieldNames : [`${prop.name}_id`];
   const fkTypes = resolveFkTypes(prop, metaByClass, fieldNames.length);
 
   return fieldNames.map((fieldName, index) => ({
