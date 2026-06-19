@@ -13,10 +13,37 @@ interface CliOptions {
   out: string;
   title: string;
   description?: string;
+  tsconfig?: string;
 }
 
 export function toConfigImportSpecifier(configPath: string): string {
   return pathToFileURL(path.resolve(configPath)).href;
+}
+
+/**
+ * Walks up from the directory of `fromPath` looking for the nearest
+ * `tsconfig.json`. Returns its absolute path, or `undefined` if none is found
+ * before reaching the filesystem root.
+ *
+ * This lets `.ts` config loading resolve the tsconfig relative to the config
+ * file itself rather than the current working directory, so the CLI behaves
+ * the same regardless of where it is invoked from.
+ */
+export function findNearestTsconfig(fromPath: string): string | undefined {
+  let dir = path.dirname(path.resolve(fromPath));
+
+  for (;;) {
+    const candidate = path.join(dir, 'tsconfig.json');
+    if (syncFs.existsSync(candidate)) {
+      return candidate;
+    }
+
+    const parent = path.dirname(dir);
+    if (parent === dir) {
+      return undefined;
+    }
+    dir = parent;
+  }
 }
 
 /**
@@ -25,19 +52,54 @@ export function toConfigImportSpecifier(configPath: string): string {
  * For `.ts` config files, registers the `tsx` loader at runtime so plain
  * `node` can import TypeScript — the user only needs `tsx` installed,
  * not a special invocation (`node --import tsx ...`).
+ *
+ * The tsconfig handed to `tsx` is resolved relative to the config file (or
+ * given explicitly via `tsconfigPath`), not the current working directory.
+ * Without this, `tsx` picks up whatever tsconfig sits above the cwd, which may
+ * not apply `emitDecoratorMetadata` to the entity files — making discovery
+ * fail with a cryptic `Cannot read properties of undefined` error depending on
+ * which directory the CLI was launched from.
  */
-export async function loadOrmOptions(configPath: string): Promise<Options> {
+export async function loadOrmOptions(configPath: string, tsconfigPath?: string): Promise<Options> {
   if (configPath.endsWith('.ts')) {
+    let register: typeof import('tsx/esm/api')['register'];
     try {
-      const { register } = await import('tsx/esm/api');
-      register();
+      ({ register } = await import('tsx/esm/api'));
     } catch {
       throw new Error('TypeScript config files require the "tsx" package.\nInstall it with: npm install -D tsx');
     }
+
+    let tsconfig: string | undefined;
+    if (tsconfigPath !== undefined) {
+      tsconfig = path.resolve(tsconfigPath);
+      if (!syncFs.existsSync(tsconfig)) {
+        throw new Error(`--tsconfig file not found: ${tsconfig}`);
+      }
+    } else {
+      tsconfig = findNearestTsconfig(configPath);
+    }
+
+    register(tsconfig !== undefined ? { tsconfig } : {});
   }
 
   const configUrl = toConfigImportSpecifier(configPath);
-  const mod = (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
+  let mod: { default?: unknown };
+  try {
+    mod = (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
+  } catch (cause) {
+    if (configPath.endsWith('.ts')) {
+      const detail = cause instanceof Error ? cause.message : String(cause);
+      throw new Error(
+        `Failed to load TypeScript config.\n${detail}\n\n` +
+          'If this looks like a decorator/metadata error, the tsconfig applied to your ' +
+          'entity files is likely missing "experimentalDecorators" / "emitDecoratorMetadata".\n' +
+          'Make sure a tsconfig.json with those options sits next to your config file, ' +
+          'or pass one explicitly with --tsconfig <path>.',
+        { cause }
+      );
+    }
+    throw cause;
+  }
 
   if (mod.default === undefined) {
     throw new Error('Config file must use a default export, e.g. `export default defineConfig({ ... })`.');
@@ -78,7 +140,7 @@ async function run(opts: CliOptions): Promise<void> {
 
   let ormOptions: Options;
   try {
-    ormOptions = await loadOrmOptions(configPath);
+    ormOptions = await loadOrmOptions(configPath, opts.tsconfig);
   } catch (err) {
     process.stderr.write(
       `Error: Cannot load config: ${configPath}\n${err instanceof Error ? err.message : String(err)}\n`
@@ -116,6 +178,10 @@ const program = new Command()
   .option('-o, --out <path>', 'Output markdown file path', './ERD.md')
   .option('-t, --title <string>', 'Document title', 'Database Schema')
   .option('-d, --description <string>', 'Optional description paragraph shown below the title')
+  .option(
+    '--tsconfig <path>',
+    'tsconfig.json to use when loading a .ts config (defaults to the nearest one beside the config file)'
+  )
   .action(run);
 
 function isDirectCliExecution(): boolean {

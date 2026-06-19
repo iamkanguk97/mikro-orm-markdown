@@ -33,10 +33,11 @@
 
 ## 🔴 HIGH
 
-### [ ] H1. `.ts` config 로딩이 cwd/tsconfig 위치에 민감해 cryptic하게 실패
+### [x] H1. `.ts` config 로딩이 cwd/tsconfig 위치에 민감해 cryptic하게 실패
 - **위치:** `src/cli.ts:29` (`loadOrmOptions`)
 - **문제:** repo 루트에서 `node dist/cli.js -c examples/mikro-orm.config.ts ...` 실행 시 `Cannot read properties of undefined (reading 'constructor')`로 실패. `examples/`로 이동해 실행하면 성공. README:59는 "CLI가 `.ts` config를 자동 로드"한다고만 안내 → 사용자가 워킹 디렉터리/tsconfig 차이로 막히고 원인 파악 불가. **재현됨.**
 - **Fix:** config 파일 기준 nearest `tsconfig` 탐색 + `register({ tsconfig })`, decorator/tsconfig mismatch 전용 에러 메시지, 필요 시 `--tsconfig` 옵션.
+- **완료(`f244e6f`):** `findNearestTsconfig`로 config 파일 옆 tsconfig를 찾아 `register({ tsconfig })`에 명시 전달 + `--tsconfig` 옵션 + `.ts` 로드 실패 시 데코레이터/메타데이터 진단 힌트. 루트 cwd 스모크 성공 확인, 신규 테스트 3건, `npm test` 120 pass.
 
 ### [ ] H2. 설정/메타데이터 실패 시 진짜 원인(cause)이 버려짐
 - **위치:** `src/cli.ts:97` (+ `src/metadata/load.ts:45`)

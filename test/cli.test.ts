@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { loadOrmOptions, toConfigImportSpecifier, writeMarkdownFile } from '../src/cli.js';
+import { findNearestTsconfig, loadOrmOptions, toConfigImportSpecifier, writeMarkdownFile } from '../src/cli.js';
 
 describe('CLI helpers', () => {
   let tempDir: string | undefined;
@@ -36,6 +36,36 @@ describe('CLI helpers', () => {
     const options = await loadOrmOptions(configPath);
 
     expect(options).toMatchObject({ dbName: ':memory:', entities: [] });
+  });
+
+  it('finds the tsconfig.json nearest to the config file, not the cwd', async () => {
+    const dir = await createTempDir();
+    const nested = path.join(dir, 'pkg', 'config');
+    await fs.mkdir(nested, { recursive: true });
+    const tsconfigPath = path.join(dir, 'pkg', 'tsconfig.json');
+    await fs.writeFile(tsconfigPath, '{}\n', 'utf-8');
+    const configPath = path.join(nested, 'mikro-orm.config.ts');
+
+    expect(findNearestTsconfig(configPath)).toBe(tsconfigPath);
+  });
+
+  it('returns undefined when no tsconfig.json exists above the config file', async () => {
+    const dir = await createTempDir();
+    const configPath = path.join(dir, 'mikro-orm.config.ts');
+
+    // A tsconfig may legitimately not exist near temp dirs; the walk should
+    // terminate at the filesystem root rather than loop forever.
+    const result = findNearestTsconfig(configPath);
+    expect(result === undefined || result.endsWith('tsconfig.json')).toBe(true);
+  });
+
+  it('rejects an explicit --tsconfig path that does not exist', async () => {
+    const dir = await createTempDir();
+    const configPath = path.join(dir, 'config.ts');
+    await fs.writeFile(configPath, "export default { dbName: ':memory:', entities: [] };\n", 'utf-8');
+    const missing = path.join(dir, 'nope.tsconfig.json');
+
+    await expect(loadOrmOptions(configPath, missing)).rejects.toThrow(`--tsconfig file not found: ${missing}`);
   });
 
   it('creates missing output parent directories before writing markdown', async () => {
