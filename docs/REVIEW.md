@@ -103,10 +103,11 @@
 - **Fix:** `npm run build` 후 `node dist/cli.js -c ... -o tmp.md` 스모크 + `npm pack` 후 임시 프로젝트 설치 테스트를 CI에 추가.
 - **완료(`다음 커밋`):** `test/e2e/cli-smoke.test.ts` 추가 — beforeAll에서 빌드 후 **루트 cwd**에서 `node dist/cli.js -c examples/...ts` 실행, 출력 검증(H1 회귀를 잡는 유일한 테스트). CI에 Build 후 E2E smoke 스텝 추가. `npm test` 136 pass(8 파일). `npm pack` 설치 테스트는 범위 외로 보류.
 
-### [ ] M8. 드라이버 지원 주장 과대 (SQLite만 테스트)
+### [x] M8. 드라이버 지원 주장 과대 (SQLite만 테스트)
 - **위치:** `README.md:20`, `package.json`
 - **문제:** PostgreSQL/MySQL/MariaDB/MSSQL 지원 명시하나 dev 의존성·테스트는 SQLite뿐. 드라이버별 metadata 차이 미검증.
 - **Fix:** 드라이버별 최소 smoke fixture 추가, 또는 "metadata-based, primarily tested with SQLite"로 문구 완화.
+- **완료(`다음 커밋`):** 문구 완화 채택 — "driver-agnostic, SQLite로 테스트, 타 드라이버는 동작 예상이나 자동 테스트 미커버"로 정정. 드라이버 패키지 설치/네이티브 의존성 부담 때문에 fixture는 보류.
 
 ---
 

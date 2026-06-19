@@ -17,7 +17,7 @@ Generate **Mermaid ERD + Markdown documentation** from your [MikroORM](https://m
   - Actual DB column names derived from your NamingStrategy
   - Indexes and constraints
 - **No live database connection required** — reads entity metadata from your MikroORM config
-- Works with MikroORM SQL drivers: PostgreSQL, MySQL/MariaDB, SQLite, and MSSQL
+- **Driver-agnostic** — works from MikroORM metadata, so any SQL driver (PostgreSQL, MySQL/MariaDB, SQLite, MSSQL) should work. Currently exercised against SQLite in the test suite; other drivers are expected to work but not yet covered by automated tests.
 
 ### MikroORM-specific concepts
 
