@@ -39,3 +39,8 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: E2E smoke (built bin, repo-root cwd)
+        run: |
+          node dist/cli.js -c examples/mikro-orm.config.ts -o /tmp/erd-smoke.md -t "CI Smoke"
+          test -s /tmp/erd-smoke.md

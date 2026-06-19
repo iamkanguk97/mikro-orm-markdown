@@ -97,10 +97,11 @@
 - **Fix:** 파싱 루프를 try/catch로 감싸 파일 단위로 실패를 흡수.
 - **완료(`다음 커밋`):** 읽기 불가 파일(chmod 000)로 EACCES throw 재현 → 경로별 `addSourceFilesAtPaths` + 파일별 파싱을 각각 try/catch로 흡수(부분 성공 유지). 신규 테스트 1건(불가 파일+유효 글롭 혼합 시 throw 없이 정상 파싱), `npm test` 135 pass.
 
-### [ ] M7. 빌드된 `dist/cli.js`를 실제 bin처럼 실행하는 e2e 스모크 테스트 부재
+### [x] M7. 빌드된 `dist/cli.js`를 실제 bin처럼 실행하는 e2e 스모크 테스트 부재
 - **위치:** `test/cli.test.ts:31`, `.github/workflows/ci.yml:28`
 - **문제:** 테스트가 helper/programmatic 중심이라 H1 같은 cwd/tsconfig 문제를 CI가 못 잡음.
 - **Fix:** `npm run build` 후 `node dist/cli.js -c ... -o tmp.md` 스모크 + `npm pack` 후 임시 프로젝트 설치 테스트를 CI에 추가.
+- **완료(`다음 커밋`):** `test/e2e/cli-smoke.test.ts` 추가 — beforeAll에서 빌드 후 **루트 cwd**에서 `node dist/cli.js -c examples/...ts` 실행, 출력 검증(H1 회귀를 잡는 유일한 테스트). CI에 Build 후 E2E smoke 스텝 추가. `npm test` 136 pass(8 파일). `npm pack` 설치 테스트는 범위 외로 보류.
 
 ### [ ] M8. 드라이버 지원 주장 과대 (SQLite만 테스트)
 - **위치:** `README.md:20`, `package.json`
