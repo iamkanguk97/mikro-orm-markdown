@@ -73,10 +73,11 @@
 - **Fix:** `prop.object`/`prop.array` 인지해 단일 JSON 컬럼으로 표현하거나 fieldName 기준 dedupe.
 - **완료(`다음 커밋`):** 재현 결과 이 버전에선 leaf가 실제 컬럼처럼 펼쳐지는 형태(`id,street,city`)였음 — 실제 스키마는 JSON 컬럼 1개. EMBEDDED 분기에서 `prop.object||prop.array`면 단일 `json` 컬럼(`embeddedIn`=`Addr` 또는 `Addr[]`) emit, SCALAR leaf(`object&&embedded`)는 skip. inline(비-object) 임베디드는 불변. 신규 테스트 1건, `npm test` 130 pass, `examples/ERD.md` 무변경.
 
-### [ ] M3. 실제 `tableName`이 어디에도 렌더링되지 않음
+### [x] M3. 실제 `tableName`이 어디에도 렌더링되지 않음
 - **위치:** `src/model/types.ts:69`, `src/render/mermaid.ts:299`
 - **문제:** `EntityModel.tableName`은 저장되지만 Mermaid/Markdown 모두 class name만 사용. DB 문서 도구에서 실제 테이블명(`users`)은 사용자가 가장 먼저 보고 싶은 정보.
 - **Fix:** 엔티티 섹션에 `Table: users` 표기 추가, 가능하면 Mermaid label에도 반영.
+- **완료(`다음 커밋`):** 엔티티 섹션 제목 아래에 `*Table: \`name\`*` 추가(Mermaid 식별자는 관계 참조 일관성 위해 className 유지). STI 자식은 루트 테이블명 표시. 신규 테스트 1건, `npm test` 131 pass, `examples/ERD.md` 재생성(Table 라인만 추가됨 확인).
 
 ### [ ] M4. 비문자열 `@Formula` 반환값이 마크다운 렌더러를 크래시
 - **위치:** `src/render/mermaid.ts:126` (`resolveFormulaExpr`)

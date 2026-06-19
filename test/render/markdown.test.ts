@@ -102,6 +102,12 @@ describe('renderMarkdown — entity descriptions', () => {
     const md = await getMarkdown();
     expect(md).toContain('> 블로그 게시글');
   });
+
+  it('shows the actual DB table name for each entity (M3)', async () => {
+    const md = await getMarkdown();
+    // Author maps to the `author` table via the default naming strategy.
+    expect(md).toContain('*Table: `author`*');
+  });
 });
 
 describe('renderMarkdown — column table', () => {

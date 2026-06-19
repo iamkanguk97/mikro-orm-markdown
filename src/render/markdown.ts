@@ -77,6 +77,10 @@ function renderGroupSection(group: NamespaceGroup): string {
 function renderEntitySection(entity: EnrichedEntity): string {
   const parts: string[] = [`### ${escapeMarkdownInline(entity.model.className)}`];
 
+  // The actual DB table name is what readers of a schema doc look for first,
+  // and it is not otherwise visible (the ERD and heading use the class name).
+  parts.push(`*Table: ${renderMarkdownInlineCode(entity.model.tableName)}*`);
+
   if (entity.jsDoc?.description) {
     parts.push(renderMarkdownBlockQuote(entity.jsDoc.description));
   }

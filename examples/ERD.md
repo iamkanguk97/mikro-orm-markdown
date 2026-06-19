@@ -34,6 +34,8 @@ erDiagram
 
 ### Animal
 
+*Table: `animal`*
+
 > Base class for all animals (Single Table Inheritance root). Dog and Cat
 > share one physical table, told apart by the type discriminator column.
 > STI has no Prisma equivalent.
@@ -52,6 +54,8 @@ erDiagram
 
 ### Dog
 
+*Table: `animal`*
+
 > A dog — stored in the Animal table with type = 'dog'.
 
 *Extends `Animal` (Single Table Inheritance)*
@@ -68,6 +72,8 @@ erDiagram
 - Index `animal_name_idx`: (name)
 
 ### Cat
+
+*Table: `animal`*
 
 > A cat — stored in the Animal table with type = 'cat'.
 
@@ -129,6 +135,8 @@ erDiagram
 
 ### User
 
+*Table: `user`*
+
 > A registered user who can author posts.
 
 | Column | Type | Key | Nullable | Description |
@@ -141,6 +149,8 @@ erDiagram
 
 ### Tag
 
+*Table: `tag`*
+
 > A label that can be attached to many posts.
 
 | Column | Type | Key | Nullable | Description |
@@ -149,6 +159,8 @@ erDiagram
 | label | string | UK |  | Unique, human-readable tag name. |
 
 ### Profile
+
+*Table: `profile`*
 
 > Extended profile information for a user.
 
@@ -159,6 +171,8 @@ erDiagram
 | avatar_url | string |  | Y | URL of the avatar image. |
 
 ### Post
+
+*Table: `post`*
 
 > A blog post written by a user.
 
@@ -176,6 +190,8 @@ erDiagram
 - `body_length`: `LENGTH(body)`
 
 ### Comment
+
+*Table: `comment`*
 
 > A reader comment on a post, optionally threaded under a parent comment.
 
@@ -199,6 +215,8 @@ erDiagram
 ```
 
 ### ReportSettings
+
+*Table: `report_settings`*
 
 > Reporting configuration. The describe tag below documents it as a table in
 > the Reporting section only — it is intentionally left out of the ERD diagram.
@@ -247,6 +265,8 @@ erDiagram
 
 ### Product
 
+*Table: `product`*
+
 > A purchasable product.
 
 | Column | Type | Key | Nullable | Description |
@@ -262,6 +282,8 @@ erDiagram
 
 ### OrderItem
 
+*Table: `order_item`*
+
 > A single line item within an order.
 
 | Column | Type | Key | Nullable | Description |
@@ -272,6 +294,8 @@ erDiagram
 | product_id | integer | FK (product) |  | The product being ordered (required). |
 
 ### Order
+
+*Table: `order`*
 
 > A customer order containing at least one line item.
 
@@ -287,6 +311,8 @@ erDiagram
 - Check `order_total_non_negative`: `total_cents >= 0`
 
 ### Customer
+
+*Table: `customer`*
 
 > A shop customer with an embedded address and a computed display column.
 
