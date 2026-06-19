@@ -143,10 +143,11 @@
 - **문제:** README는 multiline description을 programmatic API로 쓰라 안내하지만 렌더러가 줄바꿈을 공백으로 정규화 → "multiline 보존" 기대 사용자 혼란.
 - **완료(`다음 커밋`):** `escapeMarkdownParagraph` 추가 — 줄 단위로 inline 이스케이프 후 markdown hard break(`  \n`)로 연결해 줄바꿈 보존. 문서 description 렌더를 이걸로 교체. 신규 테스트 1건 + 기존 이스케이프 테스트 갱신, 141 pass, `examples/ERD.md` 불변.
 
-### [ ] L7. `npm audit` devDependency 경로 14건
+### [x] L7. `npm audit` devDependency 경로 14건
 - **위치:** `package.json` (devDependencies)
 - **문제:** `--omit=dev`는 0건이나 전체 audit는 14건(런타임 영향 낮음, 기여자/CI 신호엔 부정적).
 - **Fix:** 별도 브랜치에서 MikroORM sqlite/Vitest 계열 업그레이드 검토(강제 수정은 breaking 가능).
+- **완료(`다음 커밋`):** `npm audit fix`(비파괴)는 해결 0 — 전부 메이저 필요 확인. vitest v4 업글을 실제 시도했으나 24개 테스트 깨짐(소스경로/JSDoc 추출 회귀) → 되돌림. 런타임 0건이고 dev 권고는 toolchain/네이티브빌드(`vitest`/`vite`/`esbuild`, `sqlite3`→`node-gyp`/`tar`) 한정이며 `@mikro-orm/sqlite` v7은 지원 MikroORM 메이저까지 바꾸는 breaking이라, `SECURITY.md`에 현황·근거를 문서화하고 전용 유지보수 패스로 추적(강제 미적용).
 
 ---
 
