@@ -35,7 +35,7 @@ Prisma 기반 도구로는 표현할 수 없는 MikroORM 고유 개념도 함께
 - `@mikro-orm/core` >= 6 (peer dependency)
 - 사용할 DB에 맞는 MikroORM 드라이버 패키지가 설치된 MikroORM 설정 파일
 - 데코레이터 기반 엔티티 (`@Entity()`) — `EntitySchema`로 정의한 엔티티는 현재 지원하지 않습니다
-- 각 엔티티 프로퍼티의 타입은 discovery 시점에 결정될 수 있어야 합니다. 데코레이터에 `type:`/`entity:`를 명시하거나, `@mikro-orm/reflection`을 설치하세요 — 설치하면 CLI가 자동으로 그 `TsMorphMetadataProvider`로 TypeScript 소스에서 타입을 읽어, `@Property() name: string`처럼 타입을 생략해도 동작합니다. (CLI는 `.ts` config를 `tsx`/esbuild로 로드하는데 esbuild는 `emitDecoratorMetadata` 리플렉션 데이터를 생성하지 않으므로 기본 `ReflectMetadataProvider`는 타입을 스스로 추론하지 못합니다. 자동 주입을 원치 않으면 `metadataProvider`를 직접 지정하세요.)
+- 각 엔티티 프로퍼티의 타입은 discovery 시점에 결정될 수 있어야 합니다. 데코레이터에 `type:`/`entity:`를 명시하거나, `@mikro-orm/reflection`을 설치하세요 — 설치하면 CLI가 자동으로 그 `TsMorphMetadataProvider`로 TypeScript 소스에서 타입을 읽어, `@Property() name: string`처럼 타입을 생략해도 동작합니다. `@mikro-orm/reflection`은 **`@mikro-orm/core`와 정확히 같은 버전**으로 설치하세요 — MikroORM은 모든 공식 `@mikro-orm/*` 패키지가 하나의 정확히 같은 버전이어야 하며, 버전이 다르면 discovery가 실패합니다. (CLI는 `.ts` config를 `tsx`/esbuild로 로드하는데 esbuild는 `emitDecoratorMetadata` 리플렉션 데이터를 생성하지 않으므로 기본 `ReflectMetadataProvider`는 타입을 스스로 추론하지 못합니다. 자동 주입을 원치 않으면 `metadataProvider`를 직접 지정하세요.)
 
 ## 설치
 

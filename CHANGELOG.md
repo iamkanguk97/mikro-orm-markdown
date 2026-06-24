@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@Enum` allowed values listed in the column description (`One of: ...`)
 - STI child discriminator value shown in the Extends note
 - End-to-end smoke test running the built CLI from the repo root (plus a CI step)
+- Type-omitted properties (e.g. `@Property() name: string`) are now documented: when the config picks no metadata provider and `@mikro-orm/reflection` is installed, the CLI auto-uses its `TsMorphMetadataProvider` to read types from your TypeScript sources
+- `.ts` configs default to `preferTs: true`, so MikroORM discovers your `entitiesTs` sources without extra config
+- `npm pack` smoke test (`test:pack`) that installs the built tarball into a temporary project
 
 ### Fixed
 
@@ -28,10 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A warning is emitted when `@atLeastOne` cannot be matched to a relation edge
 - FK columns referencing a `@hidden` entity are dropped instead of dangling
 - Guarded against missing `prop.type` / `prop.fieldNames` during rendering
+- Discovery failures from missing decorator metadata now explain that the CLI's `tsx` loader cannot honor `emitDecoratorMetadata`, pointing at `@mikro-orm/reflection` or explicit `type:`/`entity:` attributes
+- Config default exports are validated to be a plain object (primitives and arrays are rejected with a clear message)
 
 ### Changed
 
 - Driver-support wording clarified: driver-agnostic, but only SQLite is covered by automated tests
+- `@Formula` computed columns now render as nullable
 
 ## [0.1.0-alpha.1] - 2026-06-11
 

@@ -35,7 +35,7 @@ Beyond what Prisma-based tools can express, `mikro-orm-markdown` also visualizes
 - `@mikro-orm/core` >= 6 (peer dependency)
 - A MikroORM config file with the matching database driver package installed
 - Decorator-based entities (`@Entity()`) — `EntitySchema`-defined entities are not currently supported
-- Each entity property's type must be resolvable during discovery. Either give the decorator an explicit `type:`/`entity:` attribute, or install `@mikro-orm/reflection` — the CLI then auto-uses its `TsMorphMetadataProvider` to read types from your TypeScript sources, so a bare `@Property() name: string` works. (The CLI loads `.ts` configs through `tsx`/esbuild, which does not emit `emitDecoratorMetadata` reflection data, so MikroORM's default `ReflectMetadataProvider` cannot infer the type on its own. Set `metadataProvider` yourself to opt out of the auto-injection.)
+- Each entity property's type must be resolvable during discovery. Either give the decorator an explicit `type:`/`entity:` attribute, or install `@mikro-orm/reflection` — the CLI then auto-uses its `TsMorphMetadataProvider` to read types from your TypeScript sources, so a bare `@Property() name: string` works. Install `@mikro-orm/reflection` at the **same version as your `@mikro-orm/core`** — MikroORM requires all official `@mikro-orm/*` packages to share one exact version, and a mismatch fails discovery. (The CLI loads `.ts` configs through `tsx`/esbuild, which does not emit `emitDecoratorMetadata` reflection data, so MikroORM's default `ReflectMetadataProvider` cannot infer the type on its own. Set `metadataProvider` yourself to opt out of the auto-injection.)
 
 ## Installation
 
