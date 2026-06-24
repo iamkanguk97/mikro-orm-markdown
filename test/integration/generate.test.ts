@@ -47,6 +47,24 @@ describe('generateMarkdown', () => {
     const descIndex = md.indexOf('주문 도메인 스키마입니다.');
     expect(descIndex).toBeGreaterThan(titleIndex);
   });
+
+  it('rejects explicit src paths that match no source files', async () => {
+    await expect(
+      generateMarkdown({
+        orm: config,
+        src: ['./test/fixtures/entities/no-match-*.ts'],
+      })
+    ).rejects.toThrow('No source files matched the explicit src paths');
+  });
+
+  it('rejects explicit src paths that omit discovered entity declarations', async () => {
+    await expect(
+      generateMarkdown({
+        orm: config,
+        src: ['./test/fixtures/entities/Author.ts'],
+      })
+    ).rejects.toThrow('Explicit src paths did not include source declarations for discovered entities');
+  });
 });
 
 describe('resolveJsDocSources', () => {

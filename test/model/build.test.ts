@@ -27,6 +27,8 @@ describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
     const jsDoc: JsDocResult = {
       entities: new Map(),
       props: new Map([['Parent', new Map([['children', { atLeastOne: true }]])]]),
+      sourceFileCount: 0,
+      classNames: new Set(),
     };
 
     const onWarn = vi.fn();
@@ -65,6 +67,8 @@ describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
     const jsDoc: JsDocResult = {
       entities: new Map([['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
       props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(),
     };
 
     const docModel = buildDocumentModel([order, secret], jsDoc, 'T');
@@ -94,7 +98,11 @@ describe('buildDocumentModel — groups', () => {
   it('"default" is sorted last when it exists', async () => {
     const { metas } = await loadEntityMetadata(config);
     // Pass empty jsDocResult so no JSDoc loaded → all entities fall into "default"
-    const docModel = buildDocumentModel(metas, { entities: new Map(), props: new Map() }, 'T');
+    const docModel = buildDocumentModel(
+      metas,
+      { entities: new Map(), props: new Map(), sourceFileCount: 0, classNames: new Set() },
+      'T'
+    );
     const groupNames = docModel.groups.map((g) => g.name);
     expect(groupNames[groupNames.length - 1]).toBe('default');
   });

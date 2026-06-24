@@ -44,6 +44,34 @@ describe('CLI helpers', () => {
     expect(options).toMatchObject({ dbName: ':memory:', entities: [] });
   });
 
+  it('defaults .ts config loading to TypeScript entity discovery', async () => {
+    const dir = await createTempDir();
+    const configPath = path.join(dir, 'config.ts');
+    await fs.writeFile(
+      configPath,
+      "export default { dbName: ':memory:', entities: ['./dist/**/*.js'], entitiesTs: ['./src/**/*.ts'] };\n",
+      'utf-8'
+    );
+
+    const options = await loadOrmOptions(configPath);
+
+    expect(options.preferTs).toBe(true);
+  });
+
+  it('does not override an explicit preferTs value in .ts config files', async () => {
+    const dir = await createTempDir();
+    const configPath = path.join(dir, 'config.ts');
+    await fs.writeFile(
+      configPath,
+      "export default { dbName: ':memory:', entities: ['./dist/**/*.js'], entitiesTs: ['./src/**/*.ts'], preferTs: false };\n",
+      'utf-8'
+    );
+
+    const options = await loadOrmOptions(configPath);
+
+    expect(options.preferTs).toBe(false);
+  });
+
   it('finds the tsconfig.json nearest to the config file, not the cwd', async () => {
     const dir = await createTempDir();
     const nested = path.join(dir, 'pkg', 'config');

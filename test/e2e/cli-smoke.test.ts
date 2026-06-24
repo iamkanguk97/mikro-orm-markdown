@@ -12,6 +12,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const repoRoot = path.resolve(import.meta.dirname, '../..');
 const cliPath = path.join(repoRoot, 'dist', 'cli.js');
 const exampleConfig = path.join('examples', 'mikro-orm.config.ts');
+const dualDiscoveryConfig = path.join('test', 'fixtures', 'mikro-orm.dual.config.ts');
+const dualDiscoveryTsconfig = path.join('test', 'fixtures', 'tsconfig.dual.json');
 
 let outFile: string;
 
@@ -36,5 +38,20 @@ describe('CLI smoke (built bin)', () => {
     const output = fs.readFileSync(outFile, 'utf-8');
     expect(output.startsWith('# Smoke')).toBe(true);
     expect(output).toContain('```mermaid');
+  });
+
+  it('uses entitiesTs by default for a .ts config with dual discovery paths', () => {
+    execFileSync(
+      'node',
+      [cliPath, '-c', dualDiscoveryConfig, '--tsconfig', dualDiscoveryTsconfig, '-o', outFile, '-t', 'Dual Discovery'],
+      {
+        cwd: repoRoot,
+        stdio: 'ignore',
+      }
+    );
+
+    const output = fs.readFileSync(outFile, 'utf-8');
+    expect(output.startsWith('# Dual Discovery')).toBe(true);
+    expect(output).toContain('### DualUser');
   });
 });

@@ -11,6 +11,8 @@ describe('loadJsDoc', () => {
     const result = loadJsDoc([]);
     expect(result.entities.size).toBe(0);
     expect(result.props.size).toBe(0);
+    expect(result.sourceFileCount).toBe(0);
+    expect(result.classNames.size).toBe(0);
   });
 
   it('never throws on an unreadable file and still parses valid sources (M6)', () => {
@@ -23,10 +25,21 @@ describe('loadJsDoc', () => {
       const result = loadJsDoc([unreadable, FIXTURES_GLOB]);
       // The bad path is absorbed; valid fixtures are still parsed.
       expect(result.entities.get('Author')).toBeDefined();
+      expect(result.sourceFileCount).toBeGreaterThan(0);
+      expect(result.classNames).toContain('Author');
     } finally {
       fs.chmodSync(unreadable, 0o644);
       fs.rmSync(dir, { recursive: true, force: true });
     }
+  });
+
+  it('reports zero source files for unmatched explicit paths', () => {
+    const result = loadJsDoc([path.resolve(import.meta.dirname, '../fixtures/entities/no-match-*.ts')]);
+
+    expect(result.sourceFileCount).toBe(0);
+    expect(result.entities.size).toBe(0);
+    expect(result.props.size).toBe(0);
+    expect(result.classNames.size).toBe(0);
   });
 
   it('extracts @namespace tag from Author entity', () => {

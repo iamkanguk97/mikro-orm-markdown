@@ -17,7 +17,7 @@
   - NamingStrategy가 적용된 실제 DB 컬럼명
   - 인덱스 및 제약 조건
 - **실행 중인 DB 연결 불필요** — MikroORM 설정에서 엔티티 메타데이터를 직접 읽습니다
-- PostgreSQL, MySQL/MariaDB, SQLite, MSSQL 등 MikroORM SQL 드라이버 지원
+- **드라이버 독립적** — MikroORM 메타데이터를 기반으로 동작하므로 PostgreSQL, MySQL/MariaDB, SQLite, MSSQL 등 SQL 드라이버에서 동작할 수 있습니다. 현재 자동 테스트는 SQLite 기준으로 실행되며, 다른 드라이버는 동작할 것으로 예상하지만 아직 자동화 테스트로 검증하지는 않았습니다.
 
 ### MikroORM 고유 개념
 
@@ -56,7 +56,7 @@ pnpm add -D mikro-orm-markdown
 }
 ```
 
-- **`.ts` config** — `tsx`를 devDependency로 설치하세요 (`npm install -D tsx`). CLI가 자동으로 로드합니다.
+- **`.ts` config** — `tsx`를 devDependency로 설치하세요 (`npm install -D tsx`). CLI가 자동으로 로드하며, `preferTs`를 명시하지 않았다면 MikroORM discovery가 `entitiesTs`를 우선 사용하도록 설정합니다.
 - **`.js` config** — 추가 패키지 불필요. 직접 작성한 파일이든, 빌드 결과물(예: `./dist/mikro-orm.config.js`)이든 상관없습니다.
 
 이후에는 아래 명령어 하나로 실행합니다:
@@ -73,6 +73,8 @@ npm run erd
 | `-o, --out <path>`     | `./ERD.md`        | 출력 Markdown 파일 경로                                               |
 | `-t, --title <string>` | `Database Schema` | 문서 H1 제목                                                          |
 | `-d, --description <string>` | —           | 제목 아래에 표시할 설명 문단 (선택)                                   |
+| `--tsconfig <path>`    | —                 | `.ts` config 로드 시 사용할 `tsconfig.json`                            |
+| `--src <paths...>`     | —                 | 빌드된 JavaScript 엔티티에서 실행할 때 JSDoc을 읽을 TypeScript 소스 glob |
 
 > 설명이 길거나 여러 줄이라면 CLI 대신 [프로그래밍 API](#프로그래밍-api)를 사용하세요 — 쉘 인용 부호 제약 없이 문자열을 그대로 전달할 수 있습니다.
 
@@ -94,6 +96,8 @@ export class Post {
 ```
 
 태그가 없는 일반 JSDoc 텍스트는 설명이 됩니다. **클래스** 위 텍스트는 엔티티 설명, **프로퍼티** 위 텍스트는 해당 컬럼 설명이 됩니다. 프로퍼티에 JSDoc이 없으면 `@Property({ comment })` 값(DDL 컬럼 코멘트)을 컬럼 설명으로 대신 사용합니다.
+
+> **컴파일된 JavaScript에서 실행하나요?** 빌드 도구는 주석을 제거하므로 `.js` 엔티티에서는 JSDoc 설명과 `@namespace`/`@hidden` 태그를 읽을 수 없습니다. 이 경우 숨겨야 할 엔티티가 문서에 노출될 수도 있습니다. `entities`가 빌드 결과물(예: `./dist/**/*.js`)을 가리킨다면 `--src "<TypeScript 소스 glob>"` 또는 프로그래밍 API의 `src` 옵션을 전달해 원본 TypeScript에서 JSDoc을 읽도록 하세요. CLI는 이 상황을 감지하면 경고를 출력합니다. 명시한 `--src` 경로가 어떤 파일과도 매칭되지 않거나 발견된 엔티티 선언 일부를 빠뜨리면 실수를 바로 알 수 있도록 생성이 실패합니다.
 
 | 태그                | 설명                                  |
 | ------------------- | ------------------------------------- |
@@ -273,7 +277,7 @@ erDiagram
 
 MikroORM config가 엔티티를 0개 찾은 경우입니다. 보통 CLI가 config를 로드하는 방식과 엔티티 경로가 맞지 않아 발생합니다.
 
-- `.ts` config를 사용 중이라면(CLI가 `tsx`를 자동으로 로드합니다), `entitiesTs`가 TypeScript 소스 파일을 가리키는지 확인하세요.
+- `.ts` config를 사용 중이라면(CLI가 `tsx`를 자동으로 로드하고 기본적으로 `preferTs: true`를 적용합니다), `entitiesTs`가 TypeScript 소스 파일을 가리키는지 확인하세요.
 - 빌드된 `.js` config를 사용 중이라면, `entities`가 **빌드 결과물**(예: `./dist/**/*.entity.js`)을 가리키고 빌드를 먼저 실행했는지 확인하세요.
 - MikroORM은 TypeScript 모드에서는 `entitiesTs`를, 그 외에는 `entities`를 사용합니다. 폴더/파일 기반 discovery를 쓴다면 두 옵션을 모두 지정하세요.
 

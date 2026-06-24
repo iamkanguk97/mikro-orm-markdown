@@ -337,6 +337,37 @@ describe('buildDiagramModel — Constraints', () => {
     expect(indexConstraint!.name).toBe('animal_name_idx');
     expect(indexConstraint!.properties).toContain('name');
   });
+
+  it('uses DB field names for index and unique constraint properties', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'Invoice',
+      tableName: 'invoice',
+      indexes: [{ name: 'invoice_issued_at_idx', properties: ['issuedAt'] }],
+      uniques: [{ name: 'invoice_reference_uq', properties: ['externalReference'] }],
+      properties: {
+        issuedAt: {
+          name: 'issuedAt',
+          fieldNames: ['issued_at'],
+          type: 'datetime',
+          kind: ReferenceKind.SCALAR,
+        },
+        externalReference: {
+          name: 'externalReference',
+          fieldNames: ['external_reference'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const invoice = model.entities.find((e) => e.className === 'Invoice')!;
+
+    expect(invoice.constraints.find((c) => c.name === 'invoice_issued_at_idx')?.properties).toEqual(['issued_at']);
+    expect(invoice.constraints.find((c) => c.name === 'invoice_reference_uq')?.properties).toEqual([
+      'external_reference',
+    ]);
+  });
 });
 
 describe('buildDiagramModel — non-abstract STI root (M1)', () => {

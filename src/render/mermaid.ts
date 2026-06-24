@@ -239,7 +239,7 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
     const props = idx.properties;
     result.push({
       type: 'index',
-      properties: Array.isArray(props) ? props.map(String) : props ? [String(props)] : [],
+      properties: resolveConstraintProperties(meta, props),
       ...(idx.name !== undefined && { name: idx.name }),
     });
   }
@@ -248,7 +248,7 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
     const props = uniq.properties;
     result.push({
       type: 'unique',
-      properties: Array.isArray(props) ? props.map(String) : props ? [String(props)] : [],
+      properties: resolveConstraintProperties(meta, props),
       ...(uniq.name !== undefined && { name: uniq.name }),
     });
   }
@@ -267,6 +267,23 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
   }
 
   return result;
+}
+
+function resolveConstraintProperties(meta: EntityMetadata, props: string | string[] | undefined): string[] {
+  const propNames = Array.isArray(props) ? props : props !== undefined ? [props] : [];
+
+  return propNames.flatMap((propName) => {
+    const prop = meta.properties[String(propName)];
+    if (prop === undefined) {
+      return [String(propName)];
+    }
+
+    if (prop.fieldNames !== undefined && prop.fieldNames.length > 0) {
+      return prop.fieldNames;
+    }
+
+    return [prop.name];
+  });
 }
 
 /**

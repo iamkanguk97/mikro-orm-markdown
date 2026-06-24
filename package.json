@@ -58,10 +58,11 @@
     "format": "biome format --write .",
     "format:check": "biome format .",
     "test": "vitest run",
+    "test:pack": "node scripts/pack-smoke.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "prepublishOnly": "npm run lint && npm run typecheck && npm run test && npm run build",
-    "prepare": "husky"
+    "prepare": "node .husky/install.mjs"
   },
   "peerDependencies": {
     "@mikro-orm/core": ">=6.0.0",

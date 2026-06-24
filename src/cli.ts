@@ -62,7 +62,9 @@ export function findNearestTsconfig(fromPath: string): string | undefined {
  * which directory the CLI was launched from.
  */
 export async function loadOrmOptions(configPath: string, tsconfigPath?: string): Promise<Options> {
-  if (configPath.endsWith('.ts')) {
+  const isTypeScriptConfig = configPath.endsWith('.ts');
+
+  if (isTypeScriptConfig) {
     let register: typeof import('tsx/esm/api')['register'];
     try {
       ({ register } = await import('tsx/esm/api'));
@@ -88,7 +90,7 @@ export async function loadOrmOptions(configPath: string, tsconfigPath?: string):
   try {
     mod = (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
   } catch (cause) {
-    if (configPath.endsWith('.ts')) {
+    if (isTypeScriptConfig) {
       const detail = cause instanceof Error ? cause.message : String(cause);
       throw new Error(
         `Failed to load TypeScript config.\n${detail}\n\n` +
@@ -113,8 +115,19 @@ export async function loadOrmOptions(configPath: string, tsconfigPath?: string):
         'Resolve it first, or use the programmatic API instead (see README).'
     );
   }
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+    throw new Error(
+      'Config file default export must be a configuration object, not a primitive value or array.\n' +
+        'Export a plain MikroORM options object instead.'
+    );
+  }
 
-  return config as Options;
+  const options = config as Options;
+  if (isTypeScriptConfig && options.preferTs === undefined) {
+    return { ...options, preferTs: true };
+  }
+
+  return options;
 }
 
 /**

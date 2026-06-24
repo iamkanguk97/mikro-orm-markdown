@@ -32,6 +32,10 @@ export type PropJsDocMap = Map<string, Map<string, PropJsDocInfo>>;
 export interface JsDocResult {
   entities: EntityJsDocMap;
   props: PropJsDocMap;
+  /** Number of TypeScript source files matched and loaded for JSDoc parsing. */
+  sourceFileCount: number;
+  /** Class declarations found in the loaded source files, including classes without JSDoc. */
+  classNames: Set<string>;
 }
 
 /**
@@ -45,9 +49,10 @@ export interface JsDocResult {
 export function loadJsDoc(filePaths: string[]): JsDocResult {
   const entities: EntityJsDocMap = new Map();
   const props: PropJsDocMap = new Map();
+  const classNames = new Set<string>();
 
   if (filePaths.length === 0) {
-    return { entities, props };
+    return { entities, props, sourceFileCount: 0, classNames };
   }
 
   const project = new Project({
@@ -70,13 +75,15 @@ export function loadJsDoc(filePaths: string[]): JsDocResult {
     }
   }
 
-  for (const sourceFile of project.getSourceFiles()) {
+  const sourceFiles = project.getSourceFiles();
+  for (const sourceFile of sourceFiles) {
     try {
       for (const cls of sourceFile.getClasses()) {
         const className = cls.getName();
         if (!className) {
           continue;
         }
+        classNames.add(className);
 
         const classDocs = cls.getJsDocs();
         if (classDocs.length > 0) {
@@ -103,7 +110,7 @@ export function loadJsDoc(filePaths: string[]): JsDocResult {
     }
   }
 
-  return { entities, props };
+  return { entities, props, sourceFileCount: sourceFiles.length, classNames };
 }
 
 function parseEntityJsDoc(jsDocs: JSDoc[]): EntityJsDocInfo {

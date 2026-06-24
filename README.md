@@ -56,7 +56,7 @@ Add a script to your `package.json`, pointing `--config` at your MikroORM config
 }
 ```
 
-- **`.ts` config** — install `tsx` as a dev dependency (`npm install -D tsx`); the CLI loads it automatically.
+- **`.ts` config** — install `tsx` as a dev dependency (`npm install -D tsx`); the CLI loads it automatically and defaults MikroORM discovery to `entitiesTs` unless you explicitly set `preferTs`.
 - **`.js` config** — no extra packages needed. Can be hand-written, or your own build output (e.g. `./dist/mikro-orm.config.js`).
 
 Then run:
@@ -73,6 +73,8 @@ npm run erd
 | `-o, --out <path>`     | `./ERD.md`        | Output Markdown file path                                                        |
 | `-t, --title <string>` | `Database Schema` | H1 heading of the generated document                                             |
 | `-d, --description <string>` | —           | Optional description paragraph shown below the title                            |
+| `--tsconfig <path>`    | —                 | `tsconfig.json` used when loading a `.ts` config                                |
+| `--src <paths...>`     | —                 | TypeScript source globs for JSDoc when entities run from compiled JavaScript    |
 
 > For a long or multiline description, use the [programmatic API](#programmatic-api) instead — it accepts any string directly, without shell quoting limits.
 
@@ -95,7 +97,7 @@ export class Post {
 
 Plain JSDoc text (no tag) becomes a description: text above a **class** describes the entity, and text above a **property** describes its column. When a property has no JSDoc, its `@Property({ comment })` value (the DDL column comment) is used as the column description instead.
 
-> **Running from compiled JavaScript?** Build tools strip comments, so JSDoc descriptions and `@namespace`/`@hidden` tags cannot be read from `.js` entities — hidden entities may even be exposed. If your `entities` point at compiled output (e.g. `./dist/**/*.js`), pass `--src "<glob to your .ts sources>"` (or the `src` option in the programmatic API) so JSDoc is read from the original TypeScript. The CLI prints a warning when it detects this situation.
+> **Running from compiled JavaScript?** Build tools strip comments, so JSDoc descriptions and `@namespace`/`@hidden` tags cannot be read from `.js` entities — hidden entities may even be exposed. If your `entities` point at compiled output (e.g. `./dist/**/*.js`), pass `--src "<glob to your .ts sources>"` (or the `src` option in the programmatic API) so JSDoc is read from the original TypeScript. The CLI prints a warning when it detects this situation. If the explicit `--src` paths match no files or omit discovered entity declarations, generation fails so the mistake is visible.
 
 | Tag                 | Description                                         |
 | ------------------- | --------------------------------------------------- |
@@ -275,7 +277,7 @@ The root (`Animal`) lists only the shared columns and marks the discriminator (`
 
 Your MikroORM config found zero entities. This usually means the entity path doesn't match how the CLI is loading your config:
 
-- If you're using a `.ts` config (the CLI loads `tsx` automatically), make sure `entitiesTs` points to your TypeScript source files.
+- If you're using a `.ts` config (the CLI loads `tsx` automatically and defaults to `preferTs: true`), make sure `entitiesTs` points to your TypeScript source files.
 - If you're using a compiled `.js` config, make sure `entities` points to the **built output** (e.g. `./dist/**/*.entity.js`) and that you've run your build first.
 - MikroORM uses `entitiesTs` when running in TypeScript mode and `entities` otherwise — if you use folder/file-based discovery, specify both.
 

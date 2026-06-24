@@ -6,7 +6,7 @@ export interface ColumnModel {
   propName: string;
   /** Actual DB column name from NamingStrategy (e.g. "author_id"). */
   fieldName: string;
-  /** MikroORM type string, normalized for Mermaid (e.g. "integer", "string"). */
+  /** Raw MikroORM type string (e.g. "integer", "varchar(255)"). */
   type: string;
   isPrimary: boolean;
   isForeignKey: boolean;
@@ -41,7 +41,7 @@ export interface ColumnModel {
 export interface ConstraintModel {
   type: 'index' | 'unique' | 'check';
   name?: string;
-  /** Property names (or field names) covered by the constraint. */
+  /** DB field names covered by the constraint. */
   properties: string[];
   /** For check constraints: the raw SQL expression. */
   expression?: string;

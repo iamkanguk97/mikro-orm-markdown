@@ -1,5 +1,5 @@
-import type { Options } from '@mikro-orm/core';
-import { loadJsDoc } from './docs/jsdoc.js';
+import type { EntityMetadata, Options } from '@mikro-orm/core';
+import { type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
 import { loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel } from './model/build.js';
 import { renderMarkdown } from './render/markdown.js';
@@ -57,6 +57,29 @@ export function resolveJsDocSources(
   return sourcePaths;
 }
 
+function assertExplicitJsDocSourceCoverage(metas: EntityMetadata[], jsDocResult: JsDocResult, src: string[]): void {
+  if (jsDocResult.sourceFileCount === 0) {
+    throw new Error(
+      `No source files matched the explicit src paths: ${src.join(', ')}\n` +
+        'Check the --src glob/path (or the `src` option). Without matching TypeScript sources, ' +
+        'JSDoc tags such as @namespace and @hidden cannot be read.'
+    );
+  }
+
+  const missingClassNames = metas
+    .filter((meta) => !meta.pivotTable && !meta.embeddable)
+    .map((meta) => meta.className)
+    .filter((className) => !jsDocResult.classNames.has(className));
+
+  if (missingClassNames.length > 0) {
+    throw new Error(
+      `Explicit src paths did not include source declarations for discovered entities: ${missingClassNames.join(', ')}\n` +
+        'Check that --src (or the `src` option) points at all TypeScript entity files. ' +
+        'JSDoc tags such as @namespace and @hidden for missing entities cannot be read.'
+    );
+  }
+}
+
 /**
  * Generates a Mermaid ERD + markdown documentation document from MikroORM
  * entity metadata.
@@ -82,6 +105,9 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
 
   const { metas, sourcePaths } = await loadEntityMetadata(orm);
   const jsDocResult = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn));
+  if (src !== undefined && src.length > 0) {
+    assertExplicitJsDocSourceCoverage(metas, jsDocResult, src);
+  }
   const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn);
   return renderMarkdown(docModel);
 }
