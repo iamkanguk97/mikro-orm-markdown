@@ -183,7 +183,7 @@ erDiagram
 | status | string |  |  | One of: draft, published, archived |
 | body | text |  | Y | Full article body. |
 | author_id | integer | FK (author) |  | Author of the post (required — non-null relation). |
-| body_length | integer |  |  | Character length of the body, computed in SQL at query time (no physical column). |
+| body_length | integer |  | Y | Character length of the body, computed in SQL at query time (no physical column). |
 
 **Computed columns:**
 
@@ -321,7 +321,7 @@ erDiagram
 | id | integer | PK |  |  |
 | name | string |  |  | Full legal name |
 | email | string |  |  | Billing email. |
-| name_length | integer |  |  | Number of characters in the name, computed in SQL (no physical column). |
+| name_length | integer |  | Y | Number of characters in the name, computed in SQL (no physical column). |
 | address_street | string | [Address] |  | Street line. |
 | address_city | string | [Address] |  | City name. |
 | address_zip_code | string | [Address] | Y | Optional postal / ZIP code. |

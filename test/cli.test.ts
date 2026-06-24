@@ -73,6 +73,33 @@ describe('CLI helpers', () => {
     expect(options.preferTs).toBe(false);
   });
 
+  it('auto-injects TsMorphMetadataProvider when the config picks no provider', async () => {
+    const { TsMorphMetadataProvider } = await import('@mikro-orm/reflection');
+    const dir = await createTempDir();
+    const configPath = path.join(dir, 'config.ts');
+    await fs.writeFile(configPath, "export default { dbName: ':memory:', entities: [] };\n", 'utf-8');
+
+    const options = await loadOrmOptions(configPath);
+
+    expect(options.metadataProvider).toBe(TsMorphMetadataProvider);
+  });
+
+  it('does not override a metadataProvider chosen by the config', async () => {
+    const { TsMorphMetadataProvider } = await import('@mikro-orm/reflection');
+    const dir = await createTempDir();
+    const configPath = path.join(dir, 'config.ts');
+    await fs.writeFile(
+      configPath,
+      "class CustomProvider {}\nexport default { dbName: ':memory:', entities: [], metadataProvider: CustomProvider };\n",
+      'utf-8'
+    );
+
+    const options = await loadOrmOptions(configPath);
+
+    expect(options.metadataProvider).toBeDefined();
+    expect(options.metadataProvider).not.toBe(TsMorphMetadataProvider);
+  });
+
   it('finds the tsconfig.json nearest to the config file, not the cwd', async () => {
     const dir = await createTempDir();
     const nested = path.join(dir, 'pkg', 'config');
@@ -138,7 +165,7 @@ describe('CLI helpers', () => {
 
     expect(formatted).toContain('caused by:');
     expect(formatted).toContain('tsx (esbuild)');
-    expect(formatted).toContain('TsMorphMetadataProvider');
+    expect(formatted).toContain('@mikro-orm/reflection');
   });
 
   it('does not append the reflection hint to unrelated discovery errors', () => {

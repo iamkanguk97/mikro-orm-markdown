@@ -123,11 +123,38 @@ export async function loadOrmOptions(configPath: string, tsconfigPath?: string):
   }
 
   const options = config as Options;
-  if (isTypeScriptConfig && options.preferTs === undefined) {
-    return { ...options, preferTs: true };
+  const withPreferTs = isTypeScriptConfig && options.preferTs === undefined ? { ...options, preferTs: true } : options;
+
+  return withTsMorphMetadataProvider(withPreferTs);
+}
+
+/**
+ * When the config does not choose a metadata provider, opt into
+ * `TsMorphMetadataProvider` if `@mikro-orm/reflection` is installed.
+ *
+ * The CLI loads `.ts` configs through `tsx` (esbuild), which strips
+ * `emitDecoratorMetadata`, so MikroORM's default `ReflectMetadataProvider`
+ * cannot infer types for entities that omit explicit `type:`/`entity:`
+ * attributes. `TsMorphMetadataProvider` reads types from the TypeScript sources
+ * instead. When the optional package is absent, the original options are kept.
+ */
+async function withTsMorphMetadataProvider(options: Options): Promise<Options> {
+  if (options.metadataProvider !== undefined) {
+    return options;
   }
 
-  return options;
+  try {
+    const { TsMorphMetadataProvider } = await import('@mikro-orm/reflection');
+    return {
+      ...options,
+      metadataProvider: TsMorphMetadataProvider,
+      // TsMorphMetadataProvider caches parsed metadata to a `temp/` folder by
+      // default; disable it so a one-shot doc run never litters the project.
+      metadataCache: { enabled: false, ...options.metadataCache },
+    };
+  } catch {
+    return options;
+  }
 }
 
 /**
@@ -160,8 +187,8 @@ export function formatErrorChain(err: unknown): string {
 const REFLECTION_METADATA_HINT =
   '\n\nNote: this tool loads configs via tsx (esbuild), which does not emit ' +
   "'emitDecoratorMetadata' reflection data, so enabling it will not help here.\n" +
-  "Give each entity property an explicit 'type:'/'entity:' attribute, or use " +
-  "the TsMorphMetadataProvider from '@mikro-orm/reflection'.";
+  "Either give each entity property an explicit 'type:'/'entity:' attribute, or " +
+  "install '@mikro-orm/reflection' — this tool then reads types from your TypeScript sources automatically.";
 
 /**
  * Formats a discovery error, appending a CLI-specific hint when the failure is

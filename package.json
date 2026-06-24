@@ -66,9 +66,13 @@
   },
   "peerDependencies": {
     "@mikro-orm/core": ">=6.0.0",
+    "@mikro-orm/reflection": ">=6.0.0",
     "tsx": ">=4.0.0"
   },
   "peerDependenciesMeta": {
+    "@mikro-orm/reflection": {
+      "optional": true
+    },
     "tsx": {
       "optional": true
     }
@@ -84,8 +88,9 @@
     "@biomejs/biome": "2.4.12",
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
-    "@mikro-orm/core": "^6.0.0",
-    "@mikro-orm/sqlite": "^6.0.0",
+    "@mikro-orm/core": "^6.6.15",
+    "@mikro-orm/reflection": "^6.6.15",
+    "@mikro-orm/sqlite": "^6.6.15",
     "@types/node": "^22.0.0",
     "@vitest/coverage-v8": "^2.0.0",
     "husky": "^9.1.7",
