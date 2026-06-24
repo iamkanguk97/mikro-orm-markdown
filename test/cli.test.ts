@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   findNearestTsconfig,
+  formatDiscoveryError,
   formatErrorChain,
   loadOrmOptions,
   toConfigImportSpecifier,
@@ -124,6 +125,31 @@ describe('CLI helpers', () => {
 
     const formatted = formatErrorChain(a);
     expect(formatted).toBe('a\n  ↳ caused by: b');
+  });
+
+  it('appends a tsx-specific hint when discovery fails on missing decorator metadata', () => {
+    const root = new Error(
+      "Please provide either 'type' or 'entity' attribute in Widget.id. If you are using " +
+        "decorators, ensure you have 'emitDecoratorMetadata' enabled in your tsconfig.json."
+    );
+    const wrapped = new Error('Failed to initialize MikroORM and run entity discovery.', { cause: root });
+
+    const formatted = formatDiscoveryError(wrapped);
+
+    expect(formatted).toContain('caused by:');
+    expect(formatted).toContain('tsx (esbuild)');
+    expect(formatted).toContain('TsMorphMetadataProvider');
+  });
+
+  it('does not append the reflection hint to unrelated discovery errors', () => {
+    const wrapped = new Error('Failed to initialize MikroORM and run entity discovery.', {
+      cause: new Error('No driver specified, fill in the `driver` option.'),
+    });
+
+    const formatted = formatDiscoveryError(wrapped);
+
+    expect(formatted).not.toContain('tsx (esbuild)');
+    expect(formatted).toBe(formatErrorChain(wrapped));
   });
 
   it('creates missing output parent directories before writing markdown', async () => {

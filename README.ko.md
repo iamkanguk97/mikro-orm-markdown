@@ -35,6 +35,7 @@ Prisma 기반 도구로는 표현할 수 없는 MikroORM 고유 개념도 함께
 - `@mikro-orm/core` >= 6 (peer dependency)
 - 사용할 DB에 맞는 MikroORM 드라이버 패키지가 설치된 MikroORM 설정 파일
 - 데코레이터 기반 엔티티 (`@Entity()`) — `EntitySchema`로 정의한 엔티티는 현재 지원하지 않습니다
+- 각 엔티티 프로퍼티의 타입은 discovery 시점에 결정될 수 있어야 합니다. 데코레이터에 `type:`/`entity:`를 명시하거나, `TsMorphMetadataProvider`(`@mikro-orm/reflection`)를 사용하세요. CLI는 `.ts` config를 `tsx`(esbuild)로 로드하는데 esbuild는 `emitDecoratorMetadata` 리플렉션 데이터를 생성하지 않으므로, 기본 `ReflectMetadataProvider`는 `@Property() name: string`처럼 타입을 생략한 경우 타입을 추론하지 못합니다.
 
 ## 설치
 

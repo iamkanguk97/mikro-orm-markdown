@@ -157,6 +157,27 @@ export function formatErrorChain(err: unknown): string {
   return lines.map((line, i) => (i === 0 ? line : `  ↳ caused by: ${line}`)).join('\n');
 }
 
+const REFLECTION_METADATA_HINT =
+  '\n\nNote: this tool loads configs via tsx (esbuild), which does not emit ' +
+  "'emitDecoratorMetadata' reflection data, so enabling it will not help here.\n" +
+  "Give each entity property an explicit 'type:'/'entity:' attribute, or use " +
+  "the TsMorphMetadataProvider from '@mikro-orm/reflection'.";
+
+/**
+ * Formats a discovery error, appending a CLI-specific hint when the failure is
+ * MikroORM's reflection-based type resolution.
+ *
+ * MikroORM's default `ReflectMetadataProvider` infers property types from
+ * `emitDecoratorMetadata` reflection and, when it is missing, tells the user to
+ * enable that tsconfig option. But the CLI loads `.ts` configs through `tsx`
+ * (esbuild), which never emits that metadata — so the advice cannot help. We
+ * detect that message in the cause chain and point at the options that do work.
+ */
+export function formatDiscoveryError(err: unknown): string {
+  const chain = formatErrorChain(err);
+  return chain.includes('emitDecoratorMetadata') ? chain + REFLECTION_METADATA_HINT : chain;
+}
+
 function formatFileSystemError(cause: unknown): string {
   if (cause instanceof Error) {
     const code = 'code' in cause && typeof cause.code === 'string' ? ` (${cause.code})` : '';
@@ -199,7 +220,7 @@ async function run(opts: CliOptions): Promise<void> {
       onWarn: (message: string): void => void process.stderr.write(`Warning: ${message}\n`),
     });
   } catch (err) {
-    process.stderr.write(`Error: ${formatErrorChain(err)}\n`);
+    process.stderr.write(`Error: ${formatDiscoveryError(err)}\n`);
     process.exit(1);
   }
 
