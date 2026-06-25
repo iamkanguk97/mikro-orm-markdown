@@ -2,6 +2,7 @@ import type { EntityMetadata, Options } from '@mikro-orm/core';
 import { type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
 import { loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel } from './model/build.js';
+import { withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
 
 export { MetadataLoadError } from './metadata/load.js';
@@ -57,7 +58,12 @@ export function resolveJsDocSources(
   return sourcePaths;
 }
 
-function assertExplicitJsDocSourceCoverage(metas: EntityMetadata[], jsDocResult: JsDocResult, src: string[]): void {
+function assertExplicitJsDocSourceCoverage(
+  metas: EntityMetadata[],
+  jsDocResult: JsDocResult,
+  src: string[],
+  onWarn?: (message: string) => void
+): void {
   if (jsDocResult.sourceFileCount === 0) {
     throw new Error(
       `No source files matched the explicit src paths: ${src.join(', ')}\n` +
@@ -66,17 +72,37 @@ function assertExplicitJsDocSourceCoverage(metas: EntityMetadata[], jsDocResult:
     );
   }
 
-  const missingClassNames = metas
-    .filter((meta) => !meta.pivotTable && !meta.embeddable)
+  const isRenderable = (meta: EntityMetadata): boolean => !meta.pivotTable && !meta.embeddable;
+
+  const missingConcrete = metas
+    .filter((meta) => isRenderable(meta) && !meta.abstract)
     .map((meta) => meta.className)
     .filter((className) => !jsDocResult.classNames.has(className));
 
-  if (missingClassNames.length > 0) {
+  if (missingConcrete.length > 0) {
     throw new Error(
-      `Explicit src paths did not include source declarations for discovered entities: ${missingClassNames.join(', ')}\n` +
+      `Explicit src paths did not include source declarations for discovered entities: ${missingConcrete.join(', ')}\n` +
         'Check that --src (or the `src` option) points at all TypeScript entity files. ' +
         'JSDoc tags such as @namespace and @hidden for missing entities cannot be read.'
     );
+  }
+
+  // Abstract STI parents appear in the diagram but are often defined in a separate
+  // base-class file that --src may not cover. Warn rather than error so the user
+  // knows @hidden/@namespace won't apply to them.
+  if (onWarn) {
+    const missingAbstract = metas
+      .filter((meta) => isRenderable(meta) && meta.abstract)
+      .map((meta) => meta.className)
+      .filter((className) => !jsDocResult.classNames.has(className));
+
+    if (missingAbstract.length > 0) {
+      onWarn(
+        `Abstract STI parent entities were not found in the explicit src paths: ${missingAbstract.join(', ')}\n` +
+          '@hidden and @namespace tags for these entities will not be applied. ' +
+          'Include their source files in --src to enable JSDoc tags for them.'
+      );
+    }
   }
 }
 
@@ -103,10 +129,11 @@ function assertExplicitJsDocSourceCoverage(metas: EntityMetadata[], jsDocResult:
 export async function generateMarkdown(options: GenerateMarkdownOptions): Promise<string> {
   const { orm, title = 'Database Schema', description, src, onWarn } = options;
 
-  const { metas, sourcePaths } = await loadEntityMetadata(orm);
+  const effectiveOrm = await withTsMorphMetadataProvider(orm, onWarn);
+  const { metas, sourcePaths } = await loadEntityMetadata(effectiveOrm);
   const jsDocResult = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn));
   if (src !== undefined && src.length > 0) {
-    assertExplicitJsDocSourceCoverage(metas, jsDocResult, src);
+    assertExplicitJsDocSourceCoverage(metas, jsDocResult, src, onWarn);
   }
   const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn);
   return renderMarkdown(docModel);

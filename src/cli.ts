@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command } from 'commander';
 import { generateMarkdown } from './index.js';
+import { withTsMorphMetadataProvider } from './provider.js';
 
 interface CliOptions {
   config: string;
@@ -126,35 +127,6 @@ export async function loadOrmOptions(configPath: string, tsconfigPath?: string):
   const withPreferTs = isTypeScriptConfig && options.preferTs === undefined ? { ...options, preferTs: true } : options;
 
   return withTsMorphMetadataProvider(withPreferTs);
-}
-
-/**
- * When the config does not choose a metadata provider, opt into
- * `TsMorphMetadataProvider` if `@mikro-orm/reflection` is installed.
- *
- * The CLI loads `.ts` configs through `tsx` (esbuild), which strips
- * `emitDecoratorMetadata`, so MikroORM's default `ReflectMetadataProvider`
- * cannot infer types for entities that omit explicit `type:`/`entity:`
- * attributes. `TsMorphMetadataProvider` reads types from the TypeScript sources
- * instead. When the optional package is absent, the original options are kept.
- */
-async function withTsMorphMetadataProvider(options: Options): Promise<Options> {
-  if (options.metadataProvider !== undefined) {
-    return options;
-  }
-
-  try {
-    const { TsMorphMetadataProvider } = await import('@mikro-orm/reflection');
-    return {
-      ...options,
-      metadataProvider: TsMorphMetadataProvider,
-      // TsMorphMetadataProvider caches parsed metadata to a `temp/` folder by
-      // default; disable it so a one-shot doc run never litters the project.
-      metadataCache: { enabled: false, ...options.metadataCache },
-    };
-  } catch {
-    return options;
-  }
 }
 
 /**

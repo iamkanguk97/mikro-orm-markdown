@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0-alpha.2] - 2026-06-25
 
 ### Added
 
@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@Enum` allowed values listed in the column description (`One of: ...`)
 - STI child discriminator value shown in the Extends note
 - End-to-end smoke test running the built CLI from the repo root (plus a CI step)
-- Type-omitted properties (e.g. `@Property() name: string`) are now documented: when the config picks no metadata provider and `@mikro-orm/reflection` is installed, the CLI auto-uses its `TsMorphMetadataProvider` to read types from your TypeScript sources
+- Type-omitted properties (e.g. `@Property() name: string`) are now documented: when the config picks no metadata provider and `@mikro-orm/reflection` is installed, both the CLI and the programmatic API auto-use `TsMorphMetadataProvider` to read types from your TypeScript sources
 - `.ts` configs default to `preferTs: true`, so MikroORM discovers your `entitiesTs` sources without extra config
 - `npm pack` smoke test (`test:pack`) that installs the built tarball into a temporary project
 
@@ -33,11 +33,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Guarded against missing `prop.type` / `prop.fieldNames` during rendering
 - Discovery failures from missing decorator metadata now explain that the CLI's `tsx` loader cannot honor `emitDecoratorMetadata`, pointing at `@mikro-orm/reflection` or explicit `type:`/`entity:` attributes
 - Config default exports are validated to be a plain object (primitives and arrays are rejected with a clear message)
+- Abstract STI parent entities are no longer flagged as errors when `--src` does not cover their source file; a warning is now emitted instead, explaining that `@hidden`/`@namespace` tags will not apply
+- `@mikro-orm/reflection` load failures (e.g. version mismatch) now emit a warning via the `onWarn` callback instead of writing directly to `process.stderr`
+- Metadata cache (`temp/`) is now always disabled during doc generation regardless of which `metadataProvider` is in use, so `temp/` is never created
 
 ### Changed
 
 - Driver-support wording clarified: driver-agnostic, but only SQLite is covered by automated tests
 - `@Formula` computed columns now render as nullable
+- Index and unique constraint properties in the generated document now show actual DB column names (mapped through NamingStrategy) instead of TypeScript property names
+- Metadata cache is always disabled for doc generation runs; a user-supplied `metadataCache: { enabled: true }` in the MikroORM config is intentionally overridden to prevent `temp/` from being created
 
 ## [0.1.0-alpha.1] - 2026-06-11
 

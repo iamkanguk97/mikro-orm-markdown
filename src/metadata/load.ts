@@ -40,6 +40,10 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
       ...options,
       debug: false,
       connect: false,
+      // Always disable the metadata cache for one-shot doc runs so the project
+      // is never littered with a temp/ folder, regardless of how metadataProvider
+      // was configured.
+      metadataCache: { ...options.metadataCache, enabled: false },
     });
   } catch (cause) {
     throw new MetadataLoadError(

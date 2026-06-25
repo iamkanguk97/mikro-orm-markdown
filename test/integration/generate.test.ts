@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources } from '../../src/index.js';
 import config from '../fixtures/mikro-orm.config.js';
+import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
 
 describe('generateMarkdown', () => {
   it('returns a non-empty markdown string', async () => {
@@ -46,6 +47,22 @@ describe('generateMarkdown', () => {
     const titleIndex = md.indexOf('# T');
     const descIndex = md.indexOf('주문 도메인 스키마입니다.');
     expect(descIndex).toBeGreaterThan(titleIndex);
+  });
+
+  it('auto-applies TsMorphMetadataProvider via programmatic API when no metadataProvider is set', async () => {
+    const { TsMorphMetadataProvider } = await import('@mikro-orm/reflection');
+
+    // This fixture intentionally omits @Property({ type: ... }); discovery only
+    // succeeds when generateMarkdown injects TsMorphMetadataProvider.
+    const md = await generateMarkdown({ orm: typeOmittedConfig, title: 'API Provider Test' });
+    expect(md.startsWith('# API Provider Test')).toBe(true);
+    expect(md).toContain('| name | string |');
+
+    // Calling generateMarkdown with an already-set metadataProvider must be a no-op.
+    const configWithProvider = { ...typeOmittedConfig, metadataProvider: TsMorphMetadataProvider };
+    const md2 = await generateMarkdown({ orm: configWithProvider, title: 'API Provider Test 2' });
+    expect(md2.startsWith('# API Provider Test 2')).toBe(true);
+    expect(md2).toContain('| name | string |');
   });
 
   it('rejects explicit src paths that match no source files', async () => {
