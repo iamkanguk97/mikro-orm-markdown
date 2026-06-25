@@ -18,9 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Type-omitted properties (e.g. `@Property() name: string`) are now documented: when the config picks no metadata provider and `@mikro-orm/reflection` is installed, both the CLI and the programmatic API auto-use `TsMorphMetadataProvider` to read types from your TypeScript sources
 - `.ts` configs default to `preferTs: true`, so MikroORM discovers your `entitiesTs` sources without extra config
 - `npm pack` smoke test (`test:pack`) that installs the built tarball into a temporary project
+- Metadata discovery smoke tests for SQLite, PostgreSQL, MySQL, and MariaDB drivers
 
 ### Fixed
 
+- Auto-applying `TsMorphMetadataProvider` no longer breaks explicit-type runtime/JavaScript entity configs when TypeScript source files are unavailable; generation falls back to MikroORM's default provider if the auto provider cannot find source files and the original config can still discover metadata
 - `.ts` config loading no longer depends on the current working directory — the tsconfig beside the config file is resolved and passed to `tsx`
 - Discovery failures now surface the underlying cause (missing driver, bad entities glob, …) instead of only a generic message
 - Parameterized SQL types (e.g. `varchar(255)`) are preserved in the markdown table instead of being sanitized
@@ -39,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Driver-support wording clarified: driver-agnostic, but only SQLite is covered by automated tests
+- Driver-support wording clarified around metadata-based generation and automated SQL driver smoke coverage
 - `@Formula` computed columns now render as nullable
 - Index and unique constraint properties in the generated document now show actual DB column names (mapped through NamingStrategy) instead of TypeScript property names
 - Metadata cache is always disabled for doc generation runs; a user-supplied `metadataCache: { enabled: true }` in the MikroORM config is intentionally overridden to prevent `temp/` from being created

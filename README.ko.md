@@ -17,7 +17,7 @@
   - NamingStrategy가 적용된 실제 DB 컬럼명
   - 인덱스 및 제약 조건
 - **실행 중인 DB 연결 불필요** — MikroORM 설정에서 엔티티 메타데이터를 직접 읽습니다
-- **드라이버 독립적** — MikroORM 메타데이터를 기반으로 동작하므로 PostgreSQL, MySQL/MariaDB, SQLite, MSSQL 등 SQL 드라이버에서 동작할 수 있습니다. 현재 자동 테스트는 SQLite 기준으로 실행되며, 다른 드라이버는 동작할 것으로 예상하지만 아직 자동화 테스트로 검증하지는 않았습니다.
+- **드라이버 독립적** — 실행 중인 DB에 접속하지 않고 MikroORM 메타데이터를 기반으로 문서를 생성합니다. SQLite, PostgreSQL, MySQL, MariaDB 드라이버는 자동화된 metadata discovery smoke test로 검증합니다.
 
 ### MikroORM 고유 개념
 
@@ -188,7 +188,7 @@ erDiagram
     integer id PK
     string title
     text body
-    integer author_id FK "author"
+    integer author_id FK
   }
   Author {
     integer id PK
@@ -210,6 +210,8 @@ erDiagram
 ```markdown
 ### Post
 
+*Table: `post`*
+
 > 등록된 사용자가 작성한 블로그 게시글입니다.
 
 | Column    | Type    | Key         | Nullable | Description |
@@ -220,11 +222,11 @@ erDiagram
 | author_id | integer | FK (author) |          |             |
 ```
 
-**Key 컬럼 주석 의미:**
+**생성 결과의 MikroORM 전용 표기 의미:**
 
 | 표기               | 의미                                         |
 | ------------------ | -------------------------------------------- |
-| `formula: <expr>`  | `@Formula` 계산 컬럼 — 실제 DB 컬럼 없음     |
+| `formula: <expr>`  | `@Formula` 계산 컬럼의 Mermaid 주석          |
 | `[EmbeddableType]` | `@Embedded` 값 객체에서 flat으로 저장된 컬럼 |
 | `discriminator`    | STI 구분자 컬럼                              |
 

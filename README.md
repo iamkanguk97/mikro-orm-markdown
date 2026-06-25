@@ -17,7 +17,7 @@ Generate **Mermaid ERD + Markdown documentation** from your [MikroORM](https://m
   - Actual DB column names derived from your NamingStrategy
   - Indexes and constraints
 - **No live database connection required** — reads entity metadata from your MikroORM config
-- **Driver-agnostic** — works from MikroORM metadata, so any SQL driver (PostgreSQL, MySQL/MariaDB, SQLite, MSSQL) should work. Currently exercised against SQLite in the test suite; other drivers are expected to work but not yet covered by automated tests.
+- **Driver-agnostic** — generates documentation from MikroORM metadata without connecting to a live database. SQLite, PostgreSQL, MySQL, and MariaDB drivers are covered by automated metadata discovery smoke tests.
 
 ### MikroORM-specific concepts
 
@@ -188,7 +188,7 @@ erDiagram
     integer id PK
     string title
     text body
-    integer author_id FK "author"
+    integer author_id FK
   }
   Author {
     integer id PK
@@ -210,6 +210,8 @@ Each entity also gets a column table in the generated `ERD.md`:
 ```markdown
 ### Post
 
+*Table: `post`*
+
 > Blog post authored by a registered user.
 
 | Column    | Type    | Key         | Nullable | Description |
@@ -220,11 +222,11 @@ Each entity also gets a column table in the generated `ERD.md`:
 | author_id | integer | FK (author) |          |             |
 ```
 
-MikroORM-specific annotations in the **Key** column:
+MikroORM-specific annotations in the generated output:
 
 | Annotation         | Meaning                                              |
 | ------------------ | ---------------------------------------------------- |
-| `formula: <expr>`  | `@Formula` computed column — no physical DB column   |
+| `formula: <expr>`  | Mermaid comment for an `@Formula` computed column    |
 | `[EmbeddableType]` | Flat column inlined from an `@Embedded` value object |
 | `discriminator`    | STI discriminator column                             |
 

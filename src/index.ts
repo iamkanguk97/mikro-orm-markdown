@@ -1,6 +1,6 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
 import { type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
-import { loadEntityMetadata } from './metadata/load.js';
+import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel } from './model/build.js';
 import { withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
@@ -106,6 +106,44 @@ function assertExplicitJsDocSourceCoverage(
   }
 }
 
+function errorMessages(err: unknown): string[] {
+  const messages: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = err;
+
+  while (current instanceof Error && !seen.has(current)) {
+    seen.add(current);
+    messages.push(current.message);
+    current = (current as { cause?: unknown }).cause;
+  }
+
+  return messages;
+}
+
+function isMissingTsMorphSourceFile(err: unknown): boolean {
+  return errorMessages(err).some((message) => message.includes('Source file') && message.includes('not found'));
+}
+
+async function loadEntityMetadataWithTsMorphFallback(
+  originalOrm: Options,
+  effectiveOrm: Options
+): Promise<LoadedEntityMetadata> {
+  try {
+    return await loadEntityMetadata(effectiveOrm);
+  } catch (err) {
+    const wasAutoInjected = originalOrm.metadataProvider === undefined && effectiveOrm.metadataProvider !== undefined;
+    if (!wasAutoInjected || !isMissingTsMorphSourceFile(err)) {
+      throw err;
+    }
+
+    try {
+      return await loadEntityMetadata(originalOrm);
+    } catch {
+      throw err;
+    }
+  }
+}
+
 /**
  * Generates a Mermaid ERD + markdown documentation document from MikroORM
  * entity metadata.
@@ -130,7 +168,7 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
   const { orm, title = 'Database Schema', description, src, onWarn } = options;
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm, onWarn);
-  const { metas, sourcePaths } = await loadEntityMetadata(effectiveOrm);
+  const { metas, sourcePaths } = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm);
   const jsDocResult = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn));
   if (src !== undefined && src.length > 0) {
     assertExplicitJsDocSourceCoverage(metas, jsDocResult, src, onWarn);

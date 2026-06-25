@@ -73,15 +73,14 @@ describe('CLI helpers', () => {
     expect(options.preferTs).toBe(false);
   });
 
-  it('auto-injects TsMorphMetadataProvider when the config picks no provider', async () => {
-    const { TsMorphMetadataProvider } = await import('@mikro-orm/reflection');
+  it('leaves metadataProvider unset so generation can apply provider fallback safely', async () => {
     const dir = await createTempDir();
     const configPath = path.join(dir, 'config.ts');
     await fs.writeFile(configPath, "export default { dbName: ':memory:', entities: [] };\n", 'utf-8');
 
     const options = await loadOrmOptions(configPath);
 
-    expect(options.metadataProvider).toBe(TsMorphMetadataProvider);
+    expect(options.metadataProvider).toBeUndefined();
   });
 
   it('does not override a metadataProvider chosen by the config', async () => {

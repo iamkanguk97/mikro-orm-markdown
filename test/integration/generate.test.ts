@@ -1,7 +1,19 @@
+import { Entity, PrimaryKey, Property } from '@mikro-orm/core';
+import { MariaDbDriver } from '@mikro-orm/mariadb';
+import { MySqlDriver } from '@mikro-orm/mysql';
+import { PostgreSqlDriver } from '@mikro-orm/postgresql';
+import { SqliteDriver } from '@mikro-orm/sqlite';
 import { describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources } from '../../src/index.js';
 import config from '../fixtures/mikro-orm.config.js';
 import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
+
+const sqlDriverSmokeCases = [
+  ['SQLite', SqliteDriver, ':memory:'],
+  ['PostgreSQL', PostgreSqlDriver, 'mikro_orm_markdown_test'],
+  ['MySQL', MySqlDriver, 'mikro_orm_markdown_test'],
+  ['MariaDB', MariaDbDriver, 'mikro_orm_markdown_test'],
+] as const;
 
 describe('generateMarkdown', () => {
   it('returns a non-empty markdown string', async () => {
@@ -63,6 +75,45 @@ describe('generateMarkdown', () => {
     const md2 = await generateMarkdown({ orm: configWithProvider, title: 'API Provider Test 2' });
     expect(md2.startsWith('# API Provider Test 2')).toBe(true);
     expect(md2).toContain('| name | string |');
+  });
+
+  it('falls back to the default provider for explicit-type runtime entities when TsMorph has no source file', async () => {
+    class RuntimeJsUser {}
+    Entity()(RuntimeJsUser);
+    PrimaryKey({ type: 'integer' })(RuntimeJsUser.prototype, 'id');
+    Property({ type: 'string' })(RuntimeJsUser.prototype, 'name');
+
+    const md = await generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [RuntimeJsUser],
+      },
+      title: 'Runtime JS',
+    });
+
+    expect(md.startsWith('# Runtime JS')).toBe(true);
+    expect(md).toContain('### RuntimeJsUser');
+    expect(md).toContain('| name | string |');
+  });
+
+  it.each(
+    sqlDriverSmokeCases
+  )('generates markdown from %s metadata without a live database connection', async (name, driver, dbName) => {
+    const md = await generateMarkdown({
+      orm: {
+        ...config,
+        driver,
+        dbName,
+      },
+      title: `${name} Driver Smoke`,
+    });
+
+    expect(md.startsWith(`# ${name} Driver Smoke`)).toBe(true);
+    expect(md).toContain('### Author');
+    expect(md).toContain('### Post');
+    expect(md).toContain('| name |');
+    expect(md).toContain('Post }|--|| Author : "author"');
   });
 
   it('rejects explicit src paths that match no source files', async () => {

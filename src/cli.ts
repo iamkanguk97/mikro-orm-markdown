@@ -7,7 +7,6 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command } from 'commander';
 import { generateMarkdown } from './index.js';
-import { withTsMorphMetadataProvider } from './provider.js';
 
 interface CliOptions {
   config: string;
@@ -126,7 +125,7 @@ export async function loadOrmOptions(configPath: string, tsconfigPath?: string):
   const options = config as Options;
   const withPreferTs = isTypeScriptConfig && options.preferTs === undefined ? { ...options, preferTs: true } : options;
 
-  return withTsMorphMetadataProvider(withPreferTs);
+  return withPreferTs;
 }
 
 /**
