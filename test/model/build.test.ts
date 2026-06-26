@@ -12,6 +12,38 @@ async function getDocModel(): Promise<DocumentModel> {
   return buildDocumentModel(metas, jsDocResult, 'Test DB');
 }
 
+function createManyToManyMetas(): EntityMetadata[] {
+  const post = Object.assign({} as EntityMetadata, {
+    className: 'Post',
+    tableName: 'post',
+    primaryKeys: ['id'],
+    properties: {
+      id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      tags: { name: 'tags', type: 'Tag', kind: ReferenceKind.MANY_TO_MANY, owner: true },
+    },
+  });
+  const tag = Object.assign({} as EntityMetadata, {
+    className: 'Tag',
+    tableName: 'tag',
+    primaryKeys: ['id'],
+    properties: {
+      id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      posts: { name: 'posts', type: 'Post', kind: ReferenceKind.MANY_TO_MANY, mappedBy: 'tags' },
+    },
+  });
+
+  return [post, tag];
+}
+
+function createAtLeastOneJsDoc(className: string, propName: string): JsDocResult {
+  return {
+    entities: new Map(),
+    props: new Map([[className, new Map([[propName, { atLeastOne: true }]])]]),
+    sourceFileCount: 0,
+    classNames: new Set(),
+  };
+}
+
 describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
   it('warns when @atLeastOne cannot be matched to a relation edge', () => {
     // A unidirectional @OneToMany (no mappedBy) produces no edge to adjust.
@@ -36,6 +68,24 @@ describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
 
     expect(onWarn).toHaveBeenCalledOnce();
     expect(String(onWarn.mock.calls[0]?.[0])).toContain('@atLeastOne on Parent.children');
+  });
+});
+
+describe('buildDocumentModel — @atLeastOne many-to-many', () => {
+  it('upgrades an owning many-to-many collection to one-or-more on the target side', () => {
+    const docModel = buildDocumentModel(createManyToManyMetas(), createAtLeastOneJsDoc('Post', 'tags'), 'T');
+    const edge = docModel.groups.flatMap((group) => group.erdRelations).find((relation) => relation.label === 'tags');
+
+    expect(edge!.fromCardinality).toBe('}o');
+    expect(edge!.toCardinality).toBe('|{');
+  });
+
+  it('upgrades an inverse many-to-many collection to one-or-more on the source side', () => {
+    const docModel = buildDocumentModel(createManyToManyMetas(), createAtLeastOneJsDoc('Tag', 'posts'), 'T');
+    const edge = docModel.groups.flatMap((group) => group.erdRelations).find((relation) => relation.label === 'tags');
+
+    expect(edge!.fromCardinality).toBe('}|');
+    expect(edge!.toCardinality).toBe('o{');
   });
 });
 

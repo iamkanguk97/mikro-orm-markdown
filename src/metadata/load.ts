@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import type { EntityMetadata, Options } from '@mikro-orm/core';
-import { MikroORM } from '@mikro-orm/core';
+import { EntitySchema, MikroORM } from '@mikro-orm/core';
 
 /** Errors thrown during metadata loading */
 export class MetadataLoadError extends Error {
@@ -25,6 +25,36 @@ async function closeDiscoveryResources(orm: MikroORM): Promise<void> {
   await orm.config.getResultCacheAdapter()?.close?.();
 }
 
+function collectEntitySchemaNames(options: Options): string[] {
+  const configuredEntities = [...(options.entities ?? []), ...(options.entitiesTs ?? [])];
+  const names: string[] = [];
+
+  for (const entity of configuredEntities) {
+    if (entity instanceof EntitySchema) {
+      names.push(entity.meta.className);
+      continue;
+    }
+
+    if (entity !== null && typeof entity === 'object' && 'schema' in entity && entity.schema instanceof EntitySchema) {
+      names.push(entity.schema.meta.className);
+    }
+  }
+
+  return names;
+}
+
+function assertNoEntitySchemaEntities(options: Options): void {
+  const schemaNames = collectEntitySchemaNames(options);
+  if (schemaNames.length === 0) {
+    return;
+  }
+
+  throw new MetadataLoadError(
+    `EntitySchema-defined entities are not currently supported: ${schemaNames.join(', ')}.\n` +
+      'Use decorator-based @Entity() classes instead.'
+  );
+}
+
 /**
  * Runs MikroORM entity discovery without connecting to the database,
  * and returns all discovered EntityMetadata objects along with the
@@ -34,6 +64,8 @@ async function closeDiscoveryResources(orm: MikroORM): Promise<void> {
  * embeddable, or pivot entities) based on rendering needs.
  */
 export async function loadEntityMetadata(options: Options): Promise<LoadedEntityMetadata> {
+  assertNoEntitySchemaEntities(options);
+
   let orm: MikroORM;
   try {
     orm = await MikroORM.init({

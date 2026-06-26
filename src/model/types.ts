@@ -35,6 +35,8 @@ export interface ColumnModel {
   enumItems?: string[];
   /** For FK columns: the className of the referenced entity (e.g. "Author"). */
   referencedEntity?: string;
+  /** True when this FK column references the same entity it belongs to (self-reference). */
+  isSelfReference?: boolean;
 }
 
 /** An index, unique, or check constraint extracted from EntityMetadata. */

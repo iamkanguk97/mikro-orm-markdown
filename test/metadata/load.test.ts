@@ -1,3 +1,4 @@
+import { EntitySchema } from '@mikro-orm/core';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import * as path from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -52,6 +53,42 @@ describe('loadEntityMetadata', () => {
 
   it('throws MetadataLoadError when no entities are discovered', async () => {
     await expect(loadEntityMetadata({ ...config, entities: [] })).rejects.toBeInstanceOf(MetadataLoadError);
+  });
+
+  it('throws a clear error for EntitySchema-defined entities', async () => {
+    const schema = new EntitySchema({
+      name: 'SchemaUser',
+      properties: {
+        id: { type: 'number', primary: true },
+      },
+    });
+
+    await expect(
+      loadEntityMetadata({
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [schema],
+      })
+    ).rejects.toThrow('EntitySchema-defined entities are not currently supported: SchemaUser.');
+  });
+
+  it('throws a clear error for EntitySchema class groups', async () => {
+    class GroupedSchemaUser {}
+
+    const schema = new EntitySchema({
+      name: 'GroupedSchemaUser',
+      properties: {
+        id: { type: 'number', primary: true },
+      },
+    });
+
+    await expect(
+      loadEntityMetadata({
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [{ entity: GroupedSchemaUser, schema }],
+      })
+    ).rejects.toThrow('EntitySchema-defined entities are not currently supported: GroupedSchemaUser.');
   });
 
   it('discovers metadata without connecting to the database', async () => {

@@ -8,6 +8,9 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -25,11 +28,18 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Format check
+        run: npm run format:check
+
       - name: Type check
         run: npm run typecheck
 
       - name: Test
         run: npm run test
+
+      - name: Verify tag matches package version
+        run: |
+          node -e "const pkg=require('./package.json'); const tag=process.env.GITHUB_REF_NAME; const expected='v'+pkg.version; if (tag !== expected) { console.error('Tag '+tag+' does not match package version '+expected); process.exit(1); }"
 
       - name: Build
         run: npm run build
@@ -38,6 +48,6 @@ jobs:
         run: npm run test:pack
 
       - name: Publish to npm
-        run: npm publish --access public
+        run: npm publish --access public --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

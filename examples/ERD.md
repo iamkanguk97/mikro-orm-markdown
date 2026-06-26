@@ -99,7 +99,7 @@ erDiagram
     string username UK
     string email UK
     datetime created_at
-    integer profile_id FK
+    integer profile_id UK
   }
   Tag {
     integer id PK
@@ -115,22 +115,21 @@ erDiagram
     string title
     string status
     text body
-    integer author_id FK
+    integer author_id
     integer body_length "formula: LENGTH(body)"
   }
   Comment {
     integer id PK
     text content
-    integer post_id FK
-    integer author_id FK
-    integer parent_id FK
+    integer post_id
+    integer author_id
+    integer parent_id "self-ref"
   }
   User ||--o| Profile : "profile"
   Post }o--|| User : "author"
   Post }o--|{ Tag : "tags"
   Comment }o--|| Post : "post"
   Comment }o--o| User : "author"
-  Comment }o--o| Comment : "parent"
 ```
 
 ### User
@@ -240,14 +239,14 @@ erDiagram
   OrderItem {
     integer id PK
     integer quantity
-    integer order_id FK
-    integer product_id FK
+    integer order_id
+    integer product_id
   }
   Order {
     integer id PK
     integer total_cents
     datetime placed_at
-    integer customer_id FK
+    integer customer_id
   }
   Customer {
     integer id PK

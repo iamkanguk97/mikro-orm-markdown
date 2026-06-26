@@ -24,12 +24,14 @@ npm run test:watch # watch mode tests
 
 ```bash
 npm run lint
+npm run format:check
 npm run typecheck
 npm run test
 npm run build
+npm run test:pack
 ```
 
-All four must pass before opening a PR.
+All checks must pass before opening a PR. `test:pack` verifies the npm tarball export and CLI binary after `build`.
 
 ## Commit Messages
 

@@ -146,7 +146,11 @@ function buildColumns(
 
   // FK columns: m:1 always owns the FK; 1:1 only when owner === true
   if (prop.kind === ReferenceKind.MANY_TO_ONE || (prop.kind === ReferenceKind.ONE_TO_ONE && prop.owner === true)) {
-    return buildForeignKeyColumns(prop, metaByClass);
+    const cols = buildForeignKeyColumns(prop, metaByClass);
+    if (prop.type === owningMeta.className) {
+      return cols.map((col) => ({ ...col, isSelfReference: true }));
+    }
+    return cols;
   }
 
   // ONE_TO_MANY, MANY_TO_MANY (both owner and inverse) → no physical column
@@ -313,6 +317,9 @@ function buildEdge(fromEntity: string, prop: EntityProperty): RelationEdge | nul
   const isNullable = prop.nullable === true;
 
   if (prop.kind === ReferenceKind.MANY_TO_ONE) {
+    if (prop.type === fromEntity) {
+      return null; // self-reference: shown as column comment, not a relation line
+    }
     return {
       fromEntity,
       toEntity: prop.type,
@@ -371,12 +378,10 @@ export function renderErDiagram(model: DiagramModel): string {
 }
 
 function renderColumnLine(col: ColumnModel): string {
-  // Priority: PK > FK > UK
+  // Priority: PK > UK (FK qualifier omitted — relationship lines already convey FK relationships)
   let qualifier = '';
   if (col.isPrimary) {
     qualifier = ' PK';
-  } else if (col.isForeignKey) {
-    qualifier = ' FK';
   } else if (col.isUnique) {
     qualifier = ' UK';
   }
@@ -394,6 +399,8 @@ function renderColumnLine(col: ColumnModel): string {
     comment = 'discriminator';
   } else if (col.embeddedIn !== undefined) {
     comment = `[${col.embeddedIn}]`;
+  } else if (col.isSelfReference) {
+    comment = 'self-ref';
   }
 
   const commentStr = comment !== undefined ? ` "${escapeMermaidQuotedText(comment)}"` : '';

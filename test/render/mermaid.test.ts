@@ -706,8 +706,10 @@ describe('renderErDiagram', () => {
       relations: [],
     };
     const result = renderErDiagram(model);
-    // DB column name + FK qualifier only; the TS property name lives in the markdown table.
-    expect(result).toContain('integer author_id FK');
+    // DB column name only; FK qualifier is omitted (relationship lines convey FK relationships).
+    // The TS property name lives in the markdown table, not the diagram.
+    expect(result).toContain('integer author_id');
+    expect(result).not.toContain('author_id FK');
     expect(result).not.toContain('"author"');
   });
 

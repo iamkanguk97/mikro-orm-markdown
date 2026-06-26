@@ -216,7 +216,8 @@ function applyAtLeastOne(
       if (!edge) {
         onWarn?.(
           `@atLeastOne on ${className}.${propName} had no effect: no matching relation edge was found. ` +
-            'It applies only to a @OneToMany/@ManyToMany with a mappedBy that pairs with an owning relation.'
+            'It applies only to collection relations that can be matched to a rendered edge: ' +
+            '@OneToMany with mappedBy, or @ManyToMany on either the owning side or an inverse mappedBy side.'
         );
       }
     }

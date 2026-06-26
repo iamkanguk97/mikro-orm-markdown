@@ -3,7 +3,7 @@ import { MariaDbDriver } from '@mikro-orm/mariadb';
 import { MySqlDriver } from '@mikro-orm/mysql';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { SqliteDriver } from '@mikro-orm/sqlite';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources } from '../../src/index.js';
 import config from '../fixtures/mikro-orm.config.js';
 import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
@@ -14,6 +14,10 @@ const sqlDriverSmokeCases = [
   ['MySQL', MySqlDriver, 'mikro_orm_markdown_test'],
   ['MariaDB', MariaDbDriver, 'mikro_orm_markdown_test'],
 ] as const;
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('generateMarkdown', () => {
   it('returns a non-empty markdown string', async () => {
@@ -100,6 +104,8 @@ describe('generateMarkdown', () => {
   it.each(
     sqlDriverSmokeCases
   )('generates markdown from %s metadata without a live database connection', async (name, driver, dbName) => {
+    const connectSpy = vi.spyOn(driver.prototype, 'connect');
+
     const md = await generateMarkdown({
       orm: {
         ...config,
@@ -109,7 +115,10 @@ describe('generateMarkdown', () => {
       title: `${name} Driver Smoke`,
     });
 
+    expect(connectSpy).not.toHaveBeenCalled();
     expect(md.startsWith(`# ${name} Driver Smoke`)).toBe(true);
+    expect(md).toContain('```mermaid');
+    expect(md).toContain('erDiagram');
     expect(md).toContain('### Author');
     expect(md).toContain('### Post');
     expect(md).toContain('| name |');
