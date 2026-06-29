@@ -8,14 +8,14 @@ import {
   renderMarkdownInlineCode,
   toMarkdownAnchor,
 } from './escape.js';
-import { normalizeType, renderErDiagram } from './mermaid.js';
+import { type MermaidRenderOptions, normalizeType, renderErDiagram } from './mermaid.js';
 
 /**
  * Renders a DocumentModel as a markdown string.
  * Each namespace group becomes a level-2 section with a Mermaid ERD block
  * followed by per-entity column tables.
  */
-export function renderMarkdown(docModel: DocumentModel): string {
+export function renderMarkdown(docModel: DocumentModel, mermaid?: MermaidRenderOptions): string {
   const sections: string[] = [`# ${escapeMarkdownInline(docModel.title)}`];
 
   if (docModel.description) {
@@ -28,7 +28,7 @@ export function renderMarkdown(docModel: DocumentModel): string {
   }
 
   for (const group of docModel.groups) {
-    sections.push(renderGroupSection(group));
+    sections.push(renderGroupSection(group, mermaid));
   }
 
   return sections.join('\n\n');
@@ -57,7 +57,7 @@ function renderTableOfContents(groups: NamespaceGroup[]): string {
   });
 }
 
-function renderGroupSection(group: NamespaceGroup): string {
+function renderGroupSection(group: NamespaceGroup, mermaid?: MermaidRenderOptions): string {
   const parts: string[] = [`## ${escapeMarkdownInline(group.name)}`];
 
   if (group.erdEntities.length > 0) {
@@ -65,7 +65,7 @@ function renderGroupSection(group: NamespaceGroup): string {
       entities: group.erdEntities.map((e) => e.model),
       relations: group.erdRelations,
     };
-    parts.push('```mermaid\n' + renderErDiagram(diagramModel) + '\n```');
+    parts.push('```mermaid\n' + renderErDiagram(diagramModel, mermaid) + '\n```');
   }
 
   for (const entity of group.textEntities) {

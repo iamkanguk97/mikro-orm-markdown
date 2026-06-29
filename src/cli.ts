@@ -7,6 +7,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command } from 'commander';
 import { generateMarkdown } from './index.js';
+import type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
+import { MERMAID_LAYOUTS, MERMAID_THEMES } from './render/mermaid.js';
 
 interface CliOptions {
   config: string;
@@ -15,6 +17,8 @@ interface CliOptions {
   description?: string;
   tsconfig?: string;
   src?: string[];
+  mermaidLayout?: string;
+  mermaidTheme?: string;
 }
 
 export function toConfigImportSpecifier(configPath: string): string {
@@ -194,9 +198,37 @@ export async function writeMarkdownFile(outPath: string, markdown: string): Prom
   }
 }
 
+function parseMermaidOptions(opts: CliOptions): MermaidRenderOptions | undefined {
+  const { mermaidLayout, mermaidTheme } = opts;
+
+  if (mermaidLayout !== undefined && !(MERMAID_LAYOUTS as readonly string[]).includes(mermaidLayout)) {
+    process.stderr.write(
+      `Error: Invalid --mermaid-layout "${mermaidLayout}". Allowed values: ${MERMAID_LAYOUTS.join(', ')}\n`
+    );
+    process.exit(1);
+  }
+
+  if (mermaidTheme !== undefined && !(MERMAID_THEMES as readonly string[]).includes(mermaidTheme)) {
+    process.stderr.write(
+      `Error: Invalid --mermaid-theme "${mermaidTheme}". Allowed values: ${MERMAID_THEMES.join(', ')}\n`
+    );
+    process.exit(1);
+  }
+
+  if (mermaidLayout === undefined && mermaidTheme === undefined) {
+    return undefined;
+  }
+
+  return {
+    ...(mermaidLayout !== undefined && { layout: mermaidLayout as MermaidLayout }),
+    ...(mermaidTheme !== undefined && { theme: mermaidTheme as MermaidTheme }),
+  };
+}
+
 async function run(opts: CliOptions): Promise<void> {
   const configPath = path.resolve(opts.config);
   const outPath = path.resolve(opts.out);
+  const mermaid = parseMermaidOptions(opts);
 
   let ormOptions: Options;
   try {
@@ -215,6 +247,7 @@ async function run(opts: CliOptions): Promise<void> {
       title: opts.title,
       ...(opts.description !== undefined && { description: opts.description }),
       ...(opts.src !== undefined && { src: opts.src }),
+      ...(mermaid !== undefined && { mermaid }),
       onWarn: (message: string): void => void process.stderr.write(`Warning: ${message}\n`),
     });
   } catch (err) {
@@ -247,6 +280,8 @@ const program = new Command()
     '--src <paths...>',
     'Source .ts file globs to read JSDoc from when entities run from compiled .js (comments are stripped at build time)'
   )
+  .option('--mermaid-layout <layout>', `Mermaid layout engine injected as frontmatter (${MERMAID_LAYOUTS.join('|')})`)
+  .option('--mermaid-theme <theme>', `Mermaid theme injected as frontmatter (${MERMAID_THEMES.join('|')})`)
   .action(run);
 
 function isDirectCliExecution(): boolean {

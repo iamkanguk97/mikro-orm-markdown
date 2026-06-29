@@ -892,3 +892,94 @@ describe('renderErDiagram', () => {
     expect(result).toContain('Order_Item }o--|| User_Account : "created \\"by\\" user"');
   });
 });
+
+// ─── renderErDiagram — Mermaid frontmatter ────────────────────────────────────
+
+describe('renderErDiagram — Mermaid frontmatter', () => {
+  const emptyModel: DiagramModel = { entities: [], relations: [] };
+
+  it('emits no frontmatter when no options are provided', () => {
+    expect(renderErDiagram(emptyModel)).toBe('erDiagram');
+  });
+
+  it('emits no frontmatter when an empty options object is provided', () => {
+    expect(renderErDiagram(emptyModel, {})).toBe('erDiagram');
+  });
+
+  it('emits layout frontmatter when layout is set', () => {
+    const result = renderErDiagram(emptyModel, { layout: 'elk' });
+    expect(result).toBe('---\nconfig:\n  layout: elk\n---\nerDiagram');
+  });
+
+  it('emits theme frontmatter when theme is set', () => {
+    const result = renderErDiagram(emptyModel, { theme: 'forest' });
+    expect(result).toBe('---\nconfig:\n  theme: forest\n---\nerDiagram');
+  });
+
+  it('emits both layout and theme frontmatter when both are set', () => {
+    const result = renderErDiagram(emptyModel, { layout: 'elk', theme: 'forest' });
+    expect(result).toBe('---\nconfig:\n  layout: elk\n  theme: forest\n---\nerDiagram');
+  });
+
+  it('frontmatter precedes erDiagram body content', () => {
+    const model: DiagramModel = {
+      entities: [
+        {
+          className: 'User',
+          tableName: 'user',
+          columns: [
+            {
+              propName: 'id',
+              fieldName: 'id',
+              type: 'integer',
+              isPrimary: true,
+              isForeignKey: false,
+              isUnique: false,
+              isNullable: false,
+            },
+          ],
+          isPivot: false,
+          isEmbeddable: false,
+          constraints: [],
+        },
+      ],
+      relations: [],
+    };
+    const result = renderErDiagram(model, { layout: 'dagre' });
+    const lines = result.split('\n');
+    expect(lines[0]).toBe('---');
+    expect(lines).toContain('erDiagram');
+    const erdIndex = lines.indexOf('erDiagram');
+    const dashIndex = lines.lastIndexOf('---');
+    expect(dashIndex).toBeLessThan(erdIndex);
+  });
+
+  it('entity body appears after frontmatter and erDiagram when both are present', () => {
+    const model: DiagramModel = {
+      entities: [
+        {
+          className: 'User',
+          tableName: 'user',
+          columns: [
+            {
+              propName: 'id',
+              fieldName: 'id',
+              type: 'integer',
+              isPrimary: true,
+              isForeignKey: false,
+              isUnique: false,
+              isNullable: false,
+            },
+          ],
+          isPivot: false,
+          isEmbeddable: false,
+          constraints: [],
+        },
+      ],
+      relations: [],
+    };
+    const result = renderErDiagram(model, { layout: 'elk', theme: 'neutral' });
+    expect(result).toContain('---\nconfig:\n  layout: elk\n  theme: neutral\n---\nerDiagram');
+    expect(result).toContain('User {');
+  });
+});

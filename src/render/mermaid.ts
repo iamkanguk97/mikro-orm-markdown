@@ -3,6 +3,18 @@ import { ReferenceKind } from '@mikro-orm/core';
 import type { ColumnModel, ConstraintModel, DiagramModel, EntityModel, RelationEdge } from '../model/types.js';
 import { escapeMermaidQuotedText, toMermaidIdentifier } from './escape.js';
 
+export const MERMAID_LAYOUTS = ['dagre', 'elk', 'elk.stress'] as const;
+export type MermaidLayout = (typeof MERMAID_LAYOUTS)[number];
+
+export const MERMAID_THEMES = ['default', 'neutral', 'dark', 'forest', 'base'] as const;
+export type MermaidTheme = (typeof MERMAID_THEMES)[number];
+
+/** Optional Mermaid rendering hints injected as YAML frontmatter inside the erDiagram fence. */
+export interface MermaidRenderOptions {
+  layout?: MermaidLayout;
+  theme?: MermaidTheme;
+}
+
 // Dummy table descriptor used when resolving formula expressions for documentation.
 // String-based formulas ignore both arguments; function-based formulas use the alias.
 const FORMULA_DUMMY_TABLE: FormulaTable = {
@@ -411,11 +423,24 @@ export function normalizeType(type: string): string {
 
 /**
  * Renders a DiagramModel as a Mermaid erDiagram block string.
- * The returned string starts with "erDiagram" and is ready to embed in a
- * markdown code fence.
+ * The returned string is ready to embed in a markdown code fence.
+ * When `mermaid` options are provided, a YAML frontmatter block is prepended.
  */
-export function renderErDiagram(model: DiagramModel): string {
-  const lines: string[] = ['erDiagram'];
+export function renderErDiagram(model: DiagramModel, mermaid?: MermaidRenderOptions): string {
+  const lines: string[] = [];
+
+  if (mermaid?.layout !== undefined || mermaid?.theme !== undefined) {
+    lines.push('---', 'config:');
+    if (mermaid.layout !== undefined) {
+      lines.push(`  layout: ${mermaid.layout}`);
+    }
+    if (mermaid.theme !== undefined) {
+      lines.push(`  theme: ${mermaid.theme}`);
+    }
+    lines.push('---');
+  }
+
+  lines.push('erDiagram');
 
   for (const entity of model.entities) {
     lines.push(`  ${toMermaidIdentifier(entity.className)} {`);

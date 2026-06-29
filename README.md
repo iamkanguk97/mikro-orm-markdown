@@ -79,6 +79,8 @@ npm run erd
 | `-d, --description <string>` | —           | Optional description paragraph shown below the title                            |
 | `--tsconfig <path>`    | —                 | `tsconfig.json` used when loading a `.ts` config; defaults to the nearest one beside the config file |
 | `--src <paths...>`     | —                 | Original TypeScript entity source paths/globs; only needed when MikroORM discovers entities from compiled JavaScript |
+| `--mermaid-layout <layout>` | —            | Mermaid layout engine (`dagre\|elk\|elk.stress`). Omit to use the viewer's default. |
+| `--mermaid-theme <theme>`   | —            | Mermaid theme (`default\|neutral\|dark\|forest\|base`). Omit to use the viewer's default. |
 
 > For a long or multiline description, use the [programmatic API](#programmatic-api) instead — it accepts any string directly, without shell quoting limits.
 
@@ -392,6 +394,7 @@ Programmatic options:
 | `description` | Optional paragraph below the title. Unlike the CLI flag, this can be any string without shell quoting concerns. |
 | `src` | Original TypeScript entity source paths/globs. Only needed when `orm.entities` discovers compiled JavaScript. |
 | `onWarn` | Callback for non-fatal warnings, such as compiled JavaScript JSDoc loss. |
+| `mermaid` | Optional Mermaid rendering options. See [Mermaid rendering options](#mermaid-rendering-options) below. |
 
 If your MikroORM config is asynchronous, resolve it yourself and pass the resulting options object:
 
@@ -399,6 +402,56 @@ If your MikroORM config is asynchronous, resolve it yourself and pass the result
 const ormConfig = await createOrmConfig();
 const markdown = await generateMarkdown({ orm: ormConfig });
 ```
+
+### Mermaid rendering options
+
+By default, mikro-orm-markdown does not emit Mermaid frontmatter config. This preserves each Markdown viewer's default Mermaid rendering behavior.
+
+You can opt into Mermaid rendering options via the CLI:
+
+```bash
+mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-layout elk
+mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-theme forest
+mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-layout elk --mermaid-theme neutral
+```
+
+Or via the programmatic API:
+
+```typescript
+const markdown = await generateMarkdown({
+  orm: ormConfig,
+  mermaid: {
+    layout: 'elk',
+    theme: 'forest',
+  },
+});
+```
+
+When a layout or theme is set, a YAML frontmatter block is prepended to each `erDiagram` fence:
+
+````markdown
+```mermaid
+---
+config:
+  layout: elk
+  theme: forest
+---
+erDiagram
+  ...
+```
+````
+
+**Available layout values:**
+
+| Value | Description |
+| ----- | ----------- |
+| `dagre` | Mermaid's default layered layout. |
+| `elk` | Alternative layout engine; can improve line routing on larger or denser ERDs. |
+| `elk.stress` | ELK stress layout variant. Support varies by Mermaid version and viewer. |
+
+**Available theme values:** `default`, `neutral`, `dark`, `forest`, `base`.
+
+> Viewer support for `elk` and theme values varies. If no `--mermaid-layout` or `--mermaid-theme` is provided, no frontmatter is emitted.
 
 ## License
 

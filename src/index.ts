@@ -4,8 +4,10 @@ import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.j
 import { buildDocumentModel } from './model/build.js';
 import { withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
+import type { MermaidRenderOptions } from './render/mermaid.js';
 
 export { MetadataLoadError } from './metadata/load.js';
+export type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
 
 /** Options for the programmatic API. */
 export interface GenerateMarkdownOptions {
@@ -24,6 +26,11 @@ export interface GenerateMarkdownOptions {
   src?: string[];
   /** Receives non-fatal warnings (e.g. JSDoc cannot be read from compiled JS). */
   onWarn?: (message: string) => void;
+  /**
+   * Optional Mermaid rendering options. When provided, a YAML frontmatter block
+   * is prepended to each erDiagram fence. Omit to preserve default viewer behavior.
+   */
+  mermaid?: MermaidRenderOptions;
 }
 
 /** File extensions produced by a TypeScript build, where comments are stripped. */
@@ -165,7 +172,7 @@ async function loadEntityMetadataWithTsMorphFallback(
  * ```
  */
 export async function generateMarkdown(options: GenerateMarkdownOptions): Promise<string> {
-  const { orm, title = 'Database Schema', description, src, onWarn } = options;
+  const { orm, title = 'Database Schema', description, src, onWarn, mermaid } = options;
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm, onWarn);
   const { metas, sourcePaths } = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm);
@@ -174,5 +181,5 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
     assertExplicitJsDocSourceCoverage(metas, jsDocResult, src, onWarn);
   }
   const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn);
-  return renderMarkdown(docModel);
+  return renderMarkdown(docModel, mermaid);
 }
