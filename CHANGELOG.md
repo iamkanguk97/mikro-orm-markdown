@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0-alpha.2] - 2026-06-25
+## [0.1.0-alpha.3] - 2026-06-29
 
 ### Added
 
@@ -45,6 +45,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `@Formula` computed columns now render as nullable
 - Index and unique constraint properties in the generated document now show actual DB column names (mapped through NamingStrategy) instead of TypeScript property names
 - Metadata cache is always disabled for doc generation runs; a user-supplied `metadataCache: { enabled: true }` in the MikroORM config is intentionally overridden to prevent `temp/` from being created
+
+## [0.1.0-alpha.2] - 2026-06-15
+
+### Fixed
+
+- Metadata discovery no longer opens a database connection
+- CLI `--src` option help text was cleaned up
+
+### Changed
+
+- Added tag-based npm release automation and repository contribution templates
+- Migrated linting and formatting setup to Biome
 
 ## [0.1.0-alpha.1] - 2026-06-11
 
