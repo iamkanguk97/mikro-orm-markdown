@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.5] - 2026-06-29
+
+### Added
+
+- `--mermaid-layout <layout>` and `--mermaid-theme <theme>` CLI options to inject Mermaid YAML frontmatter into each `erDiagram` fence
+- `mermaid` option in the programmatic API (`generateMarkdown({ mermaid: { layout, theme } })`) with the same effect
+- `MermaidLayout`, `MermaidTheme`, and `MermaidRenderOptions` types exported from the public API
+- When neither option is set, output is identical to previous versions — no frontmatter is emitted
+
 ## [0.1.0-alpha.4] - 2026-06-29
 
 ### Fixed
