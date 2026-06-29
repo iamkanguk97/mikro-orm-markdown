@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.0-alpha.4] - 2026-06-29
+
+### Fixed
+
+- `resolveScalarType` now preserves composite primary-key column alignment through FK-as-PK chains
+- `resolveScalarType` now falls back to `integer` after depth 5 instead of leaking an entity class name
+- Cross-namespace ERD filtering now treats `@describe` as a home namespace when checking `@erd` guests
+- Cross-namespace ERD guest entities with no visible primary-key columns are excluded instead of rendering empty boxes
+
+### Changed
+
+- Markdown tables and Mermaid ERDs now render database-specific scalar types as generic, database-agnostic types
+
 ## [0.1.0-alpha.3] - 2026-06-29
 
 ### Added
