@@ -90,6 +90,21 @@ describe('renderMarkdown — table of contents', () => {
     // The ] is backslash-escaped so it does not close the label early.
     expect(md).toContain('- [Archived\\]](#archived)');
   });
+
+  it('uses GitHub duplicate suffixes when heading anchors collide', () => {
+    const docModel: DocumentModel = {
+      title: 'API',
+      groups: [
+        { name: 'API', erdEntities: [], erdRelations: [], textEntities: [] },
+        { name: 'api', erdEntities: [], erdRelations: [], textEntities: [] },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+
+    expect(md).toContain('- [API](#api-1)');
+    expect(md).toContain('- [api](#api-2)');
+  });
 });
 
 describe('renderMarkdown — entity descriptions', () => {

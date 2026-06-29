@@ -107,20 +107,20 @@ erDiagram
   }
   Profile {
     integer id PK
-    text bio
+    string bio
     string avatar_url
   }
   Post {
     integer id PK
     string title
     string status
-    text body
+    string body
     integer author_id
     integer body_length "formula: LENGTH(body)"
   }
   Comment {
     integer id PK
-    text content
+    string content
     integer post_id
     integer author_id
     integer parent_id "self-ref"
@@ -166,7 +166,7 @@ erDiagram
 | Column | Type | Key | Nullable | Description |
 |--------|------|-----|----------|-------------|
 | id | integer | PK |  |  |
-| bio | text |  | Y | Free-form biography. |
+| bio | string |  | Y | Free-form biography. |
 | avatar_url | string |  | Y | URL of the avatar image. |
 
 ### Post
@@ -180,7 +180,7 @@ erDiagram
 | id | integer | PK |  |  |
 | title | string |  |  | Headline shown in listings. |
 | status | string |  |  | One of: draft, published, archived |
-| body | text |  | Y | Full article body. |
+| body | string |  | Y | Full article body. |
 | author_id | integer | FK (author) |  | Author of the post (required — non-null relation). |
 | body_length | integer |  | Y | Character length of the body, computed in SQL at query time (no physical column). |
 
@@ -197,7 +197,7 @@ erDiagram
 | Column | Type | Key | Nullable | Description |
 |--------|------|-----|----------|-------------|
 | id | integer | PK |  |  |
-| content | text |  |  | The comment text. |
+| content | string |  |  | The comment text. |
 | post_id | integer | FK (post) |  | The post being commented on (required). |
 | author_id | integer | FK (author) | Y | The commenting user, or null for anonymous guests (nullable relation). |
 | parent_id | integer | FK (parent) | Y | Parent comment when this is a threaded reply (self-reference). |

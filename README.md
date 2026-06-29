@@ -216,7 +216,7 @@ erDiagram
   Post {
     integer id PK
     string title
-    text body
+    string body
     integer author_id FK
   }
   Author {

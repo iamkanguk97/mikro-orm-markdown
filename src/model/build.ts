@@ -266,14 +266,17 @@ function belongsToGroupForText(jsDoc: EntityJsDocInfo | undefined, groupName: st
 }
 
 /**
- * Returns true when an entity appears in a group's ERD only via @erd (not @namespace).
- * These entities are "guests" in the ERD: their home section is another namespace.
+ * Returns true when an entity appears in a group's ERD only via @erd while its
+ * home section is another namespace. Entities with only @erd tags have no text
+ * home section, so their ERD section renders the full model.
  */
 function isCrossNamespaceInGroup(jsDoc: EntityJsDocInfo | undefined, groupName: string, isDefault: boolean): boolean {
   if (isDefault || !jsDoc) {
     return false;
   }
+  const hasHomeNamespace = jsDoc.namespaces.length > 0 || jsDoc.describeNamespaces.length > 0;
   return (
+    hasHomeNamespace &&
     jsDoc.erdNamespaces.includes(groupName) &&
     !jsDoc.namespaces.includes(groupName) &&
     !jsDoc.describeNamespaces.includes(groupName)

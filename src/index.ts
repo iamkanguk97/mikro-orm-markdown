@@ -176,7 +176,7 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm, onWarn);
   const { metas, sourcePaths } = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm);
-  const jsDocResult = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn));
+  const jsDocResult = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn), onWarn);
   if (src !== undefined && src.length > 0) {
     assertExplicitJsDocSourceCoverage(metas, jsDocResult, src, onWarn);
   }

@@ -1,10 +1,12 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
+import { fileURLToPath } from 'node:url';
 import * as path from 'path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
 
-const FIXTURES_GLOB = path.resolve(import.meta.dirname, '../fixtures/entities/*.ts');
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
+const FIXTURES_GLOB = path.resolve(TEST_DIR, '../fixtures/entities/*.ts');
 
 describe('loadJsDoc', () => {
   it('returns empty maps for empty glob list', () => {
@@ -20,13 +22,16 @@ describe('loadJsDoc', () => {
     const unreadable = path.join(dir, 'Unreadable.ts');
     fs.writeFileSync(unreadable, 'export class Unreadable {}\n');
     fs.chmodSync(unreadable, 0o000);
+    const onWarn = vi.fn();
 
     try {
-      const result = loadJsDoc([unreadable, FIXTURES_GLOB]);
+      const result = loadJsDoc([unreadable, FIXTURES_GLOB], onWarn);
       // The bad path is absorbed; valid fixtures are still parsed.
       expect(result.entities.get('Author')).toBeDefined();
       expect(result.sourceFileCount).toBeGreaterThan(0);
       expect(result.classNames).toContain('Author');
+      expect(onWarn).toHaveBeenCalledOnce();
+      expect(String(onWarn.mock.calls[0]?.[0])).toContain('Could not load JSDoc source path');
     } finally {
       fs.chmodSync(unreadable, 0o644);
       fs.rmSync(dir, { recursive: true, force: true });
@@ -34,12 +39,23 @@ describe('loadJsDoc', () => {
   });
 
   it('reports zero source files for unmatched explicit paths', () => {
-    const result = loadJsDoc([path.resolve(import.meta.dirname, '../fixtures/entities/no-match-*.ts')]);
+    const result = loadJsDoc([path.resolve(TEST_DIR, '../fixtures/entities/no-match-*.ts')]);
 
     expect(result.sourceFileCount).toBe(0);
     expect(result.entities.size).toBe(0);
     expect(result.props.size).toBe(0);
     expect(result.classNames.size).toBe(0);
+  });
+
+  it('warns when an exact source path matches no files', () => {
+    const onWarn = vi.fn();
+    const missingPath = path.resolve(TEST_DIR, '../fixtures/entities/NoMatch.ts');
+
+    const result = loadJsDoc([missingPath], onWarn);
+
+    expect(result.sourceFileCount).toBe(0);
+    expect(onWarn).toHaveBeenCalledOnce();
+    expect(String(onWarn.mock.calls[0]?.[0])).toContain('No JSDoc source file matched path');
   });
 
   it('extracts @namespace tag from Author entity', () => {

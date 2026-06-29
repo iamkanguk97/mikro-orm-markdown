@@ -44,9 +44,9 @@ export interface JsDocResult {
  * and their properties.
  *
  * Returns empty maps if no source files are given or no JSDoc is found.
- * Never throws — errors are silently ignored so missing docs don't block generation.
+ * Never throws — errors are reported through onWarn so missing docs don't block generation.
  */
-export function loadJsDoc(filePaths: string[]): JsDocResult {
+export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => void): JsDocResult {
   const entities: EntityJsDocMap = new Map();
   const props: PropJsDocMap = new Map();
   const classNames = new Set<string>();
@@ -69,9 +69,12 @@ export function loadJsDoc(filePaths: string[]): JsDocResult {
   // generation (the "never throws" contract).
   for (const filePath of filePaths) {
     try {
-      project.addSourceFilesAtPaths(filePath);
-    } catch {
-      // Skip this path; other sources may still contribute JSDoc.
+      const sourceFiles = project.addSourceFilesAtPaths(filePath);
+      if (sourceFiles.length === 0 && !hasGlobPattern(filePath)) {
+        onWarn?.(`No JSDoc source file matched path: ${filePath}`);
+      }
+    } catch (err) {
+      onWarn?.(`Could not load JSDoc source path "${filePath}": ${formatUnknownError(err)}`);
     }
   }
 
@@ -105,12 +108,20 @@ export function loadJsDoc(filePaths: string[]): JsDocResult {
           props.set(className, propMap);
         }
       }
-    } catch {
-      // Skip this file; a single unparseable source must not block generation.
+    } catch (err) {
+      onWarn?.(`Could not parse JSDoc source file "${sourceFile.getFilePath()}": ${formatUnknownError(err)}`);
     }
   }
 
   return { entities, props, sourceFileCount: sourceFiles.length, classNames };
+}
+
+function formatUnknownError(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function hasGlobPattern(filePath: string): boolean {
+  return /[*?[\]{}]/.test(filePath);
 }
 
 function parseEntityJsDoc(jsDocs: JSDoc[]): EntityJsDocInfo {

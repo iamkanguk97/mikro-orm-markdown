@@ -24,7 +24,7 @@ export function renderMarkdown(docModel: DocumentModel, mermaid?: MermaidRenderO
 
   // A table of contents only helps when there is more than one namespace section.
   if (docModel.groups.length > 1) {
-    sections.push(renderTableOfContents(docModel.groups));
+    sections.push(renderTableOfContents(docModel.groups, resolveGroupAnchors(docModel)));
   }
 
   for (const group of docModel.groups) {
@@ -48,13 +48,37 @@ function renderBulletSection<T>(header: string, items: T[], renderItem: (item: T
 }
 
 /** Renders a namespace-level table of contents linking to each group's H2 section. */
-function renderTableOfContents(groups: NamespaceGroup[]): string {
+function renderTableOfContents(groups: NamespaceGroup[], anchors: Map<NamespaceGroup, string>): string {
   return renderBulletSection('## Contents', groups, (group) => {
     // escapeMarkdownInline does not touch brackets; escape them here so a name
     // containing `[` or `]` cannot prematurely close the link label `[...]`.
     const label = escapeMarkdownInline(group.name).replace(/[[\]]/g, '\\$&');
-    return `- [${label}](#${toMarkdownAnchor(group.name)})`;
+    return `- [${label}](#${anchors.get(group) ?? toMarkdownAnchor(group.name)})`;
   });
+}
+
+function resolveGroupAnchors(docModel: DocumentModel): Map<NamespaceGroup, string> {
+  const seenAnchors = new Map<string, number>();
+  const groupAnchors = new Map<NamespaceGroup, string>();
+
+  resolveHeadingAnchor(docModel.title, seenAnchors);
+  resolveHeadingAnchor('Contents', seenAnchors);
+
+  for (const group of docModel.groups) {
+    groupAnchors.set(group, resolveHeadingAnchor(group.name, seenAnchors));
+    for (const entity of group.textEntities) {
+      resolveHeadingAnchor(entity.model.className, seenAnchors);
+    }
+  }
+
+  return groupAnchors;
+}
+
+function resolveHeadingAnchor(value: string, seenAnchors: Map<string, number>): string {
+  const baseAnchor = toMarkdownAnchor(value);
+  const previousCount = seenAnchors.get(baseAnchor) ?? 0;
+  seenAnchors.set(baseAnchor, previousCount + 1);
+  return previousCount === 0 ? baseAnchor : `${baseAnchor}-${previousCount}`;
 }
 
 function renderGroupSection(group: NamespaceGroup, mermaid?: MermaidRenderOptions): string {

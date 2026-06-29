@@ -247,6 +247,33 @@ describe('buildDocumentModel — @hidden', () => {
 });
 
 describe('buildDocumentModel — cross-namespace @erd', () => {
+  it('shows full columns for an entity that is included only via @erd', () => {
+    const statsMeta = Object.assign({} as EntityMetadata, {
+      className: 'DailyStats',
+      tableName: 'daily_stats',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        day: { name: 'day', fieldNames: ['day'], type: 'date', kind: ReferenceKind.SCALAR },
+        views: { name: 'views', fieldNames: ['views'], type: 'integer', kind: ReferenceKind.SCALAR },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['DailyStats', { namespaces: [], erdNamespaces: ['Reporting'], describeNamespaces: [], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['DailyStats']),
+    };
+
+    const docModel = buildDocumentModel([statsMeta], jsDoc, 'T');
+    const reporting = docModel.groups.find((g) => g.name === 'Reporting')!;
+    const stats = reporting.erdEntities.find((e) => e.model.className === 'DailyStats')!;
+
+    expect(stats.model.columns.map((c) => c.fieldName)).toEqual(['id', 'day', 'views']);
+  });
+
   it('shows only PK columns for entities that appear via @erd in a foreign namespace', () => {
     const widgetMeta = Object.assign({} as EntityMetadata, {
       className: 'Widget',

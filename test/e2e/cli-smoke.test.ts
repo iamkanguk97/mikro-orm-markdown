@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 // Exercises the built CLI exactly as a user runs it (`node dist/cli.js ...`),
@@ -9,7 +10,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 // would have caught the cwd/tsconfig regression (H1): the helper/programmatic
 // tests bypass the real bin and the working-directory-sensitive config load.
 
-const repoRoot = path.resolve(import.meta.dirname, '../..');
+const testDir = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(testDir, '../..');
 const cliPath = path.join(repoRoot, 'dist', 'cli.js');
 const exampleConfig = path.join('examples', 'mikro-orm.config.ts');
 const dualDiscoveryConfig = path.join('test', 'fixtures', 'mikro-orm.dual.config.ts');
