@@ -85,7 +85,7 @@
     "*.{ts,js,json,jsonc,yml,yaml,md}": "biome check --write --no-errors-on-unmatched"
   },
   "devDependencies": {
-    "@biomejs/biome": "2.4.12",
+    "@biomejs/biome": "2.5.1",
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
     "@mikro-orm/core": "^6.6.15",
@@ -94,10 +94,10 @@
     "@mikro-orm/postgresql": "^6.6.15",
     "@mikro-orm/reflection": "^6.6.15",
     "@mikro-orm/sqlite": "^6.6.15",
-    "@types/node": "^22.0.0",
+    "@types/node": "^26.0.1",
     "@vitest/coverage-v8": "^2.0.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
+    "lint-staged": "^17.0.8",
     "tsup": "^8.0.0",
     "tsx": "^4.22.4",
     "typescript": "^5.5.0",
