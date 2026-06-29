@@ -218,8 +218,38 @@ function resolveFkTypes(
         ? primaryProps.find((candidate) => candidate.fieldNames.includes(referencedColumnName))
         : undefined;
 
-    return (pkProp ?? primaryProps[index] ?? primaryProps[0])?.type ?? 'integer';
+    const resolvedProp = pkProp ?? primaryProps[index] ?? primaryProps[0];
+    const rawType = resolvedProp?.type ?? 'integer';
+    // Pass the resolved prop's position so recursive calls follow the same column in
+    // deeper entities (preserves composite-key alignment through FK-as-PK chains).
+    const pkIndex = resolvedProp !== undefined ? primaryProps.indexOf(resolvedProp) : 0;
+    return resolveScalarType(rawType, metaByClass, pkIndex);
   });
+}
+
+/**
+ * Follows entity-class-name references until a non-entity scalar type is reached.
+ * Handles supertype-subtype chains where B.id is FK to A, and C.id is FK to B.
+ * pkIndex preserves composite-key column alignment at each level of the chain.
+ */
+function resolveScalarType(type: string, metaByClass: Map<string, EntityMetadata>, pkIndex = 0, depth = 0): string {
+  if (depth >= 5) {
+    return 'integer';
+  }
+  const refMeta = metaByClass.get(type);
+  if (!refMeta) {
+    return type;
+  }
+  const primaryProps = getPrimaryProps(refMeta);
+  if (primaryProps.length === 0) {
+    return type;
+  }
+  const targetProp = primaryProps[pkIndex] ?? primaryProps[0];
+  const nextType = targetProp?.type ?? type;
+  if (nextType === type) {
+    return type;
+  }
+  return resolveScalarType(nextType, metaByClass, pkIndex, depth + 1);
 }
 
 function getPrimaryProps(meta: EntityMetadata): EntityProperty[] {
@@ -353,6 +383,33 @@ function buildEdge(fromEntity: string, prop: EntityProperty): RelationEdge | nul
 }
 
 /**
+ * Maps DB-specific or ORM-internal type strings to RDBMS-agnostic generic types
+ * so the generated docs are portable across PostgreSQL, MySQL, SQLite, etc.
+ */
+export function normalizeType(type: string): string {
+  const t = type.toLowerCase().trim();
+  if (t === 'uuid' || t === 'text' || t === 'string' || t.startsWith('varchar')) {
+    return 'string';
+  }
+  if (t === 'timestamptz' || t === 'timestamp' || t === 'datetime') {
+    return 'datetime';
+  }
+  if (t === 'integer' || t === 'int' || t === 'bigint' || t === 'smallint') {
+    return 'integer';
+  }
+  if (t === 'doubletype' || t === 'double precision' || t === 'double' || t === 'float' || t === 'decimal') {
+    return 'float';
+  }
+  if (t === 'boolean' || t === 'bool') {
+    return 'boolean';
+  }
+  if (t === 'jsonb') {
+    return 'json';
+  }
+  return type;
+}
+
+/**
  * Renders a DiagramModel as a Mermaid erDiagram block string.
  * The returned string starts with "erDiagram" and is ready to embed in a
  * markdown code fence.
@@ -404,5 +461,5 @@ function renderColumnLine(col: ColumnModel): string {
   }
 
   const commentStr = comment !== undefined ? ` "${escapeMermaidQuotedText(comment)}"` : '';
-  return `${toMermaidIdentifier(col.type)} ${toMermaidIdentifier(col.fieldName)}${qualifier}${commentStr}`;
+  return `${toMermaidIdentifier(normalizeType(col.type))} ${toMermaidIdentifier(col.fieldName)}${qualifier}${commentStr}`;
 }

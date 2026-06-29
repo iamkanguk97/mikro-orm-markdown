@@ -148,13 +148,10 @@ describe('renderMarkdown — column table', () => {
     expect(md).toContain('| author_id | integer | FK (author) |');
   });
 
-  it('preserves parameterized SQL types verbatim in the table (H4)', async () => {
+  it('normalizes parameterized SQL types to generic types in the table (H4)', async () => {
     const md = await getMarkdown();
-    // The Author.nickname column is declared as varchar(255); the table row must
-    // show it unaltered, not the Mermaid-sanitized varchar_255_. (The Mermaid
-    // diagram block legitimately keeps the sanitized form, so we scope the
-    // negative check to the table row only.)
-    expect(md).toContain('| nickname | varchar(255) |');
+    // The Author.nickname column is declared as varchar(255); normalizeType maps it to 'string'.
+    expect(md).toContain('| nickname | string |');
     const tableRow = md.split('\n').find((line) => line.startsWith('| nickname |'));
     expect(tableRow).not.toContain('varchar_255_');
   });
@@ -180,7 +177,7 @@ describe('renderMarkdown — column table', () => {
   it('nullable column shows Y in Nullable cell', async () => {
     const md = await getMarkdown();
     // Post.body is nullable
-    expect(md).toContain('| body | text |  | Y |');
+    expect(md).toContain('| body | string |  | Y |');
   });
 
   it('non-nullable column has empty Nullable cell', async () => {

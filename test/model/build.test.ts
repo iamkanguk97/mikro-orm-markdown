@@ -246,6 +246,140 @@ describe('buildDocumentModel — @hidden', () => {
   });
 });
 
+describe('buildDocumentModel — cross-namespace @erd', () => {
+  it('shows only PK columns for entities that appear via @erd in a foreign namespace', () => {
+    const widgetMeta = Object.assign({} as EntityMetadata, {
+      className: 'Widget',
+      tableName: 'widget',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
+        code: { name: 'code', fieldNames: ['code'], type: 'string', kind: ReferenceKind.SCALAR },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['Widget', { namespaces: ['GroupA'], erdNamespaces: ['GroupB'], describeNamespaces: [], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['Widget']),
+    };
+
+    const docModel = buildDocumentModel([widgetMeta], jsDoc, 'T');
+
+    const groupB = docModel.groups.find((g) => g.name === 'GroupB')!;
+    const widgetInB = groupB.erdEntities.find((e) => e.model.className === 'Widget')!;
+    expect(widgetInB.model.columns.map((c) => c.fieldName)).toEqual(['id']);
+
+    const groupA = docModel.groups.find((g) => g.name === 'GroupA')!;
+    const widgetInA = groupA.erdEntities.find((e) => e.model.className === 'Widget')!;
+    expect(widgetInA.model.columns.map((c) => c.fieldName)).toContain('name');
+    expect(widgetInA.model.columns.map((c) => c.fieldName)).toContain('code');
+  });
+
+  it('entity with @namespace on both groups shows full columns in both', () => {
+    const nodeMeta = Object.assign({} as EntityMetadata, {
+      className: 'Node',
+      tableName: 'node',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        label: { name: 'label', fieldNames: ['label'], type: 'string', kind: ReferenceKind.SCALAR },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['Node', { namespaces: ['Alpha', 'Beta'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['Node']),
+    };
+
+    const docModel = buildDocumentModel([nodeMeta], jsDoc, 'T');
+
+    for (const groupName of ['Alpha', 'Beta']) {
+      const group = docModel.groups.find((g) => g.name === groupName)!;
+      const nodeInGroup = group.erdEntities.find((e) => e.model.className === 'Node')!;
+      expect(nodeInGroup.model.columns.map((c) => c.fieldName)).toContain('label');
+    }
+  });
+});
+
+describe('buildDocumentModel — cross-namespace @erd edge cases', () => {
+  it('treats @describe as a home namespace — shows full columns in ERD even with @erd', () => {
+    // Bug #2: @describe X @erd X without @namespace X should NOT be treated as cross-namespace.
+    // The entity's home is GroupB (via @describe), so GroupB ERD should show all columns.
+    const itemMeta = Object.assign({} as EntityMetadata, {
+      className: 'Item',
+      tableName: 'item',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        title: { name: 'title', fieldNames: ['title'], type: 'string', kind: ReferenceKind.SCALAR },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['Item', { namespaces: [], erdNamespaces: ['GroupB'], describeNamespaces: ['GroupB'], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['Item']),
+    };
+
+    const docModel = buildDocumentModel([itemMeta], jsDoc, 'T');
+    const groupB = docModel.groups.find((g) => g.name === 'GroupB')!;
+    const itemInB = groupB.erdEntities.find((e) => e.model.className === 'Item')!;
+    expect(itemInB.model.columns.map((c) => c.fieldName)).toContain('title');
+  });
+
+  it('excludes cross-namespace entity from ERD when it has no PK columns to show', () => {
+    // Bug #3: If the only column is a FK-as-PK to a @hidden entity, pkColumns = [] after
+    // the hidden-FK filter. The entity should be dropped entirely, not rendered as an empty box.
+    const hiddenMeta = Object.assign({} as EntityMetadata, {
+      className: 'Secret',
+      tableName: 'secret',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const sharedPkMeta = Object.assign({} as EntityMetadata, {
+      className: 'SharedPk',
+      tableName: 'shared_pk',
+      properties: {
+        secret: {
+          name: 'secret',
+          fieldNames: ['id'],
+          type: 'Secret',
+          kind: ReferenceKind.MANY_TO_ONE,
+          primary: true,
+          nullable: false,
+          referencedColumnNames: ['id'],
+        },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }],
+        ['SharedPk', { namespaces: ['Home'], erdNamespaces: ['Guest'], describeNamespaces: [], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['Secret', 'SharedPk']),
+    };
+
+    const docModel = buildDocumentModel([hiddenMeta, sharedPkMeta], jsDoc, 'T');
+    const guestGroup = docModel.groups.find((g) => g.name === 'Guest')!;
+    const sharedPkInGuest = guestGroup.erdEntities.find((e) => e.model.className === 'SharedPk');
+    // Entity dropped from Guest ERD because it has no PK columns left after hidden-FK filtering
+    expect(sharedPkInGuest).toBeUndefined();
+  });
+});
+
 describe('buildDocumentModel — enriched entities', () => {
   it('Author entity has jsDoc with description and namespace', async () => {
     const docModel = await getDocModel();

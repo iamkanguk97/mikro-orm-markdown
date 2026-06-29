@@ -103,9 +103,21 @@ export function buildDocumentModel(
   for (const groupName of groupNames) {
     const isDefault = groupName === 'default';
 
-    const erdEntities = [...enrichedByClass.values()].filter(({ jsDoc }) =>
-      belongsToGroupForErd(jsDoc, groupName, isDefault)
-    );
+    const erdEntities = [...enrichedByClass.values()]
+      .filter(({ jsDoc }) => belongsToGroupForErd(jsDoc, groupName, isDefault))
+      .map((entity): EnrichedEntity | null => {
+        if (isCrossNamespaceInGroup(entity.jsDoc, groupName, isDefault)) {
+          const pkColumns = entity.model.columns.filter((col) => col.isPrimary);
+          // If no PK columns remain (e.g. FK-as-PK to a @hidden entity was filtered out),
+          // exclude the entity entirely: an empty box with dangling arrows is misleading.
+          if (pkColumns.length === 0) {
+            return null;
+          }
+          return { ...entity, model: { ...entity.model, columns: pkColumns } };
+        }
+        return entity;
+      })
+      .filter((entity): entity is EnrichedEntity => entity !== null);
 
     const textEntities = [...enrichedByClass.values()].filter(({ jsDoc }) =>
       belongsToGroupForText(jsDoc, groupName, isDefault)
@@ -251,4 +263,19 @@ function belongsToGroupForText(jsDoc: EntityJsDocInfo | undefined, groupName: st
     return false;
   }
   return jsDoc.namespaces.includes(groupName) || jsDoc.describeNamespaces.includes(groupName);
+}
+
+/**
+ * Returns true when an entity appears in a group's ERD only via @erd (not @namespace).
+ * These entities are "guests" in the ERD: their home section is another namespace.
+ */
+function isCrossNamespaceInGroup(jsDoc: EntityJsDocInfo | undefined, groupName: string, isDefault: boolean): boolean {
+  if (isDefault || !jsDoc) {
+    return false;
+  }
+  return (
+    jsDoc.erdNamespaces.includes(groupName) &&
+    !jsDoc.namespaces.includes(groupName) &&
+    !jsDoc.describeNamespaces.includes(groupName)
+  );
 }

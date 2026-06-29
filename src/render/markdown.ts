@@ -8,7 +8,7 @@ import {
   renderMarkdownInlineCode,
   toMarkdownAnchor,
 } from './escape.js';
-import { renderErDiagram } from './mermaid.js';
+import { normalizeType, renderErDiagram } from './mermaid.js';
 
 /**
  * Renders a DocumentModel as a markdown string.
@@ -126,7 +126,7 @@ function renderColumnTable(entity: EnrichedEntity): string {
     // Surface @Enum allowed values; the table cell escapes backticks, so plain text.
     const enumDesc = col.enumItems !== undefined ? `One of: ${col.enumItems.join(', ')}` : '';
     const desc = [docDesc, enumDesc].filter((part) => part !== '').join('\n');
-    return `| ${escapeMarkdownTableCell(col.fieldName)} | ${escapeMarkdownTableCell(col.type)} | ${escapeMarkdownTableCell(key)} | ${nullable} | ${escapeMarkdownTableCell(desc)} |`;
+    return `| ${escapeMarkdownTableCell(col.fieldName)} | ${escapeMarkdownTableCell(normalizeType(col.type))} | ${escapeMarkdownTableCell(key)} | ${nullable} | ${escapeMarkdownTableCell(desc)} |`;
   });
   return [header, sep, ...rows].join('\n');
 }

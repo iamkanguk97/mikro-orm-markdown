@@ -52,15 +52,14 @@ describe('buildDiagramModel', () => {
     expect(fkCol!.propName).toBe('author');
   });
 
-  it('keeps the original parameterized type on the model, sanitizing only at render (H4)', async () => {
+  it('keeps the original parameterized type on the model, normalizing only at render (H4)', async () => {
     const model = await getModel();
     const author = model.entities.find((e) => e.className === 'Author');
     const nickname = author!.columns.find((c) => c.fieldName === 'nickname');
 
-    // The model stores the raw type; the Mermaid identifier is sanitized only
-    // when the diagram line is rendered.
+    // The model stores the raw type; normalizeType maps it to a generic type at render time.
     expect(nickname?.type).toBe('varchar(255)');
-    expect(renderErDiagram(model)).toContain('varchar_255_ nickname');
+    expect(renderErDiagram(model)).toContain('string nickname');
   });
 
   it('Post m:n tags property does NOT produce a column', async () => {
@@ -517,6 +516,100 @@ describe('buildDiagramModel — composite foreign keys', () => {
 
     expect(renderErDiagram(model)).toContain('string tenant_region_code PK');
     expect(renderErDiagram(model)).toContain('integer tenant_account_id PK');
+  });
+});
+
+describe('buildDiagramModel — FK-as-PK chain (supertype-subtype)', () => {
+  it('resolves the scalar type through a two-level FK-as-PK chain', () => {
+    // EntityA: id uuid (scalar PK)
+    // EntityB: id PK+FK → EntityA  (B's PK is A's class name until resolved)
+    // EntityC: id PK+FK → EntityB  (C should ultimately resolve to uuid, not 'EntityB')
+    const entityA = Object.assign({} as EntityMetadata, {
+      className: 'EntityA',
+      tableName: 'entity_a',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const entityB = Object.assign({} as EntityMetadata, {
+      className: 'EntityB',
+      tableName: 'entity_b',
+      properties: {
+        entityA: {
+          name: 'entityA',
+          fieldNames: ['id'],
+          type: 'EntityA',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          primary: true,
+          nullable: false,
+        },
+      },
+    });
+    const entityC = Object.assign({} as EntityMetadata, {
+      className: 'EntityC',
+      tableName: 'entity_c',
+      properties: {
+        entityB: {
+          name: 'entityB',
+          fieldNames: ['id'],
+          type: 'EntityB',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          primary: true,
+          nullable: false,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([entityA, entityB, entityC]);
+
+    const cEntity = model.entities.find((e) => e.className === 'EntityC')!;
+    expect(cEntity.columns.find((c) => c.fieldName === 'id')?.type).toBe('uuid');
+
+    const bEntity = model.entities.find((e) => e.className === 'EntityB')!;
+    expect(bEntity.columns.find((c) => c.fieldName === 'id')?.type).toBe('uuid');
+  });
+});
+
+describe('buildDiagramModel — composite FK-as-PK chain', () => {
+  it('preserves composite key column type alignment through a FK-as-PK chain', () => {
+    // A has composite PK (id1: uuid, id2: integer).
+    // B's composite PK is FK-as-PK to A — B.b1 → A.id1, B.b2 → A.id2.
+    // resolveFkTypes for B must return [uuid, integer] in order, not [uuid, uuid].
+    const entityA = Object.assign({} as EntityMetadata, {
+      className: 'EntityA',
+      tableName: 'entity_a',
+      primaryKeys: ['id1', 'id2'],
+      properties: {
+        id1: { name: 'id1', fieldNames: ['id1'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
+        id2: { name: 'id2', fieldNames: ['id2'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const entityB = Object.assign({} as EntityMetadata, {
+      className: 'EntityB',
+      tableName: 'entity_b',
+      properties: {
+        rel: {
+          name: 'rel',
+          type: 'EntityA',
+          kind: ReferenceKind.MANY_TO_ONE,
+          fieldNames: ['b1', 'b2'],
+          referencedColumnNames: ['id1', 'id2'],
+          primary: true,
+          nullable: false,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([entityA, entityB]);
+    const bEntity = model.entities.find((e) => e.className === 'EntityB')!;
+
+    const b1 = bEntity.columns.find((c) => c.fieldName === 'b1')!;
+    const b2 = bEntity.columns.find((c) => c.fieldName === 'b2')!;
+    expect(b1.type).toBe('uuid');
+    expect(b2.type).toBe('integer');
   });
 });
 
