@@ -1,5 +1,9 @@
 # mikro-orm-markdown
 
+<p align="center">
+  <img src="./assets/logo.png" alt="mikro-orm-markdown logo" width="400" />
+</p>
+
 [MikroORM](https://mikro-orm.io) 엔티티에서 **Mermaid ERD + Markdown 문서**를 자동으로 생성합니다.
 
 [![npm version](https://badge.fury.io/js/mikro-orm-markdown.svg)](https://badge.fury.io/js/mikro-orm-markdown)

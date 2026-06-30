@@ -1,5 +1,9 @@
 # mikro-orm-markdown
 
+<p align="center">
+  <img src="./assets/logo.png" alt="mikro-orm-markdown logo" width="400" />
+</p>
+
 Generate **Mermaid ERD + Markdown documentation** from your [MikroORM](https://mikro-orm.io) entities.
 
 [![npm version](https://badge.fury.io/js/mikro-orm-markdown.svg)](https://badge.fury.io/js/mikro-orm-markdown)
