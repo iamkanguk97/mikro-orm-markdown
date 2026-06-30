@@ -11,7 +11,9 @@
 [![CI](https://github.com/iamkanguk97/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/iamkanguk97/mikro-orm-markdown/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[English](./README.md) | [예시 출력 →](./examples/ERD.md)
+[English](./README.md)
+
+예시 출력은 [여기](./examples/ERD.md)에서 확인하실 수 있습니다.
 
 > [@samchon](https://github.com/samchon)의 [prisma-markdown](https://github.com/samchon/prisma-markdown)에서 큰 영감을 받았습니다. 좋은 아이디어에 감사드립니다.
 

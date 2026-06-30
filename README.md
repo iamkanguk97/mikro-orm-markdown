@@ -11,7 +11,9 @@ Generate **Mermaid ERD + Markdown documentation** from your [MikroORM](https://m
 [![CI](https://github.com/iamkanguk97/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/iamkanguk97/mikro-orm-markdown/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[한국어 문서](./README.ko.md) | [Example output →](./examples/ERD.md)
+[한국어 문서](./README.ko.md)
+
+You can see the example output [here](./examples/ERD.md).
 
 > Heavily inspired by [prisma-markdown](https://github.com/samchon/prisma-markdown) by [@samchon](https://github.com/samchon). Thank you for the great idea.
 
