@@ -6,11 +6,12 @@
 
 [MikroORM](https://mikro-orm.io) 엔티티에서 **Mermaid ERD + Markdown 문서**를 자동으로 생성합니다.
 
-[![npm version](https://badge.fury.io/js/mikro-orm-markdown.svg)](https://badge.fury.io/js/mikro-orm-markdown)
+[![npm version](https://img.shields.io/npm/v/mikro-orm-markdown)](https://www.npmjs.com/package/mikro-orm-markdown)
+[![npm downloads](https://img.shields.io/npm/dm/mikro-orm-markdown)](https://www.npmjs.com/package/mikro-orm-markdown)
 [![CI](https://github.com/iamkanguk97/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/iamkanguk97/mikro-orm-markdown/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[English](./README.md)
+[English](./README.md) | [예시 출력 →](./examples/ERD.md)
 
 > [@samchon](https://github.com/samchon)의 [prisma-markdown](https://github.com/samchon/prisma-markdown)에서 큰 영감을 받았습니다. 좋은 아이디어에 감사드립니다.
 
