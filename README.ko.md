@@ -453,6 +453,40 @@ erDiagram
 
 > `elk`와 theme 지원 여부는 뷰어마다 다릅니다. `--mermaid-layout`이나 `--mermaid-theme`을 지정하지 않으면 frontmatter는 출력되지 않습니다.
 
+## 추후 구현 예정 기능
+
+다음 기능들은 향후 릴리즈에서 지원할 예정입니다.
+
+### `--check` 모드
+
+출력 파일이 현재 엔티티 메타데이터와 다를 경우 non-zero 코드로 종료하는 `--check` 플래그입니다. 파일을 직접 수정하지 않으며, CI 파이프라인에서 `ERD.md`가 엔티티 변경 사항과 함께 항상 커밋되었는지 검증하는 용도로 사용합니다.
+
+```bash
+mikro-orm-markdown --config ./mikro-orm.config.ts --check
+```
+
+### `--watch` 모드
+
+엔티티 소스 파일을 감지하여 변경이 발생할 때마다 출력 문서를 자동으로 재생성하는 `--watch` 플래그입니다. CLI를 매번 수동으로 실행하지 않아도 ERD를 최신 상태로 유지할 수 있어 개발 중에 유용합니다.
+
+```bash
+mikro-orm-markdown --config ./mikro-orm.config.ts --watch
+```
+
+### `EntitySchema` 지원
+
+현재는 decorator 기반 엔티티(`@Entity()` 클래스)만 지원합니다. 향후 릴리즈에서는 TypeScript decorator 없이 Plain Object로 스키마를 정의하는 [`EntitySchema`](https://mikro-orm.io/docs/entity-schema) 방식도 지원할 예정입니다.
+
+```typescript
+const PostSchema = new EntitySchema({
+  name: 'Post',
+  properties: {
+    id: { primary: true, type: 'integer' },
+    title: { type: 'string' },
+  },
+});
+```
+
 ## 라이선스
 
 MIT

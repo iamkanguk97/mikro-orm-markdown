@@ -453,6 +453,43 @@ erDiagram
 
 > Viewer support for `elk` and theme values varies. If no `--mermaid-layout` or `--mermaid-theme` is provided, no frontmatter is emitted.
 
+## Planned Features
+
+The following features are planned for future releases.
+
+### `--check` mode
+
+A `--check` flag that exits with a non-zero code when the output file is out of sync with the current entity metadata — without writing any files.
+Intended for CI pipelines to enforce that `ERD.md` is always committed alongside entity changes.
+
+```bash
+mikro-orm-markdown --config ./mikro-orm.config.ts --check
+```
+
+### `--watch` mode
+
+A `--watch` flag that monitors entity source files and regenerates the output document automatically on each change.
+Useful during active development when you want the ERD to stay current without running the CLI manually.
+
+```bash
+mikro-orm-markdown --config ./mikro-orm.config.ts --watch
+```
+
+### `EntitySchema` support
+
+Currently only decorator-based entities (`@Entity()` classes) are supported.
+A future release will add support for [`EntitySchema`](https://mikro-orm.io/docs/entity-schema)-defined entities, which describe the schema as a plain object without TypeScript decorators.
+
+```typescript
+const PostSchema = new EntitySchema({
+  name: 'Post',
+  properties: {
+    id: { primary: true, type: 'integer' },
+    title: { type: 'string' },
+  },
+});
+```
+
 ## License
 
 MIT
