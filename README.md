@@ -15,6 +15,8 @@ Generate **Mermaid ERD + Markdown documentation** from your [MikroORM](https://m
 
 You can see the example output [here](./examples/ERD.md).
 
+Agent users can also use the bundled [Agent Skill](./skills/mikro-orm-markdown/SKILL.md) with Claude Code or other Agent Skills-compatible tools to set up and troubleshoot `mikro-orm-markdown` in a MikroORM project.
+
 > Heavily inspired by [prisma-markdown](https://github.com/samchon/prisma-markdown) by [@samchon](https://github.com/samchon). Thank you for the great idea.
 
 ## Features
