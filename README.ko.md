@@ -15,6 +15,8 @@
 
 예시 출력은 [여기](./examples/ERD.md)에서 확인하실 수 있습니다.
 
+Claude Code 또는 기타 Agent Skills 호환 도구를 사용한다면 `skills/mikro-orm-markdown/`의 선택적 Agent Skill로 MikroORM 프로젝트에 `mikro-orm-markdown`을 설정하고 문제를 진단할 수 있습니다. 이 Skill은 필요한 사용자가 저장소에서 가져가 쓰도록 제공되며, 일반적인 npm 사용에는 필요하지 않고 npm 패키지에는 포함되지 않습니다.
+
 > [@samchon](https://github.com/samchon)의 [prisma-markdown](https://github.com/samchon/prisma-markdown)에서 큰 영감을 받았습니다. 좋은 아이디어에 감사드립니다.
 
 ## 주요 기능
