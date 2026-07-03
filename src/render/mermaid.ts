@@ -116,6 +116,15 @@ function buildColumns(
         ? resolveFormulaExpr(prop.formula as (table: FormulaTable, cols: Record<string, string>) => string)
         : undefined;
 
+    // Shadow property (persist: false, e.g. a cached/computed runtime value or a
+    // getter-only property): MikroORM never writes or reads a DB column for it, so
+    // it has no physical column to document. @Formula columns are persist: false
+    // too, but they ARE meaningful to document (a real SELECT-time expression), so
+    // only skip when there is no formula.
+    if (prop.persist === false && formulaExpr === undefined) {
+      return [];
+    }
+
     // Flat embedded columns carry `embedded: [ownerPropName, embeddedPropName]`
     let embeddedIn: string | undefined;
     let embeddedPropName: string | undefined;
