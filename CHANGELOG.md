@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-07-03
+
+### Fixed
+
+- Scalar properties with `persist: false` (MikroORM shadow properties) are no longer rendered as if they were real database columns in the ERD or the Markdown column table; `@Formula` columns (also `persist: false` internally) are unaffected and continue to render
+- A self-referencing owning 1:1 relation (e.g. `Node.twin: Node`) no longer renders a redundant self-loop relation edge in addition to the existing `"self-ref"` column comment — now matches the existing self-referencing m:1 behavior
+
 ## [0.1.0] - 2026-06-30
 
 First stable release. All alpha features are considered production-ready.
