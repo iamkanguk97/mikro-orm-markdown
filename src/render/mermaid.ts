@@ -381,6 +381,9 @@ function buildEdge(fromEntity: string, prop: EntityProperty): RelationEdge | nul
   }
 
   if (prop.kind === ReferenceKind.ONE_TO_ONE && prop.owner === true) {
+    if (prop.type === fromEntity) {
+      return null; // self-reference: shown as column comment, not a relation line
+    }
     return {
       fromEntity,
       toEntity: prop.type,
