@@ -1,6 +1,6 @@
 import * as path from 'node:path';
-import type { EntityMetadata, Options } from '@mikro-orm/core';
-import { EntitySchema, MikroORM } from '@mikro-orm/core';
+import type { EntityClass, EntityMetadata, Options } from '@mikro-orm/core';
+import { EntitySchema, MetadataStorage, MikroORM } from '@mikro-orm/core';
 
 /** Errors thrown during metadata loading */
 export class MetadataLoadError extends Error {
@@ -56,6 +56,92 @@ function assertNoEntitySchemaEntities(options: Options): void {
 }
 
 /**
+ * True when `target` was ever passed through a MikroORM property/class decorator
+ * (@Entity, @Property, @PrimaryKey, ...). Every such decorator calls
+ * `MetadataStorage.getMetadataFromDecorator`, which stamps a marker onto the
+ * class the first time it runs — used here to catch EntitySchema entities that
+ * were never decorated at all (see assertDiscoveredEntitiesAreSupported).
+ *
+ * The marker's name changed between MikroORM versions (verified by diffing
+ * @mikro-orm/core release tarballs from npm): `__path` up to 6.2.8, then a
+ * `MetadataStorage.PATH_SYMBOL`-keyed property from 6.2.9 onward. Both are
+ * checked so this works across the whole >=6.0.0 peer range.
+ */
+function hasDecoratorMarker(target: EntityClass<unknown>): boolean {
+  const pathSymbol = MetadataStorage.PATH_SYMBOL;
+  if (typeof pathSymbol === 'symbol' && pathSymbol in target) {
+    return true;
+  }
+  return '__path' in target;
+}
+
+/** Entities collectEntitySchemaNames's pre-discovery scan cannot reason about: pivot tables and embeddables are not user-facing entities. */
+function isRenderableMeta(meta: EntityMetadata): boolean {
+  return !meta.pivotTable && !meta.embeddable;
+}
+
+/**
+ * Catches EntitySchema entities that assertNoEntitySchemaEntities cannot see:
+ * ones discovered via a glob/folder pattern (`entities: ['./src/**\/*.ts']`)
+ * rather than listed directly in the config array. MikroORM only reveals the
+ * actual EntitySchema instance by dynamically importing the matched files
+ * during discovery — after the pre-discovery guard has already run — so this
+ * must run on the discovered EntityMetadata[] instead.
+ *
+ * Two signals, in order of confidence:
+ *
+ * 1. `EntitySchema.REGISTRY` — definitive proof. A class-linked EntitySchema
+ *    (`new EntitySchema({ class: Book, ... })`) registers `Book` here; internal
+ *    per-discovery copies MikroORM makes for decorator-based entities are
+ *    marked `internal: true` and are never registered. No false positives are
+ *    structurally possible.
+ * 2. Decorator marker absence — an inference, not proof. A name-only
+ *    EntitySchema (`new EntitySchema({ name: 'Publisher', ... })`, no `class:`
+ *    link) is never registered in (1) either, since there is no user class to
+ *    register against. The only signal left is that it never went through a
+ *    decorator. If some future MikroORM release changes the marker mechanism
+ *    again (it has happened once before, at 6.2.9), a validly decorated entity
+ *    could look "markerless" too — so this case still throws (the project's
+ *    policy is to reject EntitySchema outright, not just warn), but with a
+ *    softer message that invites a bug report instead of asserting certainty.
+ */
+function assertDiscoveredEntitiesAreSupported(metas: EntityMetadata[]): void {
+  const confirmed: string[] = [];
+  const unconfirmed: string[] = [];
+
+  for (const meta of metas) {
+    if (!isRenderableMeta(meta)) {
+      continue;
+    }
+    if (EntitySchema.REGISTRY.has(meta.class)) {
+      confirmed.push(meta.className);
+    } else if (!hasDecoratorMarker(meta.class)) {
+      unconfirmed.push(meta.className);
+    }
+  }
+
+  if (confirmed.length === 0 && unconfirmed.length === 0) {
+    return;
+  }
+
+  const lines: string[] = [];
+  if (confirmed.length > 0) {
+    lines.push(`EntitySchema-defined entities are not currently supported: ${confirmed.join(', ')}.`);
+  }
+  if (unconfirmed.length > 0) {
+    lines.push(
+      `Could not confirm these entities are decorator-based @Entity() classes: ${unconfirmed.join(', ')}. ` +
+        'This usually means they are EntitySchema-defined entities (also not currently supported). ' +
+        "If you're certain these are valid @Entity() classes, this may be a detection false positive in " +
+        'mikro-orm-markdown — please open an issue: https://github.com/iamkanguk97/mikro-orm-markdown/issues'
+    );
+  }
+  lines.push('Use decorator-based @Entity() classes instead.');
+
+  throw new MetadataLoadError(lines.join('\n'));
+}
+
+/**
  * Runs MikroORM entity discovery without connecting to the database,
  * and returns all discovered EntityMetadata objects along with the
  * absolute source file paths they were declared in (for JSDoc extraction).
@@ -93,6 +179,8 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
         'No entities were discovered. ' + 'Check that your config specifies at least one entity path or class.'
       );
     }
+
+    assertDiscoveredEntitiesAreSupported(all);
 
     const baseDir = orm.config.get('baseDir');
     const sourcePaths = [...new Set(all.filter((m) => m.path).map((m) => path.resolve(baseDir, m.path)))];

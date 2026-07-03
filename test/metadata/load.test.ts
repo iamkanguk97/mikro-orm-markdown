@@ -91,6 +91,26 @@ describe('loadEntityMetadata', () => {
     ).rejects.toThrow('EntitySchema-defined entities are not currently supported: GroupedSchemaUser.');
   });
 
+  it('throws a clear error for a class-linked EntitySchema discovered via a glob pattern (not listed directly)', async () => {
+    await expect(
+      loadEntityMetadata({
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: ['./test/fixtures/entity-schema/*.js'],
+      })
+    ).rejects.toThrow('EntitySchema-defined entities are not currently supported: Book.');
+  });
+
+  it('throws a softer error for a name-only EntitySchema discovered via a glob pattern', async () => {
+    await expect(
+      loadEntityMetadata({
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: ['./test/fixtures/entity-schema/*.js'],
+      })
+    ).rejects.toThrow(/Could not confirm these entities are decorator-based @Entity\(\) classes: Publisher\./);
+  });
+
   it('discovers metadata without connecting to the database', async () => {
     const connectSpy = vi.spyOn(SqliteDriver.prototype, 'connect');
 
