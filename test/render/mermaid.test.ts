@@ -266,6 +266,106 @@ describe('buildDiagramModel — @Formula', () => {
   });
 });
 
+describe('buildDiagramModel — self-reference', () => {
+  function makeSelfReferencingManyToOne(): EntityMetadata {
+    return Object.assign({} as EntityMetadata, {
+      className: 'Employee',
+      tableName: 'employee',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        manager: {
+          name: 'manager',
+          type: 'Employee',
+          kind: ReferenceKind.MANY_TO_ONE,
+          fieldNames: ['manager_id'],
+          nullable: true,
+        },
+      },
+    });
+  }
+
+  function makeSelfReferencingOneToOne(): EntityMetadata {
+    return Object.assign({} as EntityMetadata, {
+      className: 'Node',
+      tableName: 'node',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        twin: {
+          name: 'twin',
+          type: 'Node',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          fieldNames: ['twin_id'],
+          unique: true,
+          nullable: true,
+        },
+      },
+    });
+  }
+
+  it('self-referencing m:1 produces no relation edge, only a "self-ref" column comment', () => {
+    const model = buildDiagramModel([makeSelfReferencingManyToOne()]);
+
+    expect(model.relations).toHaveLength(0);
+    const managerCol = model.entities[0]!.columns.find((c) => c.propName === 'manager');
+    expect(managerCol!.isSelfReference).toBe(true);
+    expect(renderErDiagram(model)).toContain('integer manager_id "self-ref"');
+  });
+
+  it('self-referencing 1:1 produces no relation edge, only a "self-ref" column comment', () => {
+    const model = buildDiagramModel([makeSelfReferencingOneToOne()]);
+
+    expect(model.relations).toHaveLength(0);
+    const twinCol = model.entities[0]!.columns.find((c) => c.propName === 'twin');
+    expect(twinCol!.isSelfReference).toBe(true);
+    const result = renderErDiagram(model);
+    expect(result).toContain('integer twin_id UK "self-ref"');
+    expect(result).not.toContain('Node ||');
+  });
+
+  it('non-self-referencing 1:1 still produces a relation edge as before', () => {
+    const userMeta = Object.assign({} as EntityMetadata, {
+      className: 'User',
+      tableName: 'user',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        profile: {
+          name: 'profile',
+          type: 'Profile',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          fieldNames: ['profile_id'],
+          unique: true,
+          nullable: false,
+        },
+      },
+    });
+    const profileMeta = Object.assign({} as EntityMetadata, {
+      className: 'Profile',
+      tableName: 'profile',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+
+    const model = buildDiagramModel([userMeta, profileMeta]);
+
+    expect(model.relations).toHaveLength(1);
+    expect(model.relations[0]).toMatchObject({
+      fromEntity: 'User',
+      toEntity: 'Profile',
+      fromCardinality: '||',
+      toCardinality: '||',
+      label: 'profile',
+    });
+    expect(renderErDiagram(model)).toContain('User ||--|| Profile : "profile"');
+  });
+});
+
 describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
   async function getModel(): Promise<DiagramModel> {
     const { metas } = await loadEntityMetadata(config);
