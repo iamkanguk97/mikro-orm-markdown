@@ -266,6 +266,61 @@ describe('buildDiagramModel — @Formula', () => {
   });
 });
 
+describe('buildDiagramModel — persist: false (shadow properties)', () => {
+  it('excludes a shadow property (persist: false, no formula) from the columns', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'User',
+      tableName: 'user',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        email: { name: 'email', fieldNames: ['email'], type: 'string', kind: ReferenceKind.SCALAR },
+        // Shadow property: exists on the entity, but MikroORM never persists it.
+        fullNameCache: {
+          name: 'fullNameCache',
+          fieldNames: ['full_name_cache'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          persist: false,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const user = model.entities.find((e) => e.className === 'User')!;
+
+    const fieldNames = user.columns.map((c) => c.fieldName);
+    expect(fieldNames).toEqual(['id', 'email']);
+    expect(fieldNames).not.toContain('full_name_cache');
+  });
+
+  it('still renders an @Formula column even though it is also persist: false', () => {
+    // @Formula properties are persist: false internally too, but they are a real,
+    // documented feature (a SELECT-time expression) and must keep rendering.
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'Customer',
+      tableName: 'customer',
+      properties: {
+        nameLength: {
+          name: 'nameLength',
+          fieldNames: ['name_length'],
+          type: 'integer',
+          kind: ReferenceKind.SCALAR,
+          persist: false,
+          formula: () => 'LENGTH(name)',
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const customer = model.entities.find((e) => e.className === 'Customer')!;
+    const nameLengthCol = customer.columns.find((c) => c.propName === 'nameLength');
+
+    expect(nameLengthCol).toBeDefined();
+    expect(nameLengthCol!.formula).toBe('LENGTH(name)');
+  });
+});
+
 describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
   async function getModel(): Promise<DiagramModel> {
     const { metas } = await loadEntityMetadata(config);
