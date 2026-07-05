@@ -2,7 +2,7 @@ import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
 import { describe, expect, it } from 'vitest';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import type { ColumnModel, DiagramModel, RelationEdge } from '../../src/model/types.js';
-import { buildDiagramModel, renderErDiagram } from '../../src/render/mermaid.js';
+import { buildDiagramModel, normalizeType, renderErDiagram } from '../../src/render/mermaid.js';
 import config from '../fixtures/mikro-orm.config.js';
 
 // ─── buildDiagramModel (integration: uses real MikroORM metadata) ─────────────
@@ -1136,5 +1136,102 @@ describe('renderErDiagram — Mermaid frontmatter', () => {
     const result = renderErDiagram(model, { layout: 'elk', theme: 'neutral' });
     expect(result).toContain('---\nconfig:\n  layout: elk\n  theme: neutral\n---\nerDiagram');
     expect(result).toContain('User {');
+  });
+});
+
+// ─── normalizeType ────────────────────────────────────────────────────────────
+
+describe('normalizeType', () => {
+  it.each([
+    ['varchar(255)', 'string'],
+    ['character varying', 'string'],
+    ['character varying(255)', 'string'],
+    ['char(36)', 'string'],
+    ['tinytext', 'string'],
+    ['mediumtext', 'string'],
+    ['longtext', 'string'],
+  ])('normalizes %s to %s', (input, expected) => {
+    expect(normalizeType(input)).toBe(expected);
+  });
+
+  it.each([
+    ['numeric', 'float'],
+    ['numeric(10,2)', 'float'],
+    ['decimal(10,2)', 'float'],
+    ['double(8,2)', 'float'],
+    ['float(8,2)', 'float'],
+    ['real', 'float'],
+  ])('normalizes %s to %s', (input, expected) => {
+    expect(normalizeType(input)).toBe(expected);
+  });
+
+  it.each([
+    ['tinyint', 'integer'],
+    ['tinyint(4)', 'integer'],
+    ['mediumint', 'integer'],
+    ['smallint unsigned', 'integer'],
+    ['int unsigned', 'integer'],
+    ['bigint(20) unsigned', 'integer'],
+    ['serial', 'integer'],
+    ['bigserial', 'integer'],
+  ])('normalizes %s to %s', (input, expected) => {
+    expect(normalizeType(input)).toBe(expected);
+  });
+
+  it.each([
+    ['datetime(3)', 'datetime'],
+    ['timestamp(6)', 'datetime'],
+    ['timestamptz(6)', 'datetime'],
+  ])('normalizes parameterized %s to %s', (input, expected) => {
+    expect(normalizeType(input)).toBe(expected);
+  });
+
+  it('normalizes the MySQL boolean declaration tinyint(1) to boolean, unlike other tinyint widths', () => {
+    expect(normalizeType('tinyint(1)')).toBe('boolean');
+    expect(normalizeType('tinyint(2)')).toBe('integer');
+  });
+
+  it('does not confuse interval with the int family', () => {
+    expect(normalizeType('interval')).toBe('interval');
+    expect(normalizeType('interval(6)')).toBe('interval(6)');
+  });
+
+  it('is case-insensitive and trims surrounding whitespace', () => {
+    expect(normalizeType(' CHARACTER VARYING(255) ')).toBe('string');
+    expect(normalizeType('DECIMAL(10,2)')).toBe('float');
+  });
+
+  it.each([
+    ['uuid', 'string'],
+    ['text', 'string'],
+    ['string', 'string'],
+    ['timestamptz', 'datetime'],
+    ['timestamp', 'datetime'],
+    ['datetime', 'datetime'],
+    ['integer', 'integer'],
+    ['int', 'integer'],
+    ['bigint', 'integer'],
+    ['smallint', 'integer'],
+    ['DoubleType', 'float'],
+    ['double precision', 'float'],
+    ['double', 'float'],
+    ['float', 'float'],
+    ['decimal', 'float'],
+    ['boolean', 'boolean'],
+    ['bool', 'boolean'],
+    ['jsonb', 'json'],
+  ])('keeps existing mapping of %s to %s', (input, expected) => {
+    expect(normalizeType(input)).toBe(expected);
+  });
+
+  it.each([
+    'bytea',
+    'blob',
+    'geometry',
+    "enum('a','b')",
+    'text[]',
+    'unknown',
+  ])('passes unrecognized type %s through unchanged', (input) => {
+    expect(normalizeType(input)).toBe(input);
   });
 });
