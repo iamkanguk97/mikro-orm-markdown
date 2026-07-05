@@ -166,8 +166,10 @@ function resolveColumnKey(col: ColumnModel): string {
     return 'PK';
   }
   if (col.isForeignKey) {
-    // Show TS property name in parentheses if it differs from the DB column name
-    return fkKey;
+    // Show TS property name in parentheses if it differs from the DB column name.
+    // A unique FK (e.g. the owning side of a 1:1) keeps its UK marker so the
+    // table agrees with the Mermaid ERD, which renders this column as UK.
+    return col.isUnique ? `${fkKey}, UK` : fkKey;
   }
   if (col.isUnique) {
     return 'UK';

@@ -461,6 +461,58 @@ describe('renderMarkdown — composite keys', () => {
 
     expect(renderMarkdown(docModel)).toContain('| tenant_region_code | string | PK, FK (tenant) |  |  |');
   });
+
+  it('shows both FK and UK markers for a unique FK column (owning 1:1)', () => {
+    const docModel: DocumentModel = {
+      title: 'Unique FK',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'UserProfile',
+                tableName: 'user_profile',
+                columns: [
+                  {
+                    propName: 'user',
+                    fieldName: 'user_id',
+                    type: 'integer',
+                    isPrimary: false,
+                    isForeignKey: true,
+                    isUnique: true,
+                    isNullable: false,
+                  },
+                  {
+                    propName: 'organization',
+                    fieldName: 'organization_id',
+                    type: 'integer',
+                    isPrimary: false,
+                    isForeignKey: true,
+                    isUnique: false,
+                    isNullable: false,
+                  },
+                ],
+                isPivot: false,
+                isEmbeddable: false,
+                constraints: [],
+              },
+              jsDoc: undefined,
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+
+    expect(md).toContain('| user_id | integer | FK (user), UK |  |  |');
+    // A non-unique FK is unchanged.
+    expect(md).toContain('| organization_id | integer | FK (organization) |  |  |');
+  });
 });
 
 /** Extracts the content of a level-2 section (from ## heading to next ## or end). */
