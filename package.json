@@ -1,12 +1,19 @@
 {
   "name": "mikro-orm-markdown",
   "version": "0.1.2",
-  "description": "Generate Mermaid ERD and Markdown documentation from MikroORM entities",
+  "description": "Generate Mermaid ERD diagrams and Markdown database schema documentation from MikroORM entities",
   "keywords": [
     "mikro-orm",
+    "mikroorm",
     "erd",
+    "erd-generator",
+    "er-diagram",
     "mermaid",
+    "mermaid-erd",
     "markdown",
+    "database-schema",
+    "schema-documentation",
+    "database-documentation",
     "documentation",
     "entity",
     "database"

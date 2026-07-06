@@ -1,19 +1,21 @@
 # mikro-orm-markdown
 
 <p align="center">
-  <img src="./assets/logo.png" alt="mikro-orm-markdown logo" width="400" />
+  <img src="https://raw.githubusercontent.com/iamkanguk97/mikro-orm-markdown/main/assets/logo.png" alt="mikro-orm-markdown MikroORM ERD generator logo" width="400" />
 </p>
 
-[MikroORM](https://mikro-orm.io) 엔티티에서 **Mermaid ERD + Markdown 문서**를 자동으로 생성합니다.
+**mikro-orm-markdown**는 [MikroORM](https://mikro-orm.io) 엔티티에서 **Mermaid ERD 다이어그램**과 **Markdown 데이터베이스 스키마 문서**를 생성하는 MikroORM ERD generator입니다.
+
+CLI 또는 TypeScript API로 실행 중인 데이터베이스 연결 없이 엔티티 컬럼, 관계, 인덱스, 제약 조건, JSDoc 설명을 문서화할 수 있습니다.
 
 [![npm version](https://img.shields.io/npm/v/mikro-orm-markdown)](https://www.npmjs.com/package/mikro-orm-markdown)
 [![npm downloads](https://img.shields.io/npm/dm/mikro-orm-markdown)](https://www.npmjs.com/package/mikro-orm-markdown)
 [![CI](https://github.com/iamkanguk97/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/iamkanguk97/mikro-orm-markdown/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[English](./README.md)
+[English](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/README.md)
 
-예시 출력은 [여기](./examples/ERD.md)에서 확인하실 수 있습니다.
+[MikroORM ERD 예시 출력](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/examples/ERD.md)을 확인하실 수 있습니다.
 
 Claude Code 또는 기타 Agent Skills 호환 도구를 사용한다면 `skills/mikro-orm-markdown/`의 선택적 Agent Skill로 MikroORM 프로젝트에 `mikro-orm-markdown`을 설정하고 문제를 진단할 수 있습니다. 이 Skill은 필요한 사용자가 저장소에서 가져가 쓰도록 제공되며, 일반적인 npm 사용에는 필요하지 않고 npm 패키지에는 포함되지 않습니다.
 
