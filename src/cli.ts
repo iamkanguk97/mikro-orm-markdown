@@ -5,7 +5,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
-import { Command } from 'commander';
+import { Command, Option } from 'commander';
 import { generateMarkdown } from './index.js';
 import type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
 import { MERMAID_LAYOUTS, MERMAID_THEMES } from './render/mermaid.js';
@@ -17,8 +17,20 @@ interface CliOptions {
   description?: string;
   tsconfig?: string;
   src?: string[];
-  mermaidLayout?: string;
-  mermaidTheme?: string;
+  mermaidLayout?: MermaidLayout;
+  mermaidTheme?: MermaidTheme;
+}
+
+export interface LoadOrmOptionsOptions {
+  keepTsxRegistered?: boolean;
+}
+
+let activeTsxUnregister: (() => Promise<void>) | undefined;
+
+async function unregisterActiveTsxLoader(): Promise<void> {
+  const unregister = activeTsxUnregister;
+  activeTsxUnregister = undefined;
+  await unregister?.();
 }
 
 export function toConfigImportSpecifier(configPath: string): string {
@@ -65,71 +77,91 @@ export function findNearestTsconfig(fromPath: string): string | undefined {
  * fail with a cryptic `Cannot read properties of undefined` error depending on
  * which directory the CLI was launched from.
  */
-export async function loadOrmOptions(configPath: string, tsconfigPath?: string): Promise<Options> {
+export async function loadOrmOptions(
+  configPath: string,
+  tsconfigPath?: string,
+  loadOptions: LoadOrmOptionsOptions = {}
+): Promise<Options> {
   const isTypeScriptConfig = configPath.endsWith('.ts');
+  let unregisterTsx: (() => Promise<void>) | undefined;
+  let shouldKeepTsxRegistered = false;
 
-  if (isTypeScriptConfig) {
-    let register: typeof import('tsx/esm/api')['register'];
-    try {
-      ({ register } = await import('tsx/esm/api'));
-    } catch {
-      throw new Error('TypeScript config files require the "tsx" package.\nInstall it with: npm install -D tsx');
-    }
-
-    let tsconfig: string | undefined;
-    if (tsconfigPath !== undefined) {
-      tsconfig = path.resolve(tsconfigPath);
-      if (!syncFs.existsSync(tsconfig)) {
-        throw new Error(`--tsconfig file not found: ${tsconfig}`);
-      }
-    } else {
-      tsconfig = findNearestTsconfig(configPath);
-    }
-
-    register(tsconfig !== undefined ? { tsconfig } : {});
-  }
-
-  const configUrl = toConfigImportSpecifier(configPath);
-  let mod: { default?: unknown };
   try {
-    mod = (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
-  } catch (cause) {
     if (isTypeScriptConfig) {
-      const detail = cause instanceof Error ? cause.message : String(cause);
+      await unregisterActiveTsxLoader();
+
+      let register: typeof import('tsx/esm/api')['register'];
+      try {
+        ({ register } = await import('tsx/esm/api'));
+      } catch {
+        throw new Error('TypeScript config files require the "tsx" package.\nInstall it with: npm install -D tsx');
+      }
+
+      let tsconfig: string | undefined;
+      if (tsconfigPath !== undefined) {
+        tsconfig = path.resolve(tsconfigPath);
+        if (!syncFs.existsSync(tsconfig)) {
+          throw new Error(`--tsconfig file not found: ${tsconfig}`);
+        }
+      } else {
+        tsconfig = findNearestTsconfig(configPath);
+      }
+
+      unregisterTsx = register(tsconfig !== undefined ? { tsconfig } : {});
+    }
+
+    const configUrl = toConfigImportSpecifier(configPath);
+    let mod: { default?: unknown };
+    try {
+      mod = (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
+    } catch (cause) {
+      if (isTypeScriptConfig) {
+        const detail = cause instanceof Error ? cause.message : String(cause);
+        throw new Error(
+          `Failed to load TypeScript config.\n${detail}\n\n` +
+            'If this looks like a decorator/metadata error, the tsconfig applied to your ' +
+            'entity files is likely missing "experimentalDecorators" / "emitDecoratorMetadata".\n' +
+            'Make sure a tsconfig.json with those options sits next to your config file, ' +
+            'or pass one explicitly with --tsconfig <path>.',
+          { cause }
+        );
+      }
+      throw cause;
+    }
+
+    if (mod.default === undefined) {
+      throw new Error('Config file must use a default export, e.g. `export default defineConfig({ ... })`.');
+    }
+
+    const config = mod.default;
+    if (typeof config === 'function' || config instanceof Promise) {
       throw new Error(
-        `Failed to load TypeScript config.\n${detail}\n\n` +
-          'If this looks like a decorator/metadata error, the tsconfig applied to your ' +
-          'entity files is likely missing "experimentalDecorators" / "emitDecoratorMetadata".\n' +
-          'Make sure a tsconfig.json with those options sits next to your config file, ' +
-          'or pass one explicitly with --tsconfig <path>.',
-        { cause }
+        'Config file default export must be a configuration object, not a function or Promise.\n' +
+          'Resolve it first, or use the programmatic API instead (see README).'
       );
     }
-    throw cause;
-  }
+    if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+      throw new Error(
+        'Config file default export must be a configuration object, not a primitive value or array.\n' +
+          'Export a plain MikroORM options object instead.'
+      );
+    }
 
-  if (mod.default === undefined) {
-    throw new Error('Config file must use a default export, e.g. `export default defineConfig({ ... })`.');
-  }
+    const options = config as Options;
+    const withPreferTs =
+      isTypeScriptConfig && options.preferTs === undefined ? { ...options, preferTs: true } : options;
+    shouldKeepTsxRegistered = loadOptions.keepTsxRegistered === true;
 
-  const config = mod.default;
-  if (typeof config === 'function' || config instanceof Promise) {
-    throw new Error(
-      'Config file default export must be a configuration object, not a function or Promise.\n' +
-        'Resolve it first, or use the programmatic API instead (see README).'
-    );
+    return withPreferTs;
+  } finally {
+    if (unregisterTsx !== undefined) {
+      if (shouldKeepTsxRegistered) {
+        activeTsxUnregister = unregisterTsx;
+      } else {
+        await unregisterTsx();
+      }
+    }
   }
-  if (typeof config !== 'object' || config === null || Array.isArray(config)) {
-    throw new Error(
-      'Config file default export must be a configuration object, not a primitive value or array.\n' +
-        'Export a plain MikroORM options object instead.'
-    );
-  }
-
-  const options = config as Options;
-  const withPreferTs = isTypeScriptConfig && options.preferTs === undefined ? { ...options, preferTs: true } : options;
-
-  return withPreferTs;
 }
 
 /**
@@ -201,27 +233,13 @@ export async function writeMarkdownFile(outPath: string, markdown: string): Prom
 function parseMermaidOptions(opts: CliOptions): MermaidRenderOptions | undefined {
   const { mermaidLayout, mermaidTheme } = opts;
 
-  if (mermaidLayout !== undefined && !(MERMAID_LAYOUTS as readonly string[]).includes(mermaidLayout)) {
-    process.stderr.write(
-      `Error: Invalid --mermaid-layout "${mermaidLayout}". Allowed values: ${MERMAID_LAYOUTS.join(', ')}\n`
-    );
-    process.exit(1);
-  }
-
-  if (mermaidTheme !== undefined && !(MERMAID_THEMES as readonly string[]).includes(mermaidTheme)) {
-    process.stderr.write(
-      `Error: Invalid --mermaid-theme "${mermaidTheme}". Allowed values: ${MERMAID_THEMES.join(', ')}\n`
-    );
-    process.exit(1);
-  }
-
   if (mermaidLayout === undefined && mermaidTheme === undefined) {
     return undefined;
   }
 
   return {
-    ...(mermaidLayout !== undefined && { layout: mermaidLayout as MermaidLayout }),
-    ...(mermaidTheme !== undefined && { theme: mermaidTheme as MermaidTheme }),
+    ...(mermaidLayout !== undefined && { layout: mermaidLayout }),
+    ...(mermaidTheme !== undefined && { theme: mermaidTheme }),
   };
 }
 
@@ -232,7 +250,7 @@ async function run(opts: CliOptions): Promise<void> {
 
   let ormOptions: Options;
   try {
-    ormOptions = await loadOrmOptions(configPath, opts.tsconfig);
+    ormOptions = await loadOrmOptions(configPath, opts.tsconfig, { keepTsxRegistered: true });
   } catch (err) {
     process.stderr.write(
       `Error: Cannot load config: ${configPath}\n${err instanceof Error ? err.message : String(err)}\n`
@@ -251,9 +269,12 @@ async function run(opts: CliOptions): Promise<void> {
       onWarn: (message: string): void => void process.stderr.write(`Warning: ${message}\n`),
     });
   } catch (err) {
+    await unregisterActiveTsxLoader();
     process.stderr.write(`Error: ${formatDiscoveryError(err)}\n`);
     process.exit(1);
   }
+
+  await unregisterActiveTsxLoader();
 
   try {
     await writeMarkdownFile(outPath, markdown);
@@ -280,8 +301,18 @@ const program = new Command()
     '--src <paths...>',
     'Source .ts file globs to read JSDoc from when entities run from compiled .js (comments are stripped at build time)'
   )
-  .option('--mermaid-layout <layout>', `Mermaid layout engine injected as frontmatter (${MERMAID_LAYOUTS.join('|')})`)
-  .option('--mermaid-theme <theme>', `Mermaid theme injected as frontmatter (${MERMAID_THEMES.join('|')})`)
+  .addOption(
+    new Option(
+      '--mermaid-layout <layout>',
+      `Mermaid layout engine injected as frontmatter (${MERMAID_LAYOUTS.join('|')})`
+    ).choices(MERMAID_LAYOUTS)
+  )
+  .addOption(
+    new Option(
+      '--mermaid-theme <theme>',
+      `Mermaid theme injected as frontmatter (${MERMAID_THEMES.join('|')})`
+    ).choices(MERMAID_THEMES)
+  )
   .action(run);
 
 function isDirectCliExecution(): boolean {

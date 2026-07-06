@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -55,5 +55,16 @@ describe('CLI smoke (built bin)', () => {
     const output = fs.readFileSync(outFile, 'utf-8');
     expect(output.startsWith('# Dual Discovery')).toBe(true);
     expect(output).toContain('### DualUser');
+  });
+
+  it('rejects invalid Mermaid option choices through Commander validation', () => {
+    const result = spawnSync('node', [cliPath, '-c', exampleConfig, '--mermaid-layout', 'grid'], {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("error: option '--mermaid-layout <layout>' argument 'grid' is invalid");
+    expect(result.stderr).toContain('Allowed choices are dagre, elk, elk.stress');
   });
 });

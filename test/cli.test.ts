@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   findNearestTsconfig,
   formatDiscoveryError,
@@ -71,6 +71,28 @@ describe('CLI helpers', () => {
     const options = await loadOrmOptions(configPath);
 
     expect(options.preferTs).toBe(false);
+  });
+
+  it('unregisters the tsx loader after loading a TypeScript config by default', async () => {
+    const unregister = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
+    const register = vi.fn(() => unregister);
+    vi.resetModules();
+    vi.doMock('tsx/esm/api', () => ({ register }));
+
+    try {
+      const { loadOrmOptions: loadOrmOptionsWithMockedTsx } = await import('../src/cli.js');
+      const dir = await createTempDir();
+      const configPath = path.join(dir, 'config.ts');
+      await fs.writeFile(configPath, "export default { dbName: ':memory:', entities: [] };\n", 'utf-8');
+
+      await loadOrmOptionsWithMockedTsx(configPath);
+
+      expect(register).toHaveBeenCalledOnce();
+      expect(unregister).toHaveBeenCalledOnce();
+    } finally {
+      vi.doUnmock('tsx/esm/api');
+      vi.resetModules();
+    }
   });
 
   it('leaves metadataProvider unset so generation can apply provider fallback safely', async () => {
