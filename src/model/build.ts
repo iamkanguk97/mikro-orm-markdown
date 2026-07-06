@@ -1,6 +1,6 @@
 import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
 import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo, PropJsDocMap } from '../docs/jsdoc.js';
-import { buildDiagramModel } from '../render/mermaid.js';
+import { buildDiagramModel } from './diagram.js';
 import type { ColumnModel, EntityModel, RelationEdge } from './types.js';
 
 // Mermaid cardinality tokens upgrading the "many" side from zero-or-more to one-or-more.
