@@ -244,6 +244,42 @@ describe('buildDocumentModel — @hidden', () => {
     const names = blog.erdEntities.map((e) => e.model.className);
     expect(names).not.toContain('Author');
   });
+
+  it('removes STI extends references to hidden root entities', () => {
+    const animal = Object.assign({} as EntityMetadata, {
+      className: 'Animal',
+      tableName: 'animal',
+      discriminatorColumn: 'type',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        type: { name: 'type', fieldNames: ['type'], type: 'string', kind: ReferenceKind.SCALAR },
+      },
+    });
+    const dog = Object.assign({} as EntityMetadata, {
+      className: 'Dog',
+      tableName: 'animal',
+      extends: 'Animal',
+      discriminatorValue: 'dog',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([['Animal', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['Animal', 'Dog']),
+    };
+
+    const docModel = buildDocumentModel([animal, dog], jsDoc, 'T');
+    const dogEntity = docModel.groups.flatMap((group) => group.textEntities).find((e) => e.model.className === 'Dog');
+
+    expect(dogEntity).toBeDefined();
+    expect(dogEntity!.model.extendsEntity).toBeUndefined();
+  });
 });
 
 describe('buildDocumentModel — cross-namespace @erd', () => {
