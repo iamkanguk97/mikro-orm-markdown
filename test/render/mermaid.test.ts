@@ -1146,6 +1146,8 @@ describe('normalizeType', () => {
     ['varchar(255)', 'string'],
     ['character varying', 'string'],
     ['character varying(255)', 'string'],
+    ['character', 'string'],
+    ['character(36)', 'string'],
     ['char(36)', 'string'],
     ['tinytext', 'string'],
     ['mediumtext', 'string'],
@@ -1188,6 +1190,8 @@ describe('normalizeType', () => {
 
   it('normalizes the MySQL boolean declaration tinyint(1) to boolean, unlike other tinyint widths', () => {
     expect(normalizeType('tinyint(1)')).toBe('boolean');
+    expect(normalizeType('tinyint (1)')).toBe('boolean');
+    expect(normalizeType(' TINYINT ( 1 ) ')).toBe('boolean');
     expect(normalizeType('tinyint(2)')).toBe('integer');
   });
 

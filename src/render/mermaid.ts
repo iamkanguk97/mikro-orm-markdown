@@ -417,6 +417,7 @@ const GENERIC_TYPE_BY_BASE_NAME = new Map<string, string>([
   ['string', 'string'],
   ['varchar', 'string'],
   ['character varying', 'string'],
+  ['character', 'string'],
   ['char', 'string'],
   ['tinytext', 'string'],
   ['mediumtext', 'string'],
@@ -454,17 +455,16 @@ const GENERIC_TYPE_BY_BASE_NAME = new Map<string, string>([
  * Unrecognized types pass through unchanged.
  */
 export function normalizeType(type: string): string {
-  const t = type.toLowerCase().trim();
+  const t = type.toLowerCase().replace(/\s+/g, ' ').trim();
 
-  // MySQL declares booleans as tinyint(1); match before the generic tinyint → integer rule.
-  if (t === 'tinyint(1)') {
+  // MySQL declares booleans as tinyint(1); match before the generic tinyint -> integer rule.
+  if (/^tinyint\s*\(\s*1\s*\)$/.test(t)) {
     return 'boolean';
   }
 
   const baseName = t
     .replace(/\(.*\)/, '')
     .replace(/\b(un)?signed\b/, '')
-    .replace(/\s+/g, ' ')
     .trim();
 
   return GENERIC_TYPE_BY_BASE_NAME.get(baseName) ?? type;
