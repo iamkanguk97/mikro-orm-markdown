@@ -136,6 +136,40 @@ describe('loadJsDoc — property descriptions', () => {
     const tagProps = result.props.get('Tag');
     expect(tagProps?.get('id')).toBeUndefined();
   });
+
+  it('extracts property descriptions from getter accessors and constructor parameter properties', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-accessors-'));
+    const sourcePath = path.join(dir, 'AccessorEntity.ts');
+    fs.writeFileSync(
+      sourcePath,
+      `
+        class User {}
+
+        export class AccessorEntity {
+          constructor(
+            /** Constructor-declared {@link User} display name */
+            public displayName: string,
+          ) {}
+
+          /** Getter-declared score */
+          get score(): number {
+            return 1;
+          }
+        }
+      `,
+      'utf-8'
+    );
+
+    try {
+      const result = loadJsDoc([sourcePath]);
+      const props = result.props.get('AccessorEntity');
+
+      expect(props?.get('displayName')?.description).toBe('Constructor-declared {@link User} display name');
+      expect(props?.get('score')?.description).toBe('Getter-declared score');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe('loadJsDoc — @atLeastOne', () => {
@@ -149,6 +183,44 @@ describe('loadJsDoc — @atLeastOne', () => {
     const result = loadJsDoc([FIXTURES_GLOB]);
     const authorProps = result.props.get('Author');
     expect(authorProps!.get('name')?.atLeastOne).toBe(false);
+  });
+
+  it('parses @atLeastOne on getter accessors and constructor parameter properties', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-at-least-one-accessors-'));
+    const sourcePath = path.join(dir, 'RelationEntity.ts');
+    fs.writeFileSync(
+      sourcePath,
+      `
+        export class RelationEntity {
+          constructor(
+            /**
+             * Constructor collection
+             * @atLeastOne
+             */
+            public constructorItems: string[],
+          ) {}
+
+          /**
+           * Getter collection
+           * @atLeastOne
+           */
+          get getterItems(): string[] {
+            return [];
+          }
+        }
+      `,
+      'utf-8'
+    );
+
+    try {
+      const result = loadJsDoc([sourcePath]);
+      const props = result.props.get('RelationEntity');
+
+      expect(props?.get('constructorItems')?.atLeastOne).toBe(true);
+      expect(props?.get('getterItems')?.atLeastOne).toBe(true);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

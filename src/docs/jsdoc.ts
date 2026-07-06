@@ -1,5 +1,5 @@
-import type { JSDoc } from 'ts-morph';
-import { Project } from 'ts-morph';
+import type { ClassDeclaration, JSDoc as MorphJsDoc, ParameterDeclaration } from 'ts-morph';
+import { Project, ts } from 'ts-morph';
 
 /** JSDoc information extracted from an entity class. */
 export interface EntityJsDocInfo {
@@ -93,17 +93,7 @@ export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => voi
           entities.set(className, parseEntityJsDoc(classDocs));
         }
 
-        const propMap = new Map<string, PropJsDocInfo>();
-        for (const prop of cls.getProperties()) {
-          const propDocs = prop.getJsDocs();
-          if (propDocs.length === 0) {
-            continue;
-          }
-          const info = parsePropJsDoc(propDocs);
-          if (info.description !== undefined || info.atLeastOne) {
-            propMap.set(prop.getName(), info);
-          }
-        }
+        const propMap = collectPropJsDocs(cls);
         if (propMap.size > 0) {
           props.set(className, propMap);
         }
@@ -124,7 +114,37 @@ function hasGlobPattern(filePath: string): boolean {
   return /[*?[\]{}]/.test(filePath);
 }
 
-function parseEntityJsDoc(jsDocs: JSDoc[]): EntityJsDocInfo {
+function collectPropJsDocs(cls: ClassDeclaration): Map<string, PropJsDocInfo> {
+  const propMap = new Map<string, PropJsDocInfo>();
+
+  for (const prop of [...cls.getProperties(), ...cls.getGetAccessors()]) {
+    const info = parsePropJsDoc(prop.getJsDocs());
+    addPropInfo(propMap, prop.getName(), info);
+  }
+
+  for (const prop of getConstructorParameterProperties(cls)) {
+    const info = parseCompilerPropJsDoc(ts.getJSDocCommentsAndTags(prop.compilerNode));
+    addPropInfo(propMap, prop.getName(), info);
+  }
+
+  return propMap;
+}
+
+function getConstructorParameterProperties(cls: ClassDeclaration): ParameterDeclaration[] {
+  return cls
+    .getConstructors()
+    .flatMap((constructorDeclaration) =>
+      constructorDeclaration.getParameters().filter((param) => param.isParameterProperty())
+    );
+}
+
+function addPropInfo(propMap: Map<string, PropJsDocInfo>, propName: string, info: PropJsDocInfo): void {
+  if (info.description !== undefined || info.atLeastOne) {
+    propMap.set(propName, info);
+  }
+}
+
+function parseEntityJsDoc(jsDocs: MorphJsDoc[]): EntityJsDocInfo {
   const namespaces: string[] = [];
   const erdNamespaces: string[] = [];
   const describeNamespaces: string[] = [];
@@ -162,7 +182,7 @@ function parseEntityJsDoc(jsDocs: JSDoc[]): EntityJsDocInfo {
   };
 }
 
-function parsePropJsDoc(jsDocs: JSDoc[]): PropJsDocInfo {
+function parsePropJsDoc(jsDocs: MorphJsDoc[]): PropJsDocInfo {
   let description: string | undefined;
   let atLeastOne = false;
 
@@ -179,4 +199,38 @@ function parsePropJsDoc(jsDocs: JSDoc[]): PropJsDocInfo {
   }
 
   return { ...(description !== undefined && { description }), atLeastOne };
+}
+
+function parseCompilerPropJsDoc(jsDocs: readonly (ts.JSDoc | ts.JSDocTag)[]): PropJsDocInfo {
+  let description: string | undefined;
+  let atLeastOne = false;
+
+  for (const doc of jsDocs) {
+    if (ts.isJSDoc(doc)) {
+      const desc = formatCompilerJsDocComment(doc.comment);
+      if (desc && description === undefined) {
+        description = desc;
+      }
+      for (const tag of doc.tags ?? []) {
+        if (tag.tagName.getText() === 'atLeastOne') {
+          atLeastOne = true;
+        }
+      }
+      continue;
+    }
+
+    if (doc.tagName.getText() === 'atLeastOne') {
+      atLeastOne = true;
+    }
+  }
+
+  return { ...(description !== undefined && { description }), atLeastOne };
+}
+
+function formatCompilerJsDocComment(comment: ts.JSDoc['comment'] | ts.JSDocTag['comment']): string | undefined {
+  if (comment === undefined) {
+    return undefined;
+  }
+  const trimmed = ts.getTextOfJSDocComment(comment)?.trim();
+  return trimmed === undefined || trimmed === '' ? undefined : trimmed;
 }
