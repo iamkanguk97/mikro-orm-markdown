@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-07-06
+
+### Fixed
+
+- Hidden STI parent entity names no longer leak into child entity captions when the parent is excluded with `@hidden`
+- JSDoc extraction now includes getter accessors and constructor parameter properties, including rich inline JSDoc text such as `{@link ...}`
+- Markdown escaping now treats underscore emphasis and link-like labels consistently while preserving identifier-style names such as `author_id`
+- CLI TypeScript config loading now unregisters the temporary `tsx` loader when it is no longer needed
+
+### Changed
+
+- Mermaid layout and theme CLI options now use Commander's built-in choice validation
+- Diagram model construction was moved into the model layer so Mermaid rendering remains focused on output formatting
+
 ## [0.1.1] - 2026-07-03
 
 ### Fixed
