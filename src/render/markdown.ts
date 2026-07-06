@@ -50,9 +50,7 @@ function renderBulletSection<T>(header: string, items: T[], renderItem: (item: T
 /** Renders a namespace-level table of contents linking to each group's H2 section. */
 function renderTableOfContents(groups: NamespaceGroup[], anchors: Map<NamespaceGroup, string>): string {
   return renderBulletSection('## Contents', groups, (group) => {
-    // escapeMarkdownInline does not touch brackets; escape them here so a name
-    // containing `[` or `]` cannot prematurely close the link label `[...]`.
-    const label = escapeMarkdownInline(group.name).replace(/[[\]]/g, '\\$&');
+    const label = escapeMarkdownInline(group.name);
     return `- [${label}](#${anchors.get(group) ?? toMarkdownAnchor(group.name)})`;
   });
 }

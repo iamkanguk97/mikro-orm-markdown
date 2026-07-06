@@ -1,4 +1,5 @@
-const MARKDOWN_INLINE_SPECIAL_CHARS = /[\\`|*#]/g;
+const MARKDOWN_INLINE_SPECIAL_CHARS = /[\\`|*#\[\]]/g;
+const MARKDOWN_EMPHASIS_UNDERSCORE = /(?<![a-zA-Z0-9])_|_(?![a-zA-Z0-9])/g;
 const MERMAID_IDENTIFIER_INVALID_CHARS = /[^a-zA-Z0-9_]/g;
 
 function normalizeInlineText(value: string): string {
@@ -18,7 +19,9 @@ function escapeHtmlText(value: string): string {
 }
 
 export function escapeMarkdownInline(value: string): string {
-  return escapeHtmlText(normalizeInlineText(value)).replace(MARKDOWN_INLINE_SPECIAL_CHARS, '\\$&');
+  return escapeHtmlText(normalizeInlineText(value))
+    .replace(MARKDOWN_INLINE_SPECIAL_CHARS, '\\$&')
+    .replace(MARKDOWN_EMPHASIS_UNDERSCORE, '\\_');
 }
 
 export function escapeMarkdownTableCell(value: string): string {

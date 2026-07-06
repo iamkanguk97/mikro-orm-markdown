@@ -300,7 +300,7 @@ describe('renderMarkdown — MikroORM specific columns', () => {
 
   it('embedded column falls back to the @Embeddable class JSDoc for its Description', async () => {
     const md = await getMarkdown();
-    expect(md).toContain('| address_street | string | [Address] |  | 도로명 주소. |');
+    expect(md).toContain('| address_street | string | \\[Address\\] |  | 도로명 주소. |');
   });
 
   it('discriminator column shows "discriminator" in Key column', async () => {
@@ -347,7 +347,7 @@ describe('renderMarkdown — escaping', () => {
   it('escapes markdown syntax that would break headings, tables, and blockquotes', () => {
     const docModel: DocumentModel = {
       title: 'Unsafe | <Title>\nNext',
-      description: 'Summary | <script>\nsecond line',
+      description: 'Summary | <script> _raw_ [ref](https://example.com)\nsecond line',
       groups: [
         {
           name: 'Group | <A>\nNext',
@@ -399,7 +399,12 @@ describe('renderMarkdown — escaping', () => {
                 describeNamespaces: [],
                 hidden: false,
               },
-              propDocs: new Map([['name', { description: 'doc | desc\n<b>raw</b>', atLeastOne: false }]]),
+              propDocs: new Map([
+                [
+                  'name',
+                  { description: 'doc | desc _literal_ [ref](https://example.com)\n<b>raw</b>', atLeastOne: false },
+                ],
+              ]),
             },
           ],
         },
@@ -410,11 +415,13 @@ describe('renderMarkdown — escaping', () => {
 
     expect(md).toContain('# Unsafe \\| &lt;Title&gt; Next');
     // Special chars stay escaped; the newline is preserved as a hard break (L6).
-    expect(md).toContain('Summary \\| &lt;script&gt;  \nsecond line');
+    expect(md).toContain('Summary \\| &lt;script&gt; \\_raw\\_ \\[ref\\](https://example.com)  \nsecond line');
     expect(md).toContain('## Group \\| &lt;A&gt; Next');
     expect(md).toContain('### Entity \\| &lt;One&gt; Next');
     expect(md).toContain('> First \\| line\n> \\# not heading');
-    expect(md).toContain('| name\\|raw | string |  |  | doc \\| desc<br>&lt;b&gt;raw&lt;/b&gt; |');
+    expect(md).toContain(
+      '| name\\|raw | string |  |  | doc \\| desc \\_literal\\_ \\[ref\\](https://example.com)<br>&lt;b&gt;raw&lt;/b&gt; |'
+    );
     expect(md).toContain('| score | integer |  |  |  |');
     expect(md).toContain('- `score`: ``sum(`score` | 1)``');
     expect(md).toContain('*STI root — discriminator column: ``kind`type``*');
