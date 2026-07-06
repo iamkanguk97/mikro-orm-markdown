@@ -76,7 +76,10 @@ export function buildDocumentModel(
     const columns = model.columns.filter(
       (col) => !(col.isForeignKey && col.referencedEntity !== undefined && hiddenClasses.has(col.referencedEntity))
     );
-    const visibleModel = columns.length === model.columns.length ? model : { ...model, columns };
+    const visibleModel = removeHiddenEntityReferences(
+      columns.length === model.columns.length ? model : { ...model, columns },
+      hiddenClasses
+    );
     const ownPropDocs = jsDocResult.props.get(model.className) ?? new Map<string, PropJsDocInfo>();
     const propDocs = withEmbeddedPropDocs(ownPropDocs, visibleModel.columns, jsDocResult.props);
     enrichedByClass.set(model.className, { model: visibleModel, jsDoc, propDocs });
@@ -141,6 +144,16 @@ export function buildDocumentModel(
   });
 
   return { title, groups, ...(description !== undefined && { description }) };
+}
+
+function removeHiddenEntityReferences(model: EntityModel, hiddenClasses: Set<string>): EntityModel {
+  if (model.extendsEntity === undefined || !hiddenClasses.has(model.extendsEntity)) {
+    return model;
+  }
+
+  const visibleModel = { ...model };
+  delete visibleModel.extendsEntity;
+  return visibleModel;
 }
 
 /**
