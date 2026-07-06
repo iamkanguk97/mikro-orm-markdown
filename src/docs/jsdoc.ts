@@ -231,7 +231,6 @@ function formatCompilerJsDocComment(comment: ts.JSDoc['comment'] | ts.JSDocTag['
   if (comment === undefined) {
     return undefined;
   }
-  const text = typeof comment === 'string' ? comment : comment.map((part) => part.getText()).join('');
-  const trimmed = text.trim();
-  return trimmed === '' ? undefined : trimmed;
+  const trimmed = ts.getTextOfJSDocComment(comment)?.trim();
+  return trimmed === undefined || trimmed === '' ? undefined : trimmed;
 }

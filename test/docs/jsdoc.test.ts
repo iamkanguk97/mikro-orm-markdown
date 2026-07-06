@@ -143,9 +143,11 @@ describe('loadJsDoc — property descriptions', () => {
     fs.writeFileSync(
       sourcePath,
       `
+        class User {}
+
         export class AccessorEntity {
           constructor(
-            /** Constructor-declared display name */
+            /** Constructor-declared {@link User} display name */
             public displayName: string,
           ) {}
 
@@ -162,7 +164,7 @@ describe('loadJsDoc — property descriptions', () => {
       const result = loadJsDoc([sourcePath]);
       const props = result.props.get('AccessorEntity');
 
-      expect(props?.get('displayName')?.description).toBe('Constructor-declared display name');
+      expect(props?.get('displayName')?.description).toBe('Constructor-declared {@link User} display name');
       expect(props?.get('score')?.description).toBe('Getter-declared score');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
