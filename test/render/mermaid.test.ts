@@ -1,8 +1,9 @@
 import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
 import { describe, expect, it } from 'vitest';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
+import { buildDiagramModel } from '../../src/model/diagram.js';
 import type { ColumnModel, DiagramModel, RelationEdge } from '../../src/model/types.js';
-import { buildDiagramModel, normalizeType, renderErDiagram } from '../../src/render/mermaid.js';
+import { normalizeType, renderErDiagram } from '../../src/render/mermaid.js';
 import config from '../fixtures/mikro-orm.config.js';
 
 // ─── buildDiagramModel (integration: uses real MikroORM metadata) ─────────────
