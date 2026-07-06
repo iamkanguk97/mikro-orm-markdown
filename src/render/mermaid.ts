@@ -407,30 +407,67 @@ function buildEdge(fromEntity: string, prop: EntityProperty): RelationEdge | nul
 }
 
 /**
+ * Generic type per base type name, covering the declaration strings produced
+ * by the supported MikroORM platforms (PostgreSQL, MySQL, MariaDB, SQLite)
+ * plus the dialect spellings users commonly write in `@Property({ type })`.
+ */
+const GENERIC_TYPE_BY_BASE_NAME = new Map<string, string>([
+  ['uuid', 'string'],
+  ['text', 'string'],
+  ['string', 'string'],
+  ['varchar', 'string'],
+  ['character varying', 'string'],
+  ['character', 'string'],
+  ['char', 'string'],
+  ['tinytext', 'string'],
+  ['mediumtext', 'string'],
+  ['longtext', 'string'],
+  ['timestamptz', 'datetime'],
+  ['timestamp', 'datetime'],
+  ['datetime', 'datetime'],
+  ['integer', 'integer'],
+  ['int', 'integer'],
+  ['bigint', 'integer'],
+  ['smallint', 'integer'],
+  ['tinyint', 'integer'],
+  ['mediumint', 'integer'],
+  ['serial', 'integer'],
+  ['bigserial', 'integer'],
+  ['doubletype', 'float'],
+  ['double precision', 'float'],
+  ['double', 'float'],
+  ['float', 'float'],
+  ['decimal', 'float'],
+  ['numeric', 'float'],
+  ['real', 'float'],
+  ['boolean', 'boolean'],
+  ['bool', 'boolean'],
+  ['jsonb', 'json'],
+]);
+
+/**
  * Maps DB-specific or ORM-internal type strings to RDBMS-agnostic generic types
  * so the generated docs are portable across PostgreSQL, MySQL, SQLite, etc.
+ *
+ * Matching strips a trailing "(…)" parameter list (varchar(255), numeric(10,2))
+ * and a MySQL "unsigned"/"signed" modifier, then looks up the base name exactly —
+ * a prefix match would confuse e.g. PostgreSQL's `interval` with `int`.
+ * Unrecognized types pass through unchanged.
  */
 export function normalizeType(type: string): string {
-  const t = type.toLowerCase().trim();
-  if (t === 'uuid' || t === 'text' || t === 'string' || t.startsWith('varchar')) {
-    return 'string';
-  }
-  if (t === 'timestamptz' || t === 'timestamp' || t === 'datetime') {
-    return 'datetime';
-  }
-  if (t === 'integer' || t === 'int' || t === 'bigint' || t === 'smallint') {
-    return 'integer';
-  }
-  if (t === 'doubletype' || t === 'double precision' || t === 'double' || t === 'float' || t === 'decimal') {
-    return 'float';
-  }
-  if (t === 'boolean' || t === 'bool') {
+  const t = type.toLowerCase().replace(/\s+/g, ' ').trim();
+
+  // MySQL declares booleans as tinyint(1); match before the generic tinyint -> integer rule.
+  if (/^tinyint\s*\(\s*1\s*\)$/.test(t)) {
     return 'boolean';
   }
-  if (t === 'jsonb') {
-    return 'json';
-  }
-  return type;
+
+  const baseName = t
+    .replace(/\(.*\)/, '')
+    .replace(/\b(un)?signed\b/, '')
+    .trim();
+
+  return GENERIC_TYPE_BY_BASE_NAME.get(baseName) ?? type;
 }
 
 /**
