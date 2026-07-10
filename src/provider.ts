@@ -1,4 +1,5 @@
 import type { Options } from '@mikro-orm/core';
+import { emitWarning, type WarnHandler } from './warnings.js';
 
 /**
  * When the config does not choose a metadata provider, opt into
@@ -10,10 +11,7 @@ import type { Options } from '@mikro-orm/core';
  * attributes. `TsMorphMetadataProvider` reads types from the TypeScript sources
  * instead. When the optional package is absent the original options are kept.
  */
-export async function withTsMorphMetadataProvider(
-  options: Options,
-  onWarn?: (message: string) => void
-): Promise<Options> {
+export async function withTsMorphMetadataProvider(options: Options, onWarn?: WarnHandler): Promise<Options> {
   if (options.metadataProvider !== undefined) {
     return options;
   }
@@ -26,11 +24,12 @@ export async function withTsMorphMetadataProvider(
       err !== null && typeof err === 'object' && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
     const isNotInstalled = code === 'MODULE_NOT_FOUND' || code === 'ERR_MODULE_NOT_FOUND';
 
-    if (!isNotInstalled && onWarn) {
-      onWarn(
-        `@mikro-orm/reflection is installed but failed to load: ${err instanceof Error ? err.message : String(err)}. ` +
-          'Ensure all @mikro-orm/* packages are installed at the same version.'
-      );
+    if (!isNotInstalled) {
+      emitWarning(onWarn, {
+        title: '@mikro-orm/reflection failed to load',
+        detail: `@mikro-orm/reflection is installed but failed to load: ${err instanceof Error ? err.message : String(err)}.`,
+        fix: 'Ensure all @mikro-orm/* packages are installed at the same version.',
+      });
     }
 
     return options;

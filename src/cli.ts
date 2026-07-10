@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command, Option } from 'commander';
-import { generateMarkdown } from './index.js';
+import { generateMarkdown, type StructuredWarning } from './index.js';
 import type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
 import { MERMAID_LAYOUTS, MERMAID_THEMES } from './render/mermaid.js';
 
@@ -212,6 +212,34 @@ export function formatDiscoveryError(err: unknown): string {
   return chain.includes('emitDecoratorMetadata') ? chain + REFLECTION_METADATA_HINT : chain;
 }
 
+/**
+ * Formats a warning for CLI stderr output.
+ *
+ * Short warnings stay on a single `Warning: <message>` line. Long guidance
+ * warnings that carry a `StructuredWarning` are rendered as scannable sections
+ * (headline, detail, Impact list, Fix) followed by a blank separator line.
+ */
+export function formatCliWarning(message: string, warning?: StructuredWarning): string {
+  if (warning === undefined) {
+    return `Warning: ${message}\n`;
+  }
+
+  const lines = [`Warning: ${warning.title}`, '', warning.detail];
+
+  if (warning.impact !== undefined && warning.impact.length > 0) {
+    lines.push('', 'Impact:');
+    for (const item of warning.impact) {
+      lines.push(`  - ${item}`);
+    }
+  }
+
+  if (warning.fix !== undefined) {
+    lines.push('', 'Fix:', `  ${warning.fix}`);
+  }
+
+  return `${lines.join('\n')}\n\n`;
+}
+
 function formatFileSystemError(cause: unknown): string {
   if (cause instanceof Error) {
     const code = 'code' in cause && typeof cause.code === 'string' ? ` (${cause.code})` : '';
@@ -266,7 +294,8 @@ async function run(opts: CliOptions): Promise<void> {
       ...(opts.description !== undefined && { description: opts.description }),
       ...(opts.src !== undefined && { src: opts.src }),
       ...(mermaid !== undefined && { mermaid }),
-      onWarn: (message: string): void => void process.stderr.write(`Warning: ${message}\n`),
+      onWarn: (message: string, warning?: StructuredWarning): void =>
+        void process.stderr.write(formatCliWarning(message, warning)),
     });
   } catch (err) {
     await unregisterActiveTsxLoader();

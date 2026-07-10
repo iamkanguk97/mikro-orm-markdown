@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   findNearestTsconfig,
+  formatCliWarning,
   formatDiscoveryError,
   formatErrorChain,
   loadOrmOptions,
@@ -215,5 +216,57 @@ describe('CLI helpers', () => {
     await fs.mkdir(outPath);
 
     await expect(writeMarkdownFile(outPath, '# ERD\n')).rejects.toThrow(`Cannot write output file: ${outPath}`);
+  });
+});
+
+describe('formatCliWarning', () => {
+  it('keeps warnings without structure on a single prefixed line', () => {
+    expect(formatCliWarning('No JSDoc source file matched path: /src/User.ts')).toBe(
+      'Warning: No JSDoc source file matched path: /src/User.ts\n'
+    );
+  });
+
+  it('renders a structured warning as headline, detail, impact, and fix sections', () => {
+    const formatted = formatCliWarning('flat message', {
+      title: 'JSDoc source unavailable',
+      detail: 'Entities were discovered from compiled JavaScript, so JSDoc comments cannot be read.',
+      impact: ['Descriptions may be missing.', 'Hidden entities may be exposed in the generated document.'],
+      fix: 'Pass --src "<glob to your .ts sources>".',
+    });
+
+    expect(formatted).toBe(
+      'Warning: JSDoc source unavailable\n' +
+        '\n' +
+        'Entities were discovered from compiled JavaScript, so JSDoc comments cannot be read.\n' +
+        '\n' +
+        'Impact:\n' +
+        '  - Descriptions may be missing.\n' +
+        '  - Hidden entities may be exposed in the generated document.\n' +
+        '\n' +
+        'Fix:\n' +
+        '  Pass --src "<glob to your .ts sources>".\n' +
+        '\n'
+    );
+  });
+
+  it('omits the Impact section when the warning has no impact entries', () => {
+    const formatted = formatCliWarning('flat message', {
+      title: '@mikro-orm/reflection failed to load',
+      detail: '@mikro-orm/reflection is installed but failed to load: boom.',
+      fix: 'Ensure all @mikro-orm/* packages are installed at the same version.',
+    });
+
+    expect(formatted).not.toContain('Impact:');
+    expect(formatted).toContain('Warning: @mikro-orm/reflection failed to load\n');
+    expect(formatted).toContain('Fix:\n  Ensure all @mikro-orm/* packages');
+  });
+
+  it('omits the Fix section when the warning has no fix', () => {
+    const formatted = formatCliWarning('flat message', {
+      title: 'Something happened',
+      detail: 'Details about the thing.',
+    });
+
+    expect(formatted).toBe('Warning: Something happened\n\nDetails about the thing.\n\n');
   });
 });

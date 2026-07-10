@@ -160,6 +160,20 @@ describe('resolveJsDocSources', () => {
     expect(String(onWarn.mock.calls[0]?.[0])).toContain('--src');
   });
 
+  it('passes a structured warning alongside the flat compiled-JavaScript message', () => {
+    const onWarn = vi.fn();
+    resolveJsDocSources(['/build/User.js'], undefined, onWarn);
+
+    expect(onWarn).toHaveBeenCalledOnce();
+    const [message, warning] = onWarn.mock.calls[0] ?? [];
+    expect(warning).toMatchObject({ title: 'JSDoc source unavailable' });
+    expect(warning.impact).toContain('Hidden entities may be exposed in the generated document.');
+    expect(warning.fix).toContain('--src');
+    // The flat message stays self-contained: it carries the detail, impact, and fix.
+    expect(message).toContain(warning.detail);
+    expect(message).toContain(warning.fix);
+  });
+
   it('does not warn when discovered sources are TypeScript files', () => {
     const onWarn = vi.fn();
     const result = resolveJsDocSources(['/src/User.ts'], undefined, onWarn);

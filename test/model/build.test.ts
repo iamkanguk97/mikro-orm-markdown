@@ -68,6 +68,7 @@ describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
 
     expect(onWarn).toHaveBeenCalledOnce();
     expect(String(onWarn.mock.calls[0]?.[0])).toContain('@atLeastOne on Parent.children');
+    expect(onWarn.mock.calls[0]?.[1]).toMatchObject({ title: '@atLeastOne had no effect' });
   });
 });
 

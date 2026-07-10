@@ -1,5 +1,6 @@
 import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
 import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo, PropJsDocMap } from '../docs/jsdoc.js';
+import { emitWarning, type WarnHandler } from '../warnings.js';
 import { buildDiagramModel } from './diagram.js';
 import type { ColumnModel, EntityModel, RelationEdge } from './types.js';
 
@@ -51,7 +52,7 @@ export function buildDocumentModel(
   jsDocResult: JsDocResult,
   title: string,
   description?: string,
-  onWarn?: (message: string) => void
+  onWarn?: WarnHandler
 ): DocumentModel {
   const { entities: diagramEntities, relations } = buildDiagramModel(metas);
   const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props, onWarn);
@@ -190,7 +191,7 @@ function applyAtLeastOne(
   relations: RelationEdge[],
   metas: EntityMetadata[],
   props: PropJsDocMap,
-  onWarn?: (message: string) => void
+  onWarn?: WarnHandler
 ): RelationEdge[] {
   const adjusted = relations.map((edge) => ({ ...edge }));
   const metaByClass = new Map(metas.map((m) => [m.className, m]));
@@ -239,11 +240,13 @@ function applyAtLeastOne(
       // No matching edge: a unidirectional @OneToMany (no mappedBy) or a label
       // mismatch leaves the cardinality unchanged. Warn instead of failing silently.
       if (!edge) {
-        onWarn?.(
-          `@atLeastOne on ${className}.${propName} had no effect: no matching relation edge was found. ` +
-            'It applies only to collection relations that can be matched to a rendered edge: ' +
-            '@OneToMany with mappedBy, or @ManyToMany on either the owning side or an inverse mappedBy side.'
-        );
+        emitWarning(onWarn, {
+          title: '@atLeastOne had no effect',
+          detail: `@atLeastOne on ${className}.${propName} had no effect: no matching relation edge was found.`,
+          fix:
+            'Apply @atLeastOne only to collection relations that can be matched to a rendered edge: ' +
+            '@OneToMany with mappedBy, or @ManyToMany on either the owning side or an inverse mappedBy side.',
+        });
       }
     }
   }
