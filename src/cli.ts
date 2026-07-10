@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command, Option } from 'commander';
-import { generateMarkdown, type StructuredWarning } from './index.js';
+import { generateMarkdown, StructuredError, type StructuredMessage } from './index.js';
 import type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
 import { MERMAID_LAYOUTS, MERMAID_THEMES } from './render/mermaid.js';
 
@@ -213,31 +213,53 @@ export function formatDiscoveryError(err: unknown): string {
 }
 
 /**
- * Formats a warning for CLI stderr output.
- *
- * Short warnings stay on a single `Warning: <message>` line. Long guidance
- * warnings that carry a `StructuredWarning` are rendered as scannable sections
- * (headline, detail, Impact list, Fix) followed by a blank separator line.
+ * Renders a structured message as scannable stderr sections: a prefixed
+ * headline, the detail paragraph, an Impact list, and a Fix suggestion,
+ * followed by a blank separator line.
  */
-export function formatCliWarning(message: string, warning?: StructuredWarning): string {
-  if (warning === undefined) {
-    return `Warning: ${message}\n`;
-  }
+function renderStructuredSections(prefix: 'Warning' | 'Error', structured: StructuredMessage): string {
+  const lines = [`${prefix}: ${structured.title}`, '', structured.detail];
 
-  const lines = [`Warning: ${warning.title}`, '', warning.detail];
-
-  if (warning.impact !== undefined && warning.impact.length > 0) {
+  if (structured.impact !== undefined && structured.impact.length > 0) {
     lines.push('', 'Impact:');
-    for (const item of warning.impact) {
+    for (const item of structured.impact) {
       lines.push(`  - ${item}`);
     }
   }
 
-  if (warning.fix !== undefined) {
-    lines.push('', 'Fix:', `  ${warning.fix}`);
+  if (structured.fix !== undefined) {
+    lines.push('', 'Fix:', `  ${structured.fix}`);
   }
 
   return `${lines.join('\n')}\n\n`;
+}
+
+/**
+ * Formats a warning for CLI stderr output.
+ *
+ * Short warnings stay on a single `Warning: <message>` line. Long guidance
+ * warnings that carry a `StructuredMessage` are rendered as sections.
+ */
+export function formatCliWarning(message: string, warning?: StructuredMessage): string {
+  if (warning === undefined) {
+    return `Warning: ${message}\n`;
+  }
+
+  return renderStructuredSections('Warning', warning);
+}
+
+/**
+ * Formats a generation error for CLI stderr output.
+ *
+ * `StructuredError`s (guidance errors raised by this package) are rendered as
+ * sections; anything else keeps the `Error: <cause chain>` format.
+ */
+export function formatCliError(err: unknown): string {
+  if (err instanceof StructuredError) {
+    return renderStructuredSections('Error', err.structured);
+  }
+
+  return `Error: ${formatDiscoveryError(err)}\n`;
 }
 
 function formatFileSystemError(cause: unknown): string {
@@ -294,12 +316,12 @@ async function run(opts: CliOptions): Promise<void> {
       ...(opts.description !== undefined && { description: opts.description }),
       ...(opts.src !== undefined && { src: opts.src }),
       ...(mermaid !== undefined && { mermaid }),
-      onWarn: (message: string, warning?: StructuredWarning): void =>
+      onWarn: (message: string, warning?: StructuredMessage): void =>
         void process.stderr.write(formatCliWarning(message, warning)),
     });
   } catch (err) {
     await unregisterActiveTsxLoader();
-    process.stderr.write(`Error: ${formatDiscoveryError(err)}\n`);
+    process.stderr.write(formatCliError(err));
     process.exit(1);
   }
 

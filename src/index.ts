@@ -1,15 +1,16 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
 import { type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
+import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
 import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel } from './model/build.js';
 import { withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
 import type { MermaidRenderOptions } from './render/mermaid.js';
-import { emitWarning, type WarnHandler } from './warnings.js';
 
+export type { StructuredMessage, WarnHandler } from './messages.js';
+export { StructuredError } from './messages.js';
 export { MetadataLoadError } from './metadata/load.js';
 export type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
-export type { StructuredWarning, WarnHandler } from './warnings.js';
 
 /** Options for the programmatic API. */
 export interface GenerateMarkdownOptions {
@@ -29,7 +30,7 @@ export interface GenerateMarkdownOptions {
   /**
    * Receives non-fatal warnings (e.g. JSDoc cannot be read from compiled JS).
    * The first argument is always a flat, self-contained message; long guidance
-   * warnings also pass a `StructuredWarning` as the second argument.
+   * warnings also pass a `StructuredMessage` as the second argument.
    */
   onWarn?: WarnHandler;
   /**
@@ -82,11 +83,12 @@ function assertExplicitJsDocSourceCoverage(
   onWarn?: WarnHandler
 ): void {
   if (jsDocResult.sourceFileCount === 0) {
-    throw new Error(
-      `No source files matched the explicit src paths: ${src.join(', ')}\n` +
-        'Check the --src glob/path (or the `src` option). Without matching TypeScript sources, ' +
-        'JSDoc tags such as @namespace and @hidden cannot be read.'
-    );
+    throw new StructuredError({
+      title: 'No JSDoc sources matched the explicit src paths',
+      detail: `No source files matched the explicit src paths: ${src.join(', ')}.`,
+      impact: ['Without matching TypeScript sources, JSDoc tags such as @namespace and @hidden cannot be read.'],
+      fix: 'Check the --src glob/path (or the `src` option) so it matches your TypeScript entity sources.',
+    });
   }
 
   const isRenderable = (meta: EntityMetadata): boolean => !meta.pivotTable && !meta.embeddable;
@@ -97,11 +99,12 @@ function assertExplicitJsDocSourceCoverage(
     .filter((className) => !jsDocResult.classNames.has(className));
 
   if (missingConcrete.length > 0) {
-    throw new Error(
-      `Explicit src paths did not include source declarations for discovered entities: ${missingConcrete.join(', ')}\n` +
-        'Check that --src (or the `src` option) points at all TypeScript entity files. ' +
-        'JSDoc tags such as @namespace and @hidden for missing entities cannot be read.'
-    );
+    throw new StructuredError({
+      title: 'Entities missing from the explicit src paths',
+      detail: `Explicit src paths did not include source declarations for discovered entities: ${missingConcrete.join(', ')}.`,
+      impact: ['JSDoc tags such as @namespace and @hidden for the missing entities cannot be read.'],
+      fix: 'Check that --src (or the `src` option) points at all TypeScript entity files.',
+    });
   }
 
   // Abstract STI parents appear in the diagram but are often defined in a separate

@@ -1,5 +1,5 @@
 import type { Options } from '@mikro-orm/core';
-import { emitWarning, type WarnHandler } from './warnings.js';
+import { emitWarning, type WarnHandler } from './messages.js';
 
 /**
  * When the config does not choose a metadata provider, opt into

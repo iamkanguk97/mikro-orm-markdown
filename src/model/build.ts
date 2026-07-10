@@ -1,6 +1,6 @@
 import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
 import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo, PropJsDocMap } from '../docs/jsdoc.js';
-import { emitWarning, type WarnHandler } from '../warnings.js';
+import { emitWarning, type WarnHandler } from '../messages.js';
 import { buildDiagramModel } from './diagram.js';
 import type { ColumnModel, EntityModel, RelationEdge } from './types.js';
 

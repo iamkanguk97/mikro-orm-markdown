@@ -4,6 +4,7 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   findNearestTsconfig,
+  formatCliError,
   formatCliWarning,
   formatDiscoveryError,
   formatErrorChain,
@@ -11,6 +12,7 @@ import {
   toConfigImportSpecifier,
   writeMarkdownFile,
 } from '../src/cli.js';
+import { StructuredError } from '../src/index.js';
 
 describe('CLI helpers', () => {
   let tempDir: string | undefined;
@@ -268,5 +270,40 @@ describe('formatCliWarning', () => {
     });
 
     expect(formatted).toBe('Warning: Something happened\n\nDetails about the thing.\n\n');
+  });
+});
+
+describe('formatCliError', () => {
+  it('renders a StructuredError as headline, detail, impact, and fix sections', () => {
+    const err = new StructuredError({
+      title: 'No JSDoc sources matched the explicit src paths',
+      detail: 'No source files matched the explicit src paths: ./missing/*.ts.',
+      impact: ['JSDoc tags such as @namespace and @hidden cannot be read.'],
+      fix: 'Check the --src glob/path.',
+    });
+
+    expect(formatCliError(err)).toBe(
+      'Error: No JSDoc sources matched the explicit src paths\n' +
+        '\n' +
+        'No source files matched the explicit src paths: ./missing/*.ts.\n' +
+        '\n' +
+        'Impact:\n' +
+        '  - JSDoc tags such as @namespace and @hidden cannot be read.\n' +
+        '\n' +
+        'Fix:\n' +
+        '  Check the --src glob/path.\n' +
+        '\n'
+    );
+  });
+
+  it('keeps the cause-chain format for errors without structure', () => {
+    const err = new Error('Failed to initialize MikroORM and run entity discovery.', {
+      cause: new Error('No entities were discovered'),
+    });
+
+    expect(formatCliError(err)).toBe(
+      'Error: Failed to initialize MikroORM and run entity discovery.\n' +
+        '  ↳ caused by: No entities were discovered\n'
+    );
   });
 });
