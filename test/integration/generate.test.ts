@@ -4,7 +4,7 @@ import { MySqlDriver } from '@mikro-orm/mysql';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateMarkdown, resolveJsDocSources, StructuredError } from '../../src/index.js';
+import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
 import config from '../fixtures/mikro-orm.config.js';
 import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
 
@@ -170,18 +170,31 @@ describe('resolveJsDocSources', () => {
     expect(String(onWarn.mock.calls[0]?.[0])).toContain('--src');
   });
 
-  it('passes a structured warning alongside the flat compiled-JavaScript message', () => {
-    const onWarn = vi.fn();
-    resolveJsDocSources(['/build/User.js'], undefined, onWarn);
+  it('passes a structured warning alongside the flat message to two-parameter handlers', () => {
+    const calls: [string, StructuredMessage | undefined][] = [];
+    resolveJsDocSources(['/build/User.js'], undefined, (message, warning) => {
+      calls.push([message, warning]);
+    });
 
-    expect(onWarn).toHaveBeenCalledOnce();
-    const [message, warning] = onWarn.mock.calls[0] ?? [];
+    expect(calls).toHaveLength(1);
+    const [message, warning] = calls[0] ?? ['', undefined];
     expect(warning).toMatchObject({ title: 'JSDoc source unavailable' });
-    expect(warning.impact).toContain('Hidden entities may be exposed in the generated document.');
-    expect(warning.fix).toContain('--src');
+    expect(warning?.impact).toContain('Hidden entities may be exposed in the generated document.');
+    expect(warning?.fix).toContain('--src');
     // The flat message stays self-contained: it carries the detail, impact, and fix.
-    expect(message).toContain(warning.detail);
-    expect(message).toContain(warning.fix);
+    expect(message).toContain(warning?.detail);
+    expect(message).toContain(warning?.fix);
+  });
+
+  it('passes only the flat message to variadic handlers like console.warn', () => {
+    const calls: unknown[][] = [];
+    resolveJsDocSources(['/build/User.js'], undefined, (...args: unknown[]) => {
+      calls.push(args);
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toHaveLength(1);
+    expect(String(calls[0]?.[0])).toContain('--src');
   });
 
   it('does not warn when discovered sources are TypeScript files', () => {
