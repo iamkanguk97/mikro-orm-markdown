@@ -44,6 +44,17 @@ function createAtLeastOneJsDoc(className: string, propName: string): JsDocResult
   };
 }
 
+function createSimpleEntityMeta(className: string): EntityMetadata {
+  return Object.assign({} as EntityMetadata, {
+    className,
+    tableName: className.toLowerCase(),
+    primaryKeys: ['id'],
+    properties: {
+      id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+    },
+  });
+}
+
 describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
   it('warns when @atLeastOne cannot be matched to a relation edge', () => {
     // A unidirectional @OneToMany (no mappedBy) produces no edge to adjust.
@@ -168,6 +179,113 @@ describe('buildDocumentModel — groups', () => {
     const groupNames = docModel.groups.map((g) => g.name);
     const sorted = [...groupNames].sort((a, b) => a.localeCompare(b));
     expect(groupNames).toEqual(sorted);
+  });
+});
+
+describe('buildDocumentModel — explicit default namespace', () => {
+  it('includes explicit and untagged entities together in the default ERD and text sections', () => {
+    const payment = createSimpleEntityMeta('Payment');
+    const auditLog = createSimpleEntityMeta('AuditLog');
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['Payment', { namespaces: ['default'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['Payment', 'AuditLog']),
+    };
+
+    const docModel = buildDocumentModel([payment, auditLog], jsDoc, 'T');
+    const defaultGroup = docModel.groups.find((group) => group.name === 'default');
+
+    expect(defaultGroup?.erdEntities.map((entity) => entity.model.className)).toEqual(['Payment', 'AuditLog']);
+    expect(defaultGroup?.textEntities.map((entity) => entity.model.className)).toEqual(['Payment', 'AuditLog']);
+  });
+
+  it('respects @erd and @describe scopes when they explicitly target default', () => {
+    const erdOnly = createSimpleEntityMeta('ErdOnly');
+    const textOnly = createSimpleEntityMeta('TextOnly');
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['ErdOnly', { namespaces: [], erdNamespaces: ['default'], describeNamespaces: [], hidden: false }],
+        ['TextOnly', { namespaces: [], erdNamespaces: [], describeNamespaces: ['default'], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['ErdOnly', 'TextOnly']),
+    };
+
+    const docModel = buildDocumentModel([erdOnly, textOnly], jsDoc, 'T');
+    const defaultGroup = docModel.groups.find((group) => group.name === 'default');
+
+    expect(defaultGroup?.erdEntities.map((entity) => entity.model.className)).toEqual(['ErdOnly']);
+    expect(defaultGroup?.textEntities.map((entity) => entity.model.className)).toEqual(['TextOnly']);
+  });
+
+  it('keeps the PK-only projection for @erd default used as a foreign namespace', () => {
+    const widget = Object.assign({} as EntityMetadata, {
+      className: 'Widget',
+      tableName: 'widget',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['Widget', { namespaces: ['Home'], erdNamespaces: ['default'], describeNamespaces: [], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['Widget']),
+    };
+
+    const docModel = buildDocumentModel([widget], jsDoc, 'T');
+    const defaultWidget = docModel.groups
+      .find((group) => group.name === 'default')
+      ?.erdEntities.find((entity) => entity.model.className === 'Widget');
+    const homeWidget = docModel.groups
+      .find((group) => group.name === 'Home')
+      ?.erdEntities.find((entity) => entity.model.className === 'Widget');
+
+    expect(defaultWidget?.model.columns.map((column) => column.fieldName)).toEqual(['id']);
+    expect(homeWidget?.model.columns.map((column) => column.fieldName)).toEqual(['id', 'name']);
+  });
+
+  it('retains relations between entities explicitly assigned to default', () => {
+    const customer = createSimpleEntityMeta('Customer');
+    const order = Object.assign({} as EntityMetadata, {
+      className: 'Order',
+      tableName: 'order',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        customer: {
+          name: 'customer',
+          fieldNames: ['customer_id'],
+          type: 'Customer',
+          kind: ReferenceKind.MANY_TO_ONE,
+          referencedColumnNames: ['id'],
+        },
+      },
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['Customer', { namespaces: ['default'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
+        ['Order', { namespaces: ['default'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
+      ]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(['Customer', 'Order']),
+    };
+
+    const docModel = buildDocumentModel([customer, order], jsDoc, 'T');
+    const defaultRelations = docModel.groups.find((group) => group.name === 'default')?.erdRelations;
+
+    expect(defaultRelations).toEqual([
+      expect.objectContaining({ fromEntity: 'Order', toEntity: 'Customer', label: 'customer' }),
+    ]);
   });
 });
 
