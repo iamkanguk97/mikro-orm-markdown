@@ -404,7 +404,7 @@ Programmatic options:
 | `title` | H1 title. Defaults to `Database Schema`. |
 | `description` | Optional paragraph below the title. Unlike the CLI flag, this can be any string without shell quoting concerns. |
 | `src` | Original TypeScript entity source paths/globs. Only needed when `orm.entities` discovers compiled JavaScript. |
-| `onWarn` | Callback for non-fatal warnings, such as compiled JavaScript JSDoc loss. |
+| `onWarn` | Callback for non-fatal warnings, such as compiled JavaScript JSDoc loss. Always receives a plain message string; long guidance warnings also pass a structured `{ title, detail, impact, fix }` object as an optional second argument. |
 | `mermaid` | Optional Mermaid rendering options. See [Mermaid rendering options](#mermaid-rendering-options) below. |
 
 If your MikroORM config is asynchronous, resolve it yourself and pass the resulting options object:

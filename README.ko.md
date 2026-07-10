@@ -404,7 +404,7 @@ await writeFile('./ERD.md', markdown, 'utf-8');
 | `title` | H1 제목입니다. 기본값은 `Database Schema`입니다. |
 | `description` | 제목 아래에 표시할 설명 문단입니다. CLI flag와 달리 쉘 quoting 제약 없이 문자열을 그대로 전달할 수 있습니다. |
 | `src` | 원본 TypeScript 엔티티 소스 경로/glob입니다. `orm.entities`가 컴파일된 JavaScript를 discovery할 때만 필요합니다. |
-| `onWarn` | 컴파일된 JavaScript에서 JSDoc을 읽지 못하는 상황 같은 non-fatal warning을 받을 callback입니다. |
+| `onWarn` | 컴파일된 JavaScript에서 JSDoc을 읽지 못하는 상황 같은 non-fatal warning을 받을 callback입니다. 첫 번째 인자는 항상 일반 문자열 메시지이며, 긴 안내형 warning은 `{ title, detail, impact, fix }` 구조의 객체를 선택적 두 번째 인자로 함께 전달합니다. |
 | `mermaid` | Mermaid 렌더링 옵션입니다. 아래 [Mermaid 렌더링 옵션](#mermaid-렌더링-옵션)을 참고하세요. |
 
 MikroORM config를 비동기적으로 만들어야 한다면 직접 resolve한 뒤 결과 options object를 전달하세요:
