@@ -49,6 +49,8 @@ export interface ConstraintModel {
   expression?: string;
   /** True when an expression index callback could not be represented safely. */
   isExpressionUnresolved?: true;
+  /** Partial-index condition without the leading WHERE keyword. */
+  predicate?: string;
 }
 
 /** A directed relation edge from the owning side to the referenced side. */
