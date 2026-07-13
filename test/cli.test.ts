@@ -4,12 +4,15 @@ import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   findNearestTsconfig,
+  formatCliError,
+  formatCliWarning,
   formatDiscoveryError,
   formatErrorChain,
   loadOrmOptions,
   toConfigImportSpecifier,
   writeMarkdownFile,
 } from '../src/cli.js';
+import { StructuredError } from '../src/index.js';
 
 describe('CLI helpers', () => {
   let tempDir: string | undefined;
@@ -215,5 +218,92 @@ describe('CLI helpers', () => {
     await fs.mkdir(outPath);
 
     await expect(writeMarkdownFile(outPath, '# ERD\n')).rejects.toThrow(`Cannot write output file: ${outPath}`);
+  });
+});
+
+describe('formatCliWarning', () => {
+  it('keeps warnings without structure on a single prefixed line', () => {
+    expect(formatCliWarning('No JSDoc source file matched path: /src/User.ts')).toBe(
+      'Warning: No JSDoc source file matched path: /src/User.ts\n'
+    );
+  });
+
+  it('renders a structured warning as headline, detail, impact, and fix sections', () => {
+    const formatted = formatCliWarning('flat message', {
+      title: 'JSDoc source unavailable',
+      detail: 'Entities were discovered from compiled JavaScript, so JSDoc comments cannot be read.',
+      impact: ['Descriptions may be missing.', 'Hidden entities may be exposed in the generated document.'],
+      fix: 'Pass --src "<glob to your .ts sources>".',
+    });
+
+    expect(formatted).toBe(
+      'Warning: JSDoc source unavailable\n' +
+        '\n' +
+        'Entities were discovered from compiled JavaScript, so JSDoc comments cannot be read.\n' +
+        '\n' +
+        'Impact:\n' +
+        '  - Descriptions may be missing.\n' +
+        '  - Hidden entities may be exposed in the generated document.\n' +
+        '\n' +
+        'Fix:\n' +
+        '  Pass --src "<glob to your .ts sources>".\n' +
+        '\n'
+    );
+  });
+
+  it('omits the Impact section when the warning has no impact entries', () => {
+    const formatted = formatCliWarning('flat message', {
+      title: '@mikro-orm/reflection failed to load',
+      detail: '@mikro-orm/reflection is installed but failed to load: boom.',
+      fix: 'Ensure all @mikro-orm/* packages are installed at the same version.',
+    });
+
+    expect(formatted).not.toContain('Impact:');
+    expect(formatted).toContain('Warning: @mikro-orm/reflection failed to load\n');
+    expect(formatted).toContain('Fix:\n  Ensure all @mikro-orm/* packages');
+  });
+
+  it('omits the Fix section when the warning has no fix', () => {
+    const formatted = formatCliWarning('flat message', {
+      title: 'Something happened',
+      detail: 'Details about the thing.',
+    });
+
+    expect(formatted).toBe('Warning: Something happened\n\nDetails about the thing.\n\n');
+  });
+});
+
+describe('formatCliError', () => {
+  it('renders a StructuredError as headline, detail, impact, and fix sections', () => {
+    const err = new StructuredError({
+      title: 'No JSDoc sources matched the explicit src paths',
+      detail: 'No source files matched the explicit src paths: ./missing/*.ts.',
+      impact: ['JSDoc tags such as @namespace and @hidden cannot be read.'],
+      fix: 'Check the --src glob/path.',
+    });
+
+    expect(formatCliError(err)).toBe(
+      'Error: No JSDoc sources matched the explicit src paths\n' +
+        '\n' +
+        'No source files matched the explicit src paths: ./missing/*.ts.\n' +
+        '\n' +
+        'Impact:\n' +
+        '  - JSDoc tags such as @namespace and @hidden cannot be read.\n' +
+        '\n' +
+        'Fix:\n' +
+        '  Check the --src glob/path.\n' +
+        '\n'
+    );
+  });
+
+  it('keeps the cause-chain format for errors without structure', () => {
+    const err = new Error('Failed to initialize MikroORM and run entity discovery.', {
+      cause: new Error('No entities were discovered'),
+    });
+
+    expect(formatCliError(err)).toBe(
+      'Error: Failed to initialize MikroORM and run entity discovery.\n' +
+        '  ↳ caused by: No entities were discovered\n'
+    );
   });
 });

@@ -4,7 +4,7 @@ import { MySqlDriver } from '@mikro-orm/mysql';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { generateMarkdown, resolveJsDocSources } from '../../src/index.js';
+import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
 import config from '../fixtures/mikro-orm.config.js';
 import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
 
@@ -126,21 +126,31 @@ describe('generateMarkdown', () => {
   });
 
   it('rejects explicit src paths that match no source files', async () => {
-    await expect(
-      generateMarkdown({
-        orm: config,
-        src: ['./test/fixtures/entities/no-match-*.ts'],
-      })
-    ).rejects.toThrow('No source files matched the explicit src paths');
+    const pending = generateMarkdown({
+      orm: config,
+      src: ['./test/fixtures/entities/no-match-*.ts'],
+    });
+
+    await expect(pending).rejects.toThrow('No source files matched the explicit src paths');
+    await expect(pending).rejects.toBeInstanceOf(StructuredError);
+    await expect(pending).rejects.toMatchObject({
+      structured: { title: 'No JSDoc sources matched the explicit src paths' },
+    });
   });
 
   it('rejects explicit src paths that omit discovered entity declarations', async () => {
-    await expect(
-      generateMarkdown({
-        orm: config,
-        src: ['./test/fixtures/entities/Author.ts'],
-      })
-    ).rejects.toThrow('Explicit src paths did not include source declarations for discovered entities');
+    const pending = generateMarkdown({
+      orm: config,
+      src: ['./test/fixtures/entities/Author.ts'],
+    });
+
+    await expect(pending).rejects.toThrow(
+      'Explicit src paths did not include source declarations for discovered entities'
+    );
+    await expect(pending).rejects.toBeInstanceOf(StructuredError);
+    await expect(pending).rejects.toMatchObject({
+      structured: { title: 'Entities missing from the explicit src paths' },
+    });
   });
 });
 
@@ -158,6 +168,33 @@ describe('resolveJsDocSources', () => {
     expect(result).toEqual(['/build/User.js', '/build/Post.cjs']);
     expect(onWarn).toHaveBeenCalledOnce();
     expect(String(onWarn.mock.calls[0]?.[0])).toContain('--src');
+  });
+
+  it('passes a structured warning alongside the flat message to two-parameter handlers', () => {
+    const calls: [string, StructuredMessage | undefined][] = [];
+    resolveJsDocSources(['/build/User.js'], undefined, (message, warning) => {
+      calls.push([message, warning]);
+    });
+
+    expect(calls).toHaveLength(1);
+    const [message, warning] = calls[0] ?? ['', undefined];
+    expect(warning).toMatchObject({ title: 'JSDoc source unavailable' });
+    expect(warning?.impact).toContain('Hidden entities may be exposed in the generated document.');
+    expect(warning?.fix).toContain('--src');
+    // The flat message stays self-contained: it carries the detail, impact, and fix.
+    expect(message).toContain(warning?.detail);
+    expect(message).toContain(warning?.fix);
+  });
+
+  it('passes only the flat message to variadic handlers like console.warn', () => {
+    const calls: unknown[][] = [];
+    resolveJsDocSources(['/build/User.js'], undefined, (...args: unknown[]) => {
+      calls.push(args);
+    });
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toHaveLength(1);
+    expect(String(calls[0]?.[0])).toContain('--src');
   });
 
   it('does not warn when discovered sources are TypeScript files', () => {

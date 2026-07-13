@@ -1,11 +1,14 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
 import { type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
+import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
 import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel } from './model/build.js';
 import { withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
 import type { MermaidRenderOptions } from './render/mermaid.js';
 
+export type { StructuredMessage, WarnHandler } from './messages.js';
+export { StructuredError } from './messages.js';
 export { MetadataLoadError } from './metadata/load.js';
 export type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
 
@@ -24,8 +27,14 @@ export interface GenerateMarkdownOptions {
    * otherwise be lost. Defaults to each entity's own discovered source file.
    */
   src?: string[];
-  /** Receives non-fatal warnings (e.g. JSDoc cannot be read from compiled JS). */
-  onWarn?: (message: string) => void;
+  /**
+   * Receives non-fatal warnings (e.g. JSDoc cannot be read from compiled JS).
+   * The first argument is always a flat, self-contained message. Handlers that
+   * declare a second parameter also receive a `StructuredMessage` for long
+   * guidance warnings; variadic loggers passed directly (`onWarn: console.warn`)
+   * keep receiving just the string.
+   */
+  onWarn?: WarnHandler;
   /**
    * Optional Mermaid rendering options. When provided, a YAML frontmatter block
    * is prepended to each erDiagram fence. Omit to preserve default viewer behavior.
@@ -44,22 +53,26 @@ const COMPILED_JS = /\.(c|m)?js$/i;
  * JavaScript, JSDoc (descriptions, `@namespace`, and crucially `@hidden`) is
  * gone, so we warn the user and point them at `src`.
  */
-export function resolveJsDocSources(
-  sourcePaths: string[],
-  src: string[] | undefined,
-  onWarn?: (message: string) => void
-): string[] {
+export function resolveJsDocSources(sourcePaths: string[], src: string[] | undefined, onWarn?: WarnHandler): string[] {
   if (src !== undefined && src.length > 0) {
     return src;
   }
 
-  if (sourcePaths.some((p) => COMPILED_JS.test(p)) && onWarn) {
-    onWarn(
-      'Entities were discovered from compiled JavaScript, so JSDoc descriptions ' +
-        'and @namespace/@hidden tags cannot be read (build tools strip comments). ' +
-        'Hidden entities may be exposed. Pass --src "<glob to your .ts sources>" ' +
-        '(or the `src` option) to read JSDoc from the original TypeScript files.'
-    );
+  if (sourcePaths.some((p) => COMPILED_JS.test(p))) {
+    emitWarning(onWarn, {
+      title: 'JSDoc source unavailable',
+      detail:
+        'Entities were discovered from compiled JavaScript, so JSDoc comments cannot be read ' +
+        '(build tools strip comments).',
+      impact: [
+        'Descriptions may be missing.',
+        '@namespace and @hidden tags will not be applied.',
+        'Hidden entities may be exposed in the generated document.',
+      ],
+      fix:
+        'Pass --src "<glob to your .ts sources>" (or the `src` option) to read JSDoc ' +
+        'from the original TypeScript files.',
+    });
   }
 
   return sourcePaths;
@@ -69,14 +82,15 @@ function assertExplicitJsDocSourceCoverage(
   metas: EntityMetadata[],
   jsDocResult: JsDocResult,
   src: string[],
-  onWarn?: (message: string) => void
+  onWarn?: WarnHandler
 ): void {
   if (jsDocResult.sourceFileCount === 0) {
-    throw new Error(
-      `No source files matched the explicit src paths: ${src.join(', ')}\n` +
-        'Check the --src glob/path (or the `src` option). Without matching TypeScript sources, ' +
-        'JSDoc tags such as @namespace and @hidden cannot be read.'
-    );
+    throw new StructuredError({
+      title: 'No JSDoc sources matched the explicit src paths',
+      detail: `No source files matched the explicit src paths: ${src.join(', ')}.`,
+      impact: ['Without matching TypeScript sources, JSDoc tags such as @namespace and @hidden cannot be read.'],
+      fix: 'Check the --src glob/path (or the `src` option) so it matches your TypeScript entity sources.',
+    });
   }
 
   const isRenderable = (meta: EntityMetadata): boolean => !meta.pivotTable && !meta.embeddable;
@@ -87,29 +101,29 @@ function assertExplicitJsDocSourceCoverage(
     .filter((className) => !jsDocResult.classNames.has(className));
 
   if (missingConcrete.length > 0) {
-    throw new Error(
-      `Explicit src paths did not include source declarations for discovered entities: ${missingConcrete.join(', ')}\n` +
-        'Check that --src (or the `src` option) points at all TypeScript entity files. ' +
-        'JSDoc tags such as @namespace and @hidden for missing entities cannot be read.'
-    );
+    throw new StructuredError({
+      title: 'Entities missing from the explicit src paths',
+      detail: `Explicit src paths did not include source declarations for discovered entities: ${missingConcrete.join(', ')}.`,
+      impact: ['JSDoc tags such as @namespace and @hidden for the missing entities cannot be read.'],
+      fix: 'Check that --src (or the `src` option) points at all TypeScript entity files.',
+    });
   }
 
   // Abstract STI parents appear in the diagram but are often defined in a separate
   // base-class file that --src may not cover. Warn rather than error so the user
   // knows @hidden/@namespace won't apply to them.
-  if (onWarn) {
-    const missingAbstract = metas
-      .filter((meta) => isRenderable(meta) && meta.abstract)
-      .map((meta) => meta.className)
-      .filter((className) => !jsDocResult.classNames.has(className));
+  const missingAbstract = metas
+    .filter((meta) => isRenderable(meta) && meta.abstract)
+    .map((meta) => meta.className)
+    .filter((className) => !jsDocResult.classNames.has(className));
 
-    if (missingAbstract.length > 0) {
-      onWarn(
-        `Abstract STI parent entities were not found in the explicit src paths: ${missingAbstract.join(', ')}\n` +
-          '@hidden and @namespace tags for these entities will not be applied. ' +
-          'Include their source files in --src to enable JSDoc tags for them.'
-      );
-    }
+  if (missingAbstract.length > 0) {
+    emitWarning(onWarn, {
+      title: 'Abstract STI parent entities missing from src paths',
+      detail: `Abstract STI parent entities were not found in the explicit src paths: ${missingAbstract.join(', ')}.`,
+      impact: ['@hidden and @namespace tags for these entities will not be applied.'],
+      fix: 'Include their source files in --src to enable JSDoc tags for them.',
+    });
   }
 }
 

@@ -21,6 +21,7 @@ Supports a programmatic API (`generateMarkdown`) and a CLI (`mikro-orm-markdown`
 src/
   cli.ts            # Commander-based CLI entry point
   index.ts          # Public API: generateMarkdown(), resolveJsDocSources()
+  messages.ts       # Structured warning/error payloads (StructuredMessage, StructuredError)
   provider.ts       # Auto-injects TsMorphMetadataProvider when needed
   docs/
     jsdoc.ts        # Parses JSDoc tags from .ts entity files via ts-morph
