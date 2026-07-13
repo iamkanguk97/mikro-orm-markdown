@@ -5,6 +5,7 @@ import { loadJsDoc } from '../../src/docs/jsdoc.js';
 import type { StructuredMessage } from '../../src/messages.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDocumentModel, type DocumentModel } from '../../src/model/build.js';
+import { buildDiagramModel } from '../../src/model/diagram.js';
 import config from '../fixtures/mikro-orm.config.js';
 
 async function getDocModel(): Promise<DocumentModel> {
@@ -581,5 +582,105 @@ describe('buildDocumentModel — enriched entities', () => {
     const author = blog.textEntities.find((e) => e.model.className === 'Author')!;
     expect(author.propDocs.get('name')?.description).toBe('작성자 이름');
     expect(author.propDocs.get('email')?.description).toBe('이메일 주소');
+  });
+});
+
+describe('buildDiagramModel — composite FK-as-PK type resolution', () => {
+  it('preserves mixed scalar types across multiple composite FK hops', () => {
+    const entityA = Object.assign({} as EntityMetadata, {
+      className: 'EntityA',
+      tableName: 'entity_a',
+      primaryKeys: ['id1', 'id2'],
+      properties: {
+        id1: { name: 'id1', fieldNames: ['id1'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
+        id2: { name: 'id2', fieldNames: ['id2'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const entityB = Object.assign({} as EntityMetadata, {
+      className: 'EntityB',
+      tableName: 'entity_b',
+      primaryKeys: ['entityA'],
+      properties: {
+        entityA: {
+          name: 'entityA',
+          fieldNames: ['b1', 'b2'],
+          referencedColumnNames: ['id1', 'id2'],
+          type: 'EntityA',
+          kind: ReferenceKind.MANY_TO_ONE,
+          primary: true,
+        },
+      },
+    });
+    const entityC = Object.assign({} as EntityMetadata, {
+      className: 'EntityC',
+      tableName: 'entity_c',
+      primaryKeys: ['entityB'],
+      properties: {
+        entityB: {
+          name: 'entityB',
+          fieldNames: ['c1', 'c2'],
+          referencedColumnNames: ['b1', 'b2'],
+          type: 'EntityB',
+          kind: ReferenceKind.MANY_TO_ONE,
+          primary: true,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([entityA, entityB, entityC]);
+    const entityBTypes = model.entities.find((entity) => entity.className === 'EntityB')?.columns.map((c) => c.type);
+    const entityCTypes = model.entities.find((entity) => entity.className === 'EntityC')?.columns.map((c) => c.type);
+
+    expect(entityBTypes).toEqual(['uuid', 'integer']);
+    expect(entityCTypes).toEqual(['uuid', 'integer']);
+  });
+
+  it('preserves reordered referenced-column types at the next composite FK hop', () => {
+    const entityA = Object.assign({} as EntityMetadata, {
+      className: 'EntityA',
+      tableName: 'entity_a',
+      primaryKeys: ['id1', 'id2'],
+      properties: {
+        id1: { name: 'id1', fieldNames: ['id1'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
+        id2: { name: 'id2', fieldNames: ['id2'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const entityB = Object.assign({} as EntityMetadata, {
+      className: 'EntityB',
+      tableName: 'entity_b',
+      primaryKeys: ['entityA'],
+      properties: {
+        entityA: {
+          name: 'entityA',
+          fieldNames: ['b_id2', 'b_id1'],
+          referencedColumnNames: ['id2', 'id1'],
+          type: 'EntityA',
+          kind: ReferenceKind.MANY_TO_ONE,
+          primary: true,
+        },
+      },
+    });
+    const entityC = Object.assign({} as EntityMetadata, {
+      className: 'EntityC',
+      tableName: 'entity_c',
+      primaryKeys: ['entityB'],
+      properties: {
+        entityB: {
+          name: 'entityB',
+          fieldNames: ['c_id2', 'c_id1'],
+          referencedColumnNames: ['b_id2', 'b_id1'],
+          type: 'EntityB',
+          kind: ReferenceKind.MANY_TO_ONE,
+          primary: true,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([entityA, entityB, entityC]);
+    const entityBTypes = model.entities.find((entity) => entity.className === 'EntityB')?.columns.map((c) => c.type);
+    const entityCTypes = model.entities.find((entity) => entity.className === 'EntityC')?.columns.map((c) => c.type);
+
+    expect(entityBTypes).toEqual(['integer', 'uuid']);
+    expect(entityCTypes).toEqual(['integer', 'uuid']);
   });
 });
