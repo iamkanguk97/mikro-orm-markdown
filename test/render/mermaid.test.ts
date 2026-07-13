@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDiagramModel } from '../../src/model/diagram.js';
 import type { ColumnModel, DiagramModel, RelationEdge } from '../../src/model/types.js';
+import { escapeMermaidQuotedText } from '../../src/render/escape.js';
 import { normalizeType, renderErDiagram } from '../../src/render/mermaid.js';
 import config from '../fixtures/mikro-orm.config.js';
+import { parseMermaidDiagram } from './mermaid-parser.js';
 
 // ─── buildDiagramModel (integration: uses real MikroORM metadata) ─────────────
 
@@ -1013,7 +1015,7 @@ describe('renderErDiagram', () => {
     expect(renderErDiagram(model)).toContain('Post }o--o{ Tag : "tags"');
   });
 
-  it('sanitizes Mermaid identifiers and escapes quoted labels/comments', () => {
+  it('sanitizes Mermaid identifiers and encodes quoted labels/comments for the Mermaid parser', async () => {
     const model: DiagramModel = {
       entities: [
         {
@@ -1044,8 +1046,15 @@ describe('renderErDiagram', () => {
     const result = renderErDiagram(model);
 
     expect(result).toContain('Order_Item {');
-    expect(result).toContain('string full_name_raw "formula: concat(\\"first\\", \\"last\\") line"');
-    expect(result).toContain('Order_Item }o--|| User_Account : "created \\"by\\" user"');
+    expect(result).toContain('string full_name_raw "formula: concat(#quot;first#quot;, #quot;last#quot;) line"');
+    expect(result).toContain('Order_Item }o--|| User_Account : "created #quot;by#quot; user"');
+    await expect(parseMermaidDiagram(result)).resolves.toMatchObject({ diagramType: 'er' });
+  });
+
+  it('preserves literal entity-looking text and backslashes in Mermaid quoted text', () => {
+    expect(escapeMermaidQuotedText('raw #quot; #35; C:\\tmp "quote"')).toBe(
+      'raw #35;quot; #35;35; C:\\tmp #quot;quote#quot;'
+    );
   });
 });
 
