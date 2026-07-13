@@ -2,7 +2,7 @@ import type { EntityMetadata, Options } from '@mikro-orm/core';
 import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
 import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
-import { buildDocumentModel } from './model/build.js';
+import { buildDocumentModel, type DocumentModel } from './model/build.js';
 import { withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
 import type { MermaidRenderOptions } from './render/mermaid.js';
@@ -78,12 +78,7 @@ export function resolveJsDocSources(sourcePaths: string[], src: string[] | undef
   return sourcePaths;
 }
 
-function assertExplicitJsDocSourceCoverage(
-  metas: EntityMetadata[],
-  jsDocResult: JsDocResult,
-  src: string[],
-  onWarn?: WarnHandler
-): void {
+function assertExplicitJsDocSourcesMatched(jsDocResult: JsDocResult, src: string[]): void {
   if (jsDocResult.sourceFileCount === 0) {
     throw new StructuredError({
       title: 'No JSDoc sources matched the explicit src paths',
@@ -92,7 +87,29 @@ function assertExplicitJsDocSourceCoverage(
       fix: 'Check the --src glob/path (or the `src` option) so it matches your TypeScript entity sources.',
     });
   }
+}
 
+function collectRequiredEmbeddableClassNames(docModel: DocumentModel): Set<string> {
+  const classNames = new Set<string>();
+
+  for (const group of docModel.groups) {
+    for (const entity of group.textEntities) {
+      for (const column of entity.model.columns) {
+        if (column.embeddedIn !== undefined && column.embeddedPropName !== undefined) {
+          classNames.add(column.embeddedIn);
+        }
+      }
+    }
+  }
+
+  return classNames;
+}
+
+function assertExplicitEntityJsDocSourceCoverage(
+  metas: EntityMetadata[],
+  jsDocResult: JsDocResult,
+  onWarn?: WarnHandler
+): void {
   const isRenderable = (meta: EntityMetadata): boolean => !meta.pivotTable && !meta.embeddable;
 
   const missingConcrete = metas
@@ -123,6 +140,23 @@ function assertExplicitJsDocSourceCoverage(
       detail: `Abstract STI parent entities were not found in the explicit src paths: ${missingAbstract.join(', ')}.`,
       impact: ['@hidden and @namespace tags for these entities will not be applied.'],
       fix: 'Include their source files in --src to enable JSDoc tags for them.',
+    });
+  }
+}
+
+function assertExplicitEmbeddableJsDocSourceCoverage(jsDocResult: JsDocResult, docModel: DocumentModel): void {
+  const missingEmbeddables = [...collectRequiredEmbeddableClassNames(docModel)].filter(
+    (className) => !jsDocResult.classNames.has(className)
+  );
+
+  if (missingEmbeddables.length > 0) {
+    throw new StructuredError({
+      title: 'Entities missing from the explicit src paths',
+      detail:
+        'Explicit src paths did not include source declarations for document-contributing embeddables: ' +
+        `${missingEmbeddables.join(', ')}.`,
+      impact: ['Property descriptions for the missing embeddables cannot be read.'],
+      fix: 'Check that --src (or the `src` option) points at all required TypeScript source files.',
     });
   }
 }
@@ -195,8 +229,12 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
     allowCompiledSourceFallback: src !== undefined && src.length > 0,
   });
   if (src !== undefined && src.length > 0) {
-    assertExplicitJsDocSourceCoverage(metas, jsDocResult, src, onWarn);
+    assertExplicitJsDocSourcesMatched(jsDocResult, src);
+    assertExplicitEntityJsDocSourceCoverage(metas, jsDocResult, onWarn);
   }
   const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn);
+  if (src !== undefined && src.length > 0) {
+    assertExplicitEmbeddableJsDocSourceCoverage(jsDocResult, docModel);
+  }
   return renderMarkdown(docModel, mermaid);
 }
