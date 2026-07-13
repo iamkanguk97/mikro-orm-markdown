@@ -84,6 +84,10 @@ export function normalizeType(type: string): string {
  */
 export function renderErDiagram(model: DiagramModel, mermaid?: MermaidRenderOptions): string {
   const lines: string[] = [];
+  const entityIdentifiers = createMermaidIdentifierRegistry([
+    ...model.entities.map((entity) => entity.className),
+    ...model.relations.flatMap((relation) => [relation.fromEntity, relation.toEntity]),
+  ]);
 
   if (mermaid?.layout !== undefined || mermaid?.theme !== undefined) {
     lines.push('---', 'config:');
@@ -99,23 +103,65 @@ export function renderErDiagram(model: DiagramModel, mermaid?: MermaidRenderOpti
   lines.push('erDiagram');
 
   for (const entity of model.entities) {
-    lines.push(`  ${toMermaidIdentifier(entity.className)} {`);
+    const entityIdentifier = entityIdentifiers.get(entity.className) ?? toMermaidIdentifier(entity.className);
+    const entityAlias = entityIdentifier === entity.className ? '' : `["${escapeMermaidQuotedText(entity.className)}"]`;
+    const attributeIdentifiers = createMermaidIdentifierRegistry(entity.columns.map((column) => column.fieldName));
+
+    lines.push(`  ${entityIdentifier}${entityAlias} {`);
     for (const col of entity.columns) {
-      lines.push(`    ${renderColumnLine(col)}`);
+      const fieldIdentifier = attributeIdentifiers.get(col.fieldName) ?? toMermaidIdentifier(col.fieldName);
+      lines.push(`    ${renderColumnLine(col, fieldIdentifier)}`);
     }
     lines.push('  }');
   }
 
   for (const rel of model.relations) {
+    const fromIdentifier = entityIdentifiers.get(rel.fromEntity) ?? toMermaidIdentifier(rel.fromEntity);
+    const toIdentifier = entityIdentifiers.get(rel.toEntity) ?? toMermaidIdentifier(rel.toEntity);
     lines.push(
-      `  ${toMermaidIdentifier(rel.fromEntity)} ${rel.fromCardinality}--${rel.toCardinality} ${toMermaidIdentifier(rel.toEntity)} : "${escapeMermaidQuotedText(rel.label)}"`
+      `  ${fromIdentifier} ${rel.fromCardinality}--${rel.toCardinality} ${toIdentifier} : "${escapeMermaidQuotedText(rel.label)}"`
     );
   }
 
   return lines.join('\n');
 }
 
-function renderColumnLine(col: ColumnModel): string {
+function createMermaidIdentifierRegistry(values: Iterable<string>): Map<string, string> {
+  const originals = [...new Set(values)];
+  const identifiers = new Map<string, string>();
+  const allocated = new Set<string>();
+
+  // Preserve every already-safe ASCII identifier even when an earlier unsafe
+  // name sanitizes to the same value. This keeps established output stable.
+  for (const original of originals) {
+    if (toMermaidIdentifier(original) === original) {
+      identifiers.set(original, original);
+      allocated.add(original);
+    }
+  }
+
+  for (const original of originals) {
+    if (identifiers.has(original)) {
+      continue;
+    }
+
+    const baseIdentifier = toMermaidIdentifier(original);
+    let identifier = baseIdentifier;
+    let suffix = 2;
+
+    while (allocated.has(identifier)) {
+      identifier = `${baseIdentifier}_${suffix}`;
+      suffix += 1;
+    }
+
+    allocated.add(identifier);
+    identifiers.set(original, identifier);
+  }
+
+  return identifiers;
+}
+
+function renderColumnLine(col: ColumnModel, fieldIdentifier: string): string {
   // Priority: PK > UK (FK qualifier omitted — relationship lines already convey FK relationships)
   let qualifier = '';
   if (col.isPrimary) {
@@ -142,5 +188,5 @@ function renderColumnLine(col: ColumnModel): string {
   }
 
   const commentStr = comment !== undefined ? ` "${escapeMermaidQuotedText(comment)}"` : '';
-  return `${toMermaidIdentifier(normalizeType(col.type))} ${toMermaidIdentifier(col.fieldName)}${qualifier}${commentStr}`;
+  return `${toMermaidIdentifier(normalizeType(col.type))} ${fieldIdentifier}${qualifier}${commentStr}`;
 }
