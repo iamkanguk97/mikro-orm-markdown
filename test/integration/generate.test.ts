@@ -1,12 +1,19 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Entity, type EntityClass, MetadataStorage, PrimaryKey, Property } from '@mikro-orm/core';
+import { Entity, type EntityClass, Formula, MetadataStorage, PrimaryKey, Property } from '@mikro-orm/core';
 import { MariaDbDriver } from '@mikro-orm/mariadb';
 import { MySqlDriver } from '@mikro-orm/mysql';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
+import { CoverageAddress, UnusedCoverageAddress } from '../fixtures/embeddable-coverage/Address.js';
+import {
+  ErdOnlyEmbeddedOwner,
+  HiddenEmbeddedOwner,
+  PlainCoverageEntity,
+  VisibleEmbeddedOwner,
+} from '../fixtures/embeddable-coverage/Owners.js';
 import config from '../fixtures/mikro-orm.config.js';
 import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
 import { CollisionEntity } from '../fixtures/source-identity/entity/CollisionEntity.js';
@@ -22,6 +29,8 @@ const COMPILED_IDENTITY_DUPLICATE = path.resolve(
   TEST_DIR,
   '../fixtures/source-identity/compiled-duplicate/CompiledIdentityEntity.ts'
 );
+const EMBEDDABLE_ADDRESS_SOURCE = path.resolve(TEST_DIR, '../fixtures/embeddable-coverage/Address.ts');
+const EMBEDDABLE_OWNERS_SOURCE = path.resolve(TEST_DIR, '../fixtures/embeddable-coverage/Owners.ts');
 
 function createCompiledIdentityEntity(metadataPath: string): EntityClass<object> {
   class CompiledIdentityEntity {}
@@ -178,6 +187,93 @@ describe('generateMarkdown', () => {
     await expect(pending).rejects.toMatchObject({
       structured: { title: 'Entities missing from the explicit src paths' },
     });
+  });
+
+  it('rejects missing concrete entity sources before building the document model', async () => {
+    const formula = vi.fn(() => '1');
+    class MissingFormulaEntity {}
+    Object.defineProperty(MissingFormulaEntity, MetadataStorage.PATH_SYMBOL, {
+      value: '/virtual/dist/MissingFormulaEntity.js',
+      writable: true,
+    });
+    Entity()(MissingFormulaEntity);
+    PrimaryKey({ type: 'integer' })(MissingFormulaEntity.prototype, 'id');
+    Formula(formula, { type: 'integer' })(MissingFormulaEntity.prototype, 'computed');
+
+    const pending = generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [MissingFormulaEntity],
+      },
+      src: [COLLISION_DTO_SOURCE],
+    });
+
+    await expect(pending).rejects.toMatchObject({
+      structured: { title: 'Entities missing from the explicit src paths' },
+    });
+    expect(formula).not.toHaveBeenCalled();
+  });
+
+  it('rejects explicit src paths that omit an embeddable contributing descriptions to a text entity', async () => {
+    const pending = generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [VisibleEmbeddedOwner, CoverageAddress],
+      },
+      src: [EMBEDDABLE_OWNERS_SOURCE],
+    });
+
+    await expect(pending).rejects.toBeInstanceOf(StructuredError);
+    await expect(pending).rejects.toMatchObject({
+      structured: { title: 'Entities missing from the explicit src paths' },
+    });
+    await expect(pending).rejects.toThrow('CoverageAddress');
+  });
+
+  it('preserves flattened property descriptions when the contributing embeddable source is included', async () => {
+    const md = await generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [VisibleEmbeddedOwner, CoverageAddress],
+      },
+      src: [EMBEDDABLE_OWNERS_SOURCE, EMBEDDABLE_ADDRESS_SOURCE],
+    });
+
+    expect(md).toContain(
+      '| address_street | string | \\[CoverageAddress\\] |  | Street description from the embeddable source. |'
+    );
+  });
+
+  it.each([
+    ['hidden', HiddenEmbeddedOwner],
+    ['ERD-only', ErdOnlyEmbeddedOwner],
+  ])('does not require an embeddable used only by a %s entity', async (_kind, owner) => {
+    await expect(
+      generateMarkdown({
+        orm: {
+          driver: SqliteDriver,
+          dbName: ':memory:',
+          entities: [owner, CoverageAddress],
+        },
+        src: [EMBEDDABLE_OWNERS_SOURCE],
+      })
+    ).resolves.toEqual(expect.any(String));
+  });
+
+  it('does not require a configured embeddable that contributes no rendered column', async () => {
+    await expect(
+      generateMarkdown({
+        orm: {
+          driver: SqliteDriver,
+          dbName: ':memory:',
+          entities: [PlainCoverageEntity, UnusedCoverageAddress],
+        },
+        src: [EMBEDDABLE_OWNERS_SOURCE],
+      })
+    ).resolves.toContain('### PlainCoverageEntity');
   });
 
   it('does not let a same-named DTO satisfy explicit src coverage for a TypeScript entity', async () => {
