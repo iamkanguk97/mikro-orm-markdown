@@ -692,6 +692,97 @@ describe('buildDiagramModel — Constraints', () => {
     ]);
     expect(account.constraints.some((constraint) => constraint.name === 'transient_code_uq')).toBe(false);
   });
+
+  it('preserves single-field property indexes and deduplicates only an exact tuple', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'IndexedAccount',
+      tableName: 'indexed_account',
+      indexes: [
+        { name: 'email_property_idx', properties: ['email'] },
+        { name: 'email_entity_idx', properties: ['email'] },
+        { name: 'email_entity_idx', properties: ['email'] },
+        { name: 'ordered_idx', properties: ['firstOrder', 'secondOrder'] },
+        { name: 'ordered_idx', properties: ['secondOrder', 'firstOrder'] },
+        { expression: 'lower(email_address)' },
+        { expression: 'upper(email_address)' },
+      ],
+      properties: {
+        email: {
+          name: 'email',
+          fieldNames: ['email_address'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          index: 'email_property_idx',
+        },
+        active: {
+          name: 'active',
+          fieldNames: ['is_active'],
+          type: 'boolean',
+          kind: ReferenceKind.SCALAR,
+          index: true,
+        },
+        preferences: {
+          name: 'preferences',
+          fieldNames: ['preferences_json'],
+          type: 'Preferences',
+          kind: ReferenceKind.EMBEDDED,
+          object: true,
+          index: 'preferences_idx',
+        },
+        organization: {
+          name: 'organization',
+          fieldNames: ['organization_id'],
+          type: 'Organization',
+          kind: ReferenceKind.MANY_TO_ONE,
+          index: 'organization_idx',
+        },
+        transientSearch: {
+          name: 'transientSearch',
+          fieldNames: ['transient_search'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          persist: false,
+          index: 'transient_search_idx',
+        },
+        compositeRelation: {
+          name: 'compositeRelation',
+          fieldNames: ['relation_tenant_id', 'relation_id'],
+          type: 'CompositeTarget',
+          kind: ReferenceKind.MANY_TO_ONE,
+          index: 'composite_relation_idx',
+        },
+        firstOrder: {
+          name: 'firstOrder',
+          fieldNames: ['first_order'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+        },
+        secondOrder: {
+          name: 'secondOrder',
+          fieldNames: ['second_order'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+        },
+      },
+    });
+
+    const indexedAccount = buildDiagramModel([meta]).entities[0]!;
+    const indexes = indexedAccount.constraints.filter((constraint) => constraint.type === 'index');
+
+    expect(indexes).toEqual([
+      { type: 'index', properties: ['email_address'], name: 'email_property_idx' },
+      { type: 'index', properties: ['email_address'], name: 'email_entity_idx' },
+      { type: 'index', properties: ['first_order', 'second_order'], name: 'ordered_idx' },
+      { type: 'index', properties: ['second_order', 'first_order'], name: 'ordered_idx' },
+      { type: 'index', properties: [] },
+      { type: 'index', properties: [] },
+      { type: 'index', properties: ['is_active'] },
+      { type: 'index', properties: ['preferences_json'], name: 'preferences_idx' },
+      { type: 'index', properties: ['organization_id'], name: 'organization_idx' },
+    ]);
+    expect(indexes.some((constraint) => constraint.name === 'transient_search_idx')).toBe(false);
+    expect(indexes.some((constraint) => constraint.name === 'composite_relation_idx')).toBe(false);
+  });
 });
 
 describe('buildDiagramModel — non-abstract STI root (M1)', () => {

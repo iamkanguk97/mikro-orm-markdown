@@ -311,23 +311,49 @@ function getPrimaryPhysicalFields(meta: EntityMetadata): PrimaryPhysicalField[] 
   });
 }
 
-/** Collects indexes, unique constraints, and check constraints from entity-level metadata. */
+/** Collects indexes, unique constraints, and check constraints from entity and property metadata. */
 function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
   const result: ConstraintModel[] = [];
+  const indexIdentities = new Set<string>();
   const uniqueIdentities = new Set<string>();
 
   for (const idx of meta.indexes ?? []) {
     const props = idx.properties;
-    result.push({
+    const constraint: ConstraintModel = {
       type: 'index',
       properties: resolveConstraintProperties(meta, props),
       ...(idx.name !== undefined && { name: idx.name }),
+    };
+
+    // Expression indexes have no property tuple until their expression is
+    // modelled separately, so they cannot share this tuple-based identity.
+    if (idx.expression !== undefined) {
+      result.push(constraint);
+      continue;
+    }
+    pushDistinctConstraint(result, indexIdentities, constraint);
+  }
+
+  for (const prop of Object.values(meta.properties)) {
+    const fieldName = prop.fieldNames?.[0];
+    if (
+      (prop.index !== true && typeof prop.index !== 'string') ||
+      prop.persist === false ||
+      prop.fieldNames?.length !== 1 ||
+      fieldName === undefined
+    ) {
+      continue;
+    }
+    pushDistinctConstraint(result, indexIdentities, {
+      type: 'index',
+      properties: [fieldName],
+      ...(typeof prop.index === 'string' && { name: prop.index }),
     });
   }
 
   for (const uniq of meta.uniques ?? []) {
     const props = uniq.properties;
-    pushDistinctUnique(result, uniqueIdentities, {
+    pushDistinctConstraint(result, uniqueIdentities, {
       type: 'unique',
       properties: resolveConstraintProperties(meta, props),
       ...(uniq.name !== undefined && { name: uniq.name }),
@@ -344,7 +370,7 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
     ) {
       continue;
     }
-    pushDistinctUnique(result, uniqueIdentities, {
+    pushDistinctConstraint(result, uniqueIdentities, {
       type: 'unique',
       name: prop.unique,
       properties: [fieldName],
@@ -367,7 +393,7 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
   return result;
 }
 
-function pushDistinctUnique(result: ConstraintModel[], identities: Set<string>, constraint: ConstraintModel): void {
+function pushDistinctConstraint(result: ConstraintModel[], identities: Set<string>, constraint: ConstraintModel): void {
   const identity = JSON.stringify([constraint.type, constraint.name ?? null, constraint.properties]);
   if (identities.has(identity)) {
     return;
