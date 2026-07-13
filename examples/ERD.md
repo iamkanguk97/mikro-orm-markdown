@@ -63,7 +63,7 @@ erDiagram
 | Column | Type | Key | Nullable | Description |
 |--------|------|-----|----------|-------------|
 | id | integer | PK |  |  |
-| name | string |  |  |  |
+| name | string |  |  | Display name. |
 | type | string |  |  | One of: dog, cat |
 | breed | string |  | Y | Breed, if known. |
 
@@ -82,7 +82,7 @@ erDiagram
 | Column | Type | Key | Nullable | Description |
 |--------|------|-----|----------|-------------|
 | id | integer | PK |  |  |
-| name | string |  |  |  |
+| name | string |  |  | Display name. |
 | type | string |  |  | One of: dog, cat |
 | indoor | boolean |  | Y | Whether the cat is kept indoors. |
 
