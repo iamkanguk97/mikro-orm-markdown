@@ -176,6 +176,14 @@ describe('renderMarkdown — column table', () => {
     expect(md).toContain('| name | string |  |  | 작성자 이름 |');
   });
 
+  it('shows an STI parent property description in every child table', async () => {
+    const md = await getMarkdown();
+    const animals = extractSection(md, 'Animals');
+
+    expect(extractEntitySection(animals, 'Dog')).toContain('| name | string |  |  | Display name. |');
+    expect(extractEntitySection(animals, 'Cat')).toContain('| name | string |  |  | Display name. |');
+  });
+
   it('falls back to @Property({ comment }) when a column has no JSDoc', async () => {
     const md = await getMarkdown();
     // Customer.name has no JSDoc, only a comment
@@ -530,4 +538,14 @@ function extractSection(md: string, sectionName: string): string {
   }
   const nextSection = md.indexOf('\n## ', start + 1);
   return nextSection === -1 ? md.slice(start) : md.slice(start, nextSection);
+}
+
+/** Extracts one entity subsection (from ### heading to the next ### or end). */
+function extractEntitySection(md: string, entityName: string): string {
+  const start = md.indexOf(`### ${entityName}`);
+  if (start === -1) {
+    return '';
+  }
+  const nextEntity = md.indexOf('\n### ', start + 1);
+  return nextEntity === -1 ? md.slice(start) : md.slice(start, nextEntity);
 }

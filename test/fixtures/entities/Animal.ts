@@ -12,6 +12,7 @@ export class Animal {
   @PrimaryKey({ type: 'integer' })
   id!: number;
 
+  /** Display name. */
   @Property({ type: 'string' })
   name!: string;
 }

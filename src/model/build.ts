@@ -56,6 +56,7 @@ export function buildDocumentModel(
   onWarn?: WarnHandler
 ): DocumentModel {
   const { entities: diagramEntities, relations } = buildDiagramModel(metas);
+  const metadataByClass = new Map(metas.map((meta) => [meta.className, meta]));
   const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props, onWarn);
 
   // Classes excluded via @hidden — FK columns pointing at them would otherwise
@@ -93,8 +94,8 @@ export function buildDocumentModel(
             ),
           };
     const visibleModel = removeHiddenEntityReferences(visibleModelWithoutHiddenForeignKeys, hiddenClasses);
-    const ownPropDocs = jsDocResult.props.get(model.className) ?? new Map<string, PropJsDocInfo>();
-    const propDocs = withEmbeddedPropDocs(ownPropDocs, visibleModel.columns, jsDocResult.props);
+    const stiPropDocs = withInheritedStiPropDocs(model, metadataByClass, jsDocResult.props, hiddenClasses);
+    const propDocs = withEmbeddedPropDocs(stiPropDocs, visibleModel.columns, jsDocResult.props);
     enrichedByClass.set(model.className, { model: visibleModel, jsDoc, propDocs });
   }
 
@@ -167,6 +168,48 @@ function removeHiddenEntityReferences(model: EntityModel, hiddenClasses: Set<str
   const visibleModel = { ...model };
   delete visibleModel.extendsEntity;
   return visibleModel;
+}
+
+/**
+ * Merges property documentation from a visible STI ancestry chain.
+ *
+ * Ancestors are applied root-to-child so the nearest declaration wins, then
+ * the current entity is applied last. Raw MikroORM metadata is used because an
+ * abstract intermediate STI class may have `extends` without a discriminator
+ * value, so it does not get an `EntityModel.extendsEntity` field. A hidden or
+ * missing ancestor is a hard boundary, and the visited set keeps malformed
+ * cyclic metadata from looping forever.
+ */
+function withInheritedStiPropDocs(
+  model: EntityModel,
+  metadataByClass: ReadonlyMap<string, EntityMetadata>,
+  allPropDocs: PropJsDocMap,
+  hiddenClasses: ReadonlySet<string>
+): Map<string, PropJsDocInfo> {
+  const ancestorClassNames: string[] = [];
+  const visited = new Set<string>([model.className]);
+  let ancestorName = metadataByClass.get(model.className)?.extends;
+
+  while (ancestorName !== undefined && !visited.has(ancestorName) && !hiddenClasses.has(ancestorName)) {
+    const ancestor = metadataByClass.get(ancestorName);
+    if (ancestor === undefined) {
+      break;
+    }
+    visited.add(ancestorName);
+    ancestorClassNames.push(ancestorName);
+    ancestorName = ancestor.extends;
+  }
+
+  const merged = new Map<string, PropJsDocInfo>();
+  for (const ancestorClassName of ancestorClassNames.reverse()) {
+    for (const [propName, info] of allPropDocs.get(ancestorClassName) ?? []) {
+      merged.set(propName, info);
+    }
+  }
+  for (const [propName, info] of allPropDocs.get(model.className) ?? []) {
+    merged.set(propName, info);
+  }
+  return merged;
 }
 
 /**

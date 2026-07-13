@@ -57,6 +57,35 @@ function createSimpleEntityMeta(className: string): EntityMetadata {
   });
 }
 
+function createStiEntityMeta(
+  className: string,
+  propertyNames: string[],
+  options: { extendsEntity?: string; discriminatorColumn?: string; discriminatorValue?: string } = {}
+): EntityMetadata {
+  const properties = Object.fromEntries(
+    propertyNames.map((name) => [
+      name,
+      {
+        name,
+        fieldNames: [name],
+        type: name === 'id' ? 'integer' : 'string',
+        kind: ReferenceKind.SCALAR,
+        primary: name === 'id',
+      },
+    ])
+  );
+
+  return Object.assign({} as EntityMetadata, {
+    className,
+    tableName: 'sti_entity',
+    primaryKeys: propertyNames.includes('id') ? ['id'] : [],
+    properties,
+    ...(options.extendsEntity !== undefined && { extends: options.extendsEntity }),
+    ...(options.discriminatorColumn !== undefined && { discriminatorColumn: options.discriminatorColumn }),
+    ...(options.discriminatorValue !== undefined && { discriminatorValue: options.discriminatorValue }),
+  });
+}
+
 describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
   it('warns when @atLeastOne cannot be matched to a relation edge', () => {
     // A unidirectional @OneToMany (no mappedBy) produces no edge to adjust.
@@ -444,6 +473,138 @@ describe('buildDocumentModel — @hidden', () => {
 
     expect(dogEntity).toBeDefined();
     expect(dogEntity!.model.extendsEntity).toBeUndefined();
+  });
+});
+
+describe('buildDocumentModel — STI property documentation inheritance', () => {
+  it('merges visible ancestor docs root-to-child and lets the child override a property', () => {
+    const root = createStiEntityMeta('Root', ['id', 'rootOnly', 'shared'], { discriminatorColumn: 'kind' });
+    const middle = createStiEntityMeta('Middle', ['id', 'rootOnly', 'middleOnly', 'shared'], {
+      extendsEntity: 'Root',
+    });
+    const leaf = createStiEntityMeta('Leaf', ['id', 'rootOnly', 'middleOnly', 'leafOnly', 'shared'], {
+      extendsEntity: 'Middle',
+      discriminatorValue: 'leaf',
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map(),
+      props: new Map([
+        [
+          'Root',
+          new Map([
+            ['rootOnly', { description: 'root description', atLeastOne: false }],
+            ['shared', { description: 'root shared', atLeastOne: false }],
+          ]),
+        ],
+        [
+          'Middle',
+          new Map([
+            ['middleOnly', { description: 'middle description', atLeastOne: false }],
+            ['shared', { description: 'middle shared', atLeastOne: false }],
+          ]),
+        ],
+        [
+          'Leaf',
+          new Map([
+            ['leafOnly', { description: 'leaf description', atLeastOne: false }],
+            ['shared', { description: 'leaf shared', atLeastOne: false }],
+          ]),
+        ],
+      ]),
+      sourceFileCount: 0,
+      classNames: new Set(['Root', 'Middle', 'Leaf']),
+    };
+
+    const leafEntity = buildDocumentModel([root, middle, leaf], jsDoc, 'T')
+      .groups.flatMap((group) => group.textEntities)
+      .find((entity) => entity.model.className === 'Leaf')!;
+
+    expect(Object.fromEntries([...leafEntity.propDocs].map(([name, info]) => [name, info.description]))).toEqual({
+      rootOnly: 'root description',
+      shared: 'leaf shared',
+      middleOnly: 'middle description',
+      leafOnly: 'leaf description',
+    });
+  });
+
+  it('stops inheritance at a hidden ancestor without losing child docs', () => {
+    const root = createStiEntityMeta('Root', ['id', 'rootOnly'], { discriminatorColumn: 'kind' });
+    const hiddenMiddle = createStiEntityMeta('HiddenMiddle', ['id', 'rootOnly', 'middleOnly'], {
+      extendsEntity: 'Root',
+      discriminatorValue: 'middle',
+    });
+    const leaf = createStiEntityMeta('Leaf', ['id', 'rootOnly', 'middleOnly', 'leafOnly'], {
+      extendsEntity: 'HiddenMiddle',
+      discriminatorValue: 'leaf',
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map([
+        ['HiddenMiddle', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }],
+      ]),
+      props: new Map([
+        ['Root', new Map([['rootOnly', { description: 'root description', atLeastOne: false }]])],
+        ['HiddenMiddle', new Map([['middleOnly', { description: 'hidden description', atLeastOne: false }]])],
+        ['Leaf', new Map([['leafOnly', { description: 'leaf description', atLeastOne: false }]])],
+      ]),
+      sourceFileCount: 0,
+      classNames: new Set(['Root', 'HiddenMiddle', 'Leaf']),
+    };
+
+    const leafEntity = buildDocumentModel([root, hiddenMiddle, leaf], jsDoc, 'T')
+      .groups.flatMap((group) => group.textEntities)
+      .find((entity) => entity.model.className === 'Leaf')!;
+
+    expect(leafEntity.propDocs.get('leafOnly')?.description).toBe('leaf description');
+    expect(leafEntity.propDocs.has('middleOnly')).toBe(false);
+    expect(leafEntity.propDocs.has('rootOnly')).toBe(false);
+  });
+
+  it('terminates cyclic and self-referential ancestry while preserving child overrides', () => {
+    const a = createStiEntityMeta('A', ['id', 'aOnly', 'shared'], {
+      extendsEntity: 'B',
+      discriminatorValue: 'a',
+    });
+    const b = createStiEntityMeta('B', ['id', 'bOnly', 'shared'], {
+      extendsEntity: 'A',
+      discriminatorValue: 'b',
+    });
+    const self = createStiEntityMeta('Self', ['id', 'selfOnly'], {
+      extendsEntity: 'Self',
+      discriminatorValue: 'self',
+    });
+    const jsDoc: JsDocResult = {
+      entities: new Map(),
+      props: new Map([
+        [
+          'A',
+          new Map([
+            ['aOnly', { description: 'A only', atLeastOne: false }],
+            ['shared', { description: 'A wins', atLeastOne: false }],
+          ]),
+        ],
+        [
+          'B',
+          new Map([
+            ['bOnly', { description: 'B only', atLeastOne: false }],
+            ['shared', { description: 'B wins', atLeastOne: false }],
+          ]),
+        ],
+        ['Self', new Map([['selfOnly', { description: 'self description', atLeastOne: false }]])],
+      ]),
+      sourceFileCount: 0,
+      classNames: new Set(['A', 'B', 'Self']),
+    };
+
+    const entities = buildDocumentModel([a, b, self], jsDoc, 'T').groups.flatMap((group) => group.textEntities);
+    const aDocs = entities.find((entity) => entity.model.className === 'A')!.propDocs;
+    const bDocs = entities.find((entity) => entity.model.className === 'B')!.propDocs;
+    const selfDocs = entities.find((entity) => entity.model.className === 'Self')!.propDocs;
+
+    expect(aDocs.get('bOnly')?.description).toBe('B only');
+    expect(aDocs.get('shared')?.description).toBe('A wins');
+    expect(bDocs.get('aOnly')?.description).toBe('A only');
+    expect(bDocs.get('shared')?.description).toBe('B wins');
+    expect(selfDocs.get('selfOnly')?.description).toBe('self description');
   });
 });
 
