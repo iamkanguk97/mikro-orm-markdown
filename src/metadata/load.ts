@@ -21,10 +21,14 @@ export interface LoadedEntityMetadata {
   entitySourcePaths: Map<string, string>;
 }
 
-async function closeDiscoveryResources(orm: MikroORM): Promise<void> {
+async function closeDiscoveryResources(orm: MikroORM): Promise<unknown[]> {
   // With connect=false, orm.close() can instantiate SQL clients just to close them.
-  await orm.config.getMetadataCacheAdapter()?.close?.();
-  await orm.config.getResultCacheAdapter()?.close?.();
+  const results = await Promise.allSettled([
+    Promise.resolve().then(() => orm.config.getMetadataCacheAdapter()?.close?.()),
+    Promise.resolve().then(() => orm.config.getResultCacheAdapter()?.close?.()),
+  ]);
+
+  return results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
 }
 
 function collectEntitySchemaNames(options: Options): string[] {
@@ -173,6 +177,9 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
     );
   }
 
+  let discoveryFailed = false;
+  let discoveryError: unknown;
+
   try {
     const all = Object.values(orm.getMetadata().getAll());
 
@@ -191,7 +198,21 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
     const sourcePaths = [...new Set(entitySourcePaths.values())];
 
     return { metas: all, sourcePaths, entitySourcePaths };
+  } catch (error) {
+    discoveryFailed = true;
+    discoveryError = error;
+    throw error;
   } finally {
-    await closeDiscoveryResources(orm);
+    const cleanupErrors = await closeDiscoveryResources(orm);
+    if (cleanupErrors.length > 0) {
+      if (discoveryFailed) {
+        Object.defineProperty(discoveryError as object, 'cleanupErrors', {
+          value: cleanupErrors,
+          enumerable: false,
+        });
+      } else {
+        throw new AggregateError(cleanupErrors, 'Failed to close MikroORM discovery cache adapters.');
+      }
+    }
   }
 }
