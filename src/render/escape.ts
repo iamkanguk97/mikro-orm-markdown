@@ -65,7 +65,7 @@ export function toMermaidIdentifier(value: string): string {
 }
 
 export function escapeMermaidQuotedText(value: string): string {
-  return normalizeInlineText(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  return normalizeInlineText(value).replace(/#/g, '#35;').replace(/"/g, '#quot;');
 }
 
 /**
