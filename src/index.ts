@@ -3,7 +3,7 @@ import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/js
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
 import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel, type DocumentModel } from './model/build.js';
-import { withTsMorphMetadataProvider } from './provider.js';
+import { MissingTsMorphSourceError, withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
 import type { MermaidRenderOptions } from './render/mermaid.js';
 
@@ -161,41 +161,50 @@ function assertExplicitEmbeddableJsDocSourceCoverage(jsDocResult: JsDocResult, d
   }
 }
 
-function errorMessages(err: unknown): string[] {
-  const messages: string[] = [];
+function hasMissingTsMorphSourceError(err: unknown): boolean {
   const seen = new Set<unknown>();
   let current: unknown = err;
 
-  while (current instanceof Error && !seen.has(current)) {
+  while (current !== null && typeof current === 'object' && !seen.has(current)) {
+    if (current instanceof MissingTsMorphSourceError) {
+      return true;
+    }
     seen.add(current);
-    messages.push(current.message);
     current = (current as { cause?: unknown }).cause;
   }
 
-  return messages;
-}
-
-function isMissingTsMorphSourceFile(err: unknown): boolean {
-  return errorMessages(err).some((message) => message.includes('Source file') && message.includes('not found'));
+  return false;
 }
 
 async function loadEntityMetadataWithTsMorphFallback(
   originalOrm: Options,
-  effectiveOrm: Options
+  effectiveOrm: Options,
+  onWarn?: WarnHandler
 ): Promise<LoadedEntityMetadata> {
   try {
     return await loadEntityMetadata(effectiveOrm);
   } catch (err) {
     const wasAutoInjected = originalOrm.metadataProvider === undefined && effectiveOrm.metadataProvider !== undefined;
-    if (!wasAutoInjected || !isMissingTsMorphSourceFile(err)) {
+    if (!wasAutoInjected || !hasMissingTsMorphSourceError(err)) {
       throw err;
     }
 
+    let loaded: LoadedEntityMetadata;
     try {
-      return await loadEntityMetadata(originalOrm);
+      loaded = await loadEntityMetadata(originalOrm);
     } catch {
       throw err;
     }
+
+    emitWarning(onWarn, {
+      title: 'TypeScript metadata source unavailable',
+      detail:
+        'The automatically selected TypeScript metadata provider could not find a source file, ' +
+        'so generation succeeded by retrying with the original metadata provider.',
+      impact: ['Type information will come from runtime decorator metadata instead of TypeScript source analysis.'],
+      fix: 'Configure `entitiesTs` to point at the original TypeScript entity sources when source analysis is required.',
+    });
+    return loaded;
   }
 }
 
@@ -223,7 +232,11 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
   const { orm, title = 'Database Schema', description, src, onWarn, mermaid } = options;
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm, onWarn);
-  const { metas, sourcePaths, entitySourcePaths } = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm);
+  const { metas, sourcePaths, entitySourcePaths } = await loadEntityMetadataWithTsMorphFallback(
+    orm,
+    effectiveOrm,
+    onWarn
+  );
   const loadedJsDoc = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn), onWarn);
   const jsDocResult = bindJsDocToEntitySources(loadedJsDoc, entitySourcePaths, {
     allowCompiledSourceFallback: src !== undefined && src.length > 0,
