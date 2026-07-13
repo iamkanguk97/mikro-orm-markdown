@@ -1,5 +1,7 @@
 import type { ClassDeclaration, JSDoc as MorphJsDoc, ParameterDeclaration } from 'ts-morph';
 import { Project, ts } from 'ts-morph';
+import { StructuredError } from '../messages.js';
+import { normalizeSourcePath } from '../source-path.js';
 
 /** JSDoc information extracted from an entity class. */
 export interface EntityJsDocInfo {
@@ -29,6 +31,14 @@ export type EntityJsDocMap = Map<string, EntityJsDocInfo>;
 /** Outer key: entity class name. Inner key: property name. */
 export type PropJsDocMap = Map<string, Map<string, PropJsDocInfo>>;
 
+/** JSDoc parsed from one concrete class declaration in one source file. */
+export interface JsDocDeclaration {
+  className: string;
+  sourcePath: string;
+  entity?: EntityJsDocInfo;
+  props: Map<string, PropJsDocInfo>;
+}
+
 export interface JsDocResult {
   entities: EntityJsDocMap;
   props: PropJsDocMap;
@@ -38,6 +48,18 @@ export interface JsDocResult {
   classNames: Set<string>;
 }
 
+export interface LoadedJsDocResult extends JsDocResult {
+  /** Source-aware declarations retained so same-named classes are not conflated. */
+  declarations: JsDocDeclaration[];
+}
+
+export interface BindJsDocOptions {
+  /** Allow compiled or bundled metadata to bind to one unambiguous TypeScript declaration. */
+  allowCompiledSourceFallback?: boolean;
+}
+
+const TYPESCRIPT_SOURCE = /\.(c|m)?tsx?$/i;
+
 /**
  * Parses the given TypeScript source files and extracts JSDoc descriptions
  * and custom tags (@namespace, @erd, @describe, @hidden) from entity classes
@@ -46,13 +68,15 @@ export interface JsDocResult {
  * Returns empty maps if no source files are given or no JSDoc is found.
  * Never throws — errors are reported through onWarn so missing docs don't block generation.
  */
-export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => void): JsDocResult {
+export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => void): LoadedJsDocResult {
   const entities: EntityJsDocMap = new Map();
   const props: PropJsDocMap = new Map();
   const classNames = new Set<string>();
+  const declarations: JsDocDeclaration[] = [];
+  const declarationKeys = new Set<string>();
 
   if (filePaths.length === 0) {
-    return { entities, props, sourceFileCount: 0, classNames };
+    return { entities, props, sourceFileCount: 0, classNames, declarations };
   }
 
   const project = new Project({
@@ -86,24 +110,91 @@ export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => voi
         if (!className) {
           continue;
         }
+        const sourcePath = normalizeSourcePath(sourceFile.getFilePath());
+        const declarationKey = JSON.stringify([sourcePath, className]);
+        if (declarationKeys.has(declarationKey)) {
+          continue;
+        }
+        declarationKeys.add(declarationKey);
         classNames.add(className);
 
         const classDocs = cls.getJsDocs();
-        if (classDocs.length > 0) {
-          entities.set(className, parseEntityJsDoc(classDocs));
+        const entity = classDocs.length > 0 ? parseEntityJsDoc(classDocs) : undefined;
+        if (entity !== undefined) {
+          entities.set(className, entity);
         }
 
         const propMap = collectPropJsDocs(cls);
         if (propMap.size > 0) {
           props.set(className, propMap);
         }
+
+        declarations.push({
+          className,
+          sourcePath,
+          ...(entity !== undefined && { entity }),
+          props: propMap,
+        });
       }
     } catch (err) {
       onWarn?.(`Could not parse JSDoc source file "${sourceFile.getFilePath()}": ${formatUnknownError(err)}`);
     }
   }
 
-  return { entities, props, sourceFileCount: sourceFiles.length, classNames };
+  return { entities, props, sourceFileCount: sourceFiles.length, classNames, declarations };
+}
+
+/** Binds declarations by exact normalized path, with an optional unique fallback for compiled or bundled code. */
+export function bindJsDocToEntitySources(
+  jsDocResult: LoadedJsDocResult,
+  entitySourcePaths: ReadonlyMap<string, string>,
+  options: BindJsDocOptions = {}
+): JsDocResult {
+  const entities: EntityJsDocMap = new Map();
+  const props: PropJsDocMap = new Map();
+  const classNames = new Set<string>();
+
+  for (const [className, sourcePath] of entitySourcePaths) {
+    const canUseTypeScriptFallback =
+      options.allowCompiledSourceFallback === true && !TYPESCRIPT_SOURCE.test(sourcePath);
+    const exactDeclaration = jsDocResult.declarations.find(
+      (candidate) =>
+        candidate.className === className &&
+        normalizeSourcePath(candidate.sourcePath) === normalizeSourcePath(sourcePath)
+    );
+    const fallbackCandidates = jsDocResult.declarations.filter(
+      (candidate) => candidate.className === className && TYPESCRIPT_SOURCE.test(candidate.sourcePath)
+    );
+    if (exactDeclaration === undefined && canUseTypeScriptFallback && fallbackCandidates.length > 1) {
+      const candidatePaths = fallbackCandidates.map((candidate) => candidate.sourcePath).sort();
+      throw new StructuredError({
+        title: 'Ambiguous JSDoc source declarations',
+        detail:
+          `Compiled or bundled metadata for ${className} could not be matched unambiguously because multiple ` +
+          `TypeScript declarations have that class name: ${candidatePaths.join(', ')}.`,
+        impact: [
+          'JSDoc tags and descriptions cannot be applied safely because a candidate may be a DTO or unrelated class.',
+        ],
+        fix: 'Narrow --src (or the `src` option) to the entity source files, or rename same-named non-entity classes.',
+      });
+    }
+    const declaration =
+      exactDeclaration ??
+      (canUseTypeScriptFallback && fallbackCandidates.length === 1 ? fallbackCandidates[0] : undefined);
+    if (declaration === undefined) {
+      continue;
+    }
+
+    classNames.add(className);
+    if (declaration.entity !== undefined) {
+      entities.set(className, declaration.entity);
+    }
+    if (declaration.props.size > 0) {
+      props.set(className, declaration.props);
+    }
+  }
+
+  return { entities, props, sourceFileCount: jsDocResult.sourceFileCount, classNames };
 }
 
 function formatUnknownError(err: unknown): string {

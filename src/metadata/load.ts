@@ -1,6 +1,6 @@
-import * as path from 'node:path';
 import type { EntityClass, EntityMetadata, Options } from '@mikro-orm/core';
 import { EntitySchema, MetadataStorage, MikroORM } from '@mikro-orm/core';
+import { normalizeSourcePath } from '../source-path.js';
 
 /** Errors thrown during metadata loading */
 export class MetadataLoadError extends Error {
@@ -17,6 +17,8 @@ export interface LoadedEntityMetadata {
   metas: EntityMetadata[];
   /** Absolute paths to the source files each entity class was declared in, deduped. */
   sourcePaths: string[];
+  /** Absolute source path for each discovered entity class. */
+  entitySourcePaths: Map<string, string>;
 }
 
 async function closeDiscoveryResources(orm: MikroORM): Promise<void> {
@@ -183,9 +185,12 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
     assertDiscoveredEntitiesAreSupported(all);
 
     const baseDir = orm.config.get('baseDir');
-    const sourcePaths = [...new Set(all.filter((m) => m.path).map((m) => path.resolve(baseDir, m.path)))];
+    const entitySourcePaths = new Map(
+      all.filter((meta) => meta.path).map((meta) => [meta.className, normalizeSourcePath(meta.path, baseDir)])
+    );
+    const sourcePaths = [...new Set(entitySourcePaths.values())];
 
-    return { metas: all, sourcePaths };
+    return { metas: all, sourcePaths, entitySourcePaths };
   } finally {
     await closeDiscoveryResources(orm);
   }

@@ -3,10 +3,12 @@ import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import * as path from 'path';
 import { describe, expect, it, vi } from 'vitest';
-import { loadJsDoc } from '../../src/docs/jsdoc.js';
+import { bindJsDocToEntitySources, loadJsDoc } from '../../src/docs/jsdoc.js';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_GLOB = path.resolve(TEST_DIR, '../fixtures/entities/*.ts');
+const COLLISION_ENTITY_SOURCE = path.resolve(TEST_DIR, '../fixtures/source-identity/entity/CollisionEntity.ts');
+const COLLISION_DTO_SOURCE = path.resolve(TEST_DIR, '../fixtures/source-identity/dto/CollisionEntity.ts');
 
 describe('loadJsDoc', () => {
   it('returns empty maps for empty glob list', () => {
@@ -105,6 +107,41 @@ describe('loadJsDoc', () => {
     const author = result.entities.get('Author');
     expect(author!.erdNamespaces).toHaveLength(0);
     expect(author!.describeNamespaces).toHaveLength(0);
+  });
+
+  it('retains separate source-aware declarations for same-named classes', () => {
+    const result = loadJsDoc([COLLISION_ENTITY_SOURCE, COLLISION_DTO_SOURCE]);
+    const collisions = result.declarations.filter((declaration) => declaration.className === 'CollisionEntity');
+
+    expect(collisions).toHaveLength(2);
+    expect(collisions.map((declaration) => declaration.sourcePath)).toEqual(
+      expect.arrayContaining([COLLISION_ENTITY_SOURCE, COLLISION_DTO_SOURCE])
+    );
+    expect(
+      collisions.find((declaration) => declaration.sourcePath === COLLISION_ENTITY_SOURCE)?.entity?.description
+    ).toBe('Entity source description');
+    expect(collisions.find((declaration) => declaration.sourcePath === COLLISION_DTO_SOURCE)?.entity?.hidden).toBe(
+      true
+    );
+  });
+
+  it('deduplicates symlink aliases before checking compiled-source ambiguity', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-source-alias-'));
+    const aliasPath = path.join(dir, 'CollisionEntity.ts');
+    fs.symlinkSync(COLLISION_ENTITY_SOURCE, aliasPath);
+
+    try {
+      const loaded = loadJsDoc([COLLISION_ENTITY_SOURCE, aliasPath]);
+      const collisions = loaded.declarations.filter((declaration) => declaration.className === 'CollisionEntity');
+
+      expect(collisions).toHaveLength(1);
+      const bound = bindJsDocToEntitySources(loaded, new Map([['CollisionEntity', '/virtual/CollisionEntity']]), {
+        allowCompiledSourceFallback: true,
+      });
+      expect(bound.entities.get('CollisionEntity')?.description).toBe('Entity source description');
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

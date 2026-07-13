@@ -1,5 +1,5 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
-import { type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
+import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
 import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel } from './model/build.js';
@@ -189,8 +189,11 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
   const { orm, title = 'Database Schema', description, src, onWarn, mermaid } = options;
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm, onWarn);
-  const { metas, sourcePaths } = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm);
-  const jsDocResult = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn), onWarn);
+  const { metas, sourcePaths, entitySourcePaths } = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm);
+  const loadedJsDoc = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn), onWarn);
+  const jsDocResult = bindJsDocToEntitySources(loadedJsDoc, entitySourcePaths, {
+    allowCompiledSourceFallback: src !== undefined && src.length > 0,
+  });
   if (src !== undefined && src.length > 0) {
     assertExplicitJsDocSourceCoverage(metas, jsDocResult, src, onWarn);
   }

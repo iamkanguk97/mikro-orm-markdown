@@ -1,4 +1,6 @@
-import { Entity, PrimaryKey, Property } from '@mikro-orm/core';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { Entity, type EntityClass, MetadataStorage, PrimaryKey, Property } from '@mikro-orm/core';
 import { MariaDbDriver } from '@mikro-orm/mariadb';
 import { MySqlDriver } from '@mikro-orm/mysql';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
@@ -7,6 +9,31 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
 import config from '../fixtures/mikro-orm.config.js';
 import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
+import { CollisionEntity } from '../fixtures/source-identity/entity/CollisionEntity.js';
+
+const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
+const COLLISION_ENTITY_SOURCE = path.resolve(TEST_DIR, '../fixtures/source-identity/entity/CollisionEntity.ts');
+const COLLISION_DTO_SOURCE = path.resolve(TEST_DIR, '../fixtures/source-identity/dto/CollisionEntity.ts');
+const COMPILED_IDENTITY_SOURCE = path.resolve(
+  TEST_DIR,
+  '../fixtures/source-identity/compiled/CompiledIdentityEntity.ts'
+);
+const COMPILED_IDENTITY_DUPLICATE = path.resolve(
+  TEST_DIR,
+  '../fixtures/source-identity/compiled-duplicate/CompiledIdentityEntity.ts'
+);
+
+function createCompiledIdentityEntity(metadataPath: string): EntityClass<object> {
+  class CompiledIdentityEntity {}
+  Object.defineProperty(CompiledIdentityEntity, MetadataStorage.PATH_SYMBOL, {
+    value: metadataPath,
+    writable: true,
+  });
+  Entity()(CompiledIdentityEntity);
+  PrimaryKey({ type: 'integer' })(CompiledIdentityEntity.prototype, 'id');
+  Property({ type: 'string' })(CompiledIdentityEntity.prototype, 'name');
+  return CompiledIdentityEntity;
+}
 
 const sqlDriverSmokeCases = [
   ['SQLite', SqliteDriver, ':memory:'],
@@ -151,6 +178,123 @@ describe('generateMarkdown', () => {
     await expect(pending).rejects.toMatchObject({
       structured: { title: 'Entities missing from the explicit src paths' },
     });
+  });
+
+  it('does not let a same-named DTO satisfy explicit src coverage for a TypeScript entity', async () => {
+    const pending = generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [CollisionEntity],
+      },
+      src: [COLLISION_DTO_SOURCE],
+    });
+
+    await expect(pending).rejects.toBeInstanceOf(StructuredError);
+    await expect(pending).rejects.toMatchObject({
+      structured: { title: 'Entities missing from the explicit src paths' },
+    });
+    await expect(pending).rejects.toThrow('CollisionEntity');
+  });
+
+  it('binds the exact normalized TypeScript entity source and ignores same-named DTO JSDoc', async () => {
+    const entitySourceWithParentSegment = `${path.dirname(COLLISION_ENTITY_SOURCE)}${path.sep}..${path.sep}entity${path.sep}CollisionEntity.ts`;
+
+    const md = await generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [CollisionEntity],
+      },
+      src: [entitySourceWithParentSegment, COLLISION_DTO_SOURCE],
+    });
+
+    expect(md).toContain('## EntityNamespace');
+    expect(md).toContain('### CollisionEntity');
+    expect(md).toContain('> Entity source description');
+    expect(md).toContain('| name | string |  |  | Entity name description |');
+    expect(md).not.toContain('DtoNamespace');
+    expect(md).not.toContain('DtoErdNamespace');
+    expect(md).not.toContain('DtoDescribeNamespace');
+    expect(md).not.toContain('DTO poison description');
+    expect(md).not.toContain('DTO poison property description');
+  });
+
+  it('uses the sole class-name candidate when compiled JavaScript metadata points to an explicit TypeScript src', async () => {
+    const CompiledIdentityEntity = createCompiledIdentityEntity('/virtual/dist/CompiledIdentityEntity.js');
+
+    const md = await generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [CompiledIdentityEntity],
+      },
+      src: [COMPILED_IDENTITY_SOURCE],
+    });
+
+    expect(md).toContain('## CompiledSourceNamespace');
+    expect(md).toContain('> Compiled source description');
+    expect(md).toContain('Compiled source name description');
+  });
+
+  it('uses the sole TypeScript candidate for extensionless bundled metadata', async () => {
+    const CompiledIdentityEntity = createCompiledIdentityEntity('/virtual/bundle/CompiledIdentityEntity');
+
+    const md = await generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [CompiledIdentityEntity],
+      },
+      src: [COMPILED_IDENTITY_SOURCE],
+    });
+
+    expect(md).toContain('## CompiledSourceNamespace');
+    expect(md).toContain('> Compiled source description');
+    expect(md).toContain('Compiled source name description');
+  });
+
+  it('keeps the structured coverage error when no TypeScript declaration matches a compiled entity', async () => {
+    const CompiledIdentityEntity = createCompiledIdentityEntity('/virtual/dist/missing/CompiledIdentityEntity.js');
+
+    const pending = generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [CompiledIdentityEntity],
+      },
+      src: [COLLISION_DTO_SOURCE],
+    });
+
+    await expect(pending).rejects.toBeInstanceOf(StructuredError);
+    await expect(pending).rejects.toMatchObject({
+      structured: { title: 'Entities missing from the explicit src paths' },
+    });
+    await expect(pending).rejects.toThrow('CompiledIdentityEntity');
+  });
+
+  it('rejects multiple same-named TypeScript candidates for compiled JavaScript metadata', async () => {
+    const CompiledIdentityEntity = createCompiledIdentityEntity('/virtual/dist/ambiguous/CompiledIdentityEntity.js');
+
+    const pending = generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [CompiledIdentityEntity],
+      },
+      src: [COMPILED_IDENTITY_SOURCE, COMPILED_IDENTITY_DUPLICATE],
+    });
+
+    await expect(pending).rejects.toBeInstanceOf(StructuredError);
+    await expect(pending).rejects.toMatchObject({
+      structured: {
+        title: 'Ambiguous JSDoc source declarations',
+        detail: expect.stringContaining('CompiledIdentityEntity'),
+        fix: expect.stringContaining('--src'),
+      },
+    });
+    await expect(pending).rejects.toThrow(COMPILED_IDENTITY_SOURCE);
+    await expect(pending).rejects.toThrow(COMPILED_IDENTITY_DUPLICATE);
   });
 });
 
