@@ -684,3 +684,65 @@ describe('buildDiagramModel — composite FK-as-PK type resolution', () => {
     expect(entityCTypes).toEqual(['integer', 'uuid']);
   });
 });
+
+describe('buildDiagramModel — cycle-aware FK-as-PK type resolution', () => {
+  function createPkRelationMeta(
+    className: string,
+    targetClassName: string,
+    fieldName: string,
+    referencedColumnName: string
+  ): EntityMetadata {
+    return Object.assign({} as EntityMetadata, {
+      className,
+      tableName: className.toLowerCase(),
+      primaryKeys: ['id'],
+      properties: {
+        id: {
+          name: 'id',
+          fieldNames: [fieldName],
+          referencedColumnNames: [referencedColumnName],
+          type: targetClassName,
+          kind: ReferenceKind.MANY_TO_ONE,
+          primary: true,
+        },
+      },
+    });
+  }
+
+  it('resolves a UUID through six acyclic FK-as-PK hops', () => {
+    const entityA = Object.assign({} as EntityMetadata, {
+      className: 'EntityA',
+      tableName: 'entity_a',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const chain = ['EntityB', 'EntityC', 'EntityD', 'EntityE', 'EntityF', 'EntityG'].map((className, index, names) =>
+      createPkRelationMeta(className, index === 0 ? 'EntityA' : names[index - 1]!, 'id', 'id')
+    );
+
+    const model = buildDiagramModel([entityA, ...chain]);
+    const finalColumns = model.entities
+      .find((entity) => entity.className === 'EntityG')
+      ?.columns.map(({ fieldName, type }) => ({ fieldName, type }));
+
+    expect(finalColumns).toEqual([{ fieldName: 'id', type: 'uuid' }]);
+  });
+
+  it('renders both physical PK columns in a relation cycle as unknown', () => {
+    const entityA = createPkRelationMeta('EntityA', 'EntityB', 'b_id', 'a_id');
+    const entityB = createPkRelationMeta('EntityB', 'EntityA', 'a_id', 'b_id');
+
+    const model = buildDiagramModel([entityA, entityB]);
+    const physicalColumns = model.entities.map(({ className, columns }) => ({
+      className,
+      columns: columns.map(({ fieldName, type }) => ({ fieldName, type })),
+    }));
+
+    expect(physicalColumns).toEqual([
+      { className: 'EntityA', columns: [{ fieldName: 'b_id', type: 'unknown' }] },
+      { className: 'EntityB', columns: [{ fieldName: 'a_id', type: 'unknown' }] },
+    ]);
+  });
+});

@@ -207,6 +207,7 @@ function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, E
 }
 
 interface PrimaryPhysicalField {
+  ownerClassName: string;
   property: EntityProperty;
   fieldName: string;
   fieldIndex: number;
@@ -242,10 +243,19 @@ function resolveFkTypes(
  * Handles supertype-subtype chains where B.id is FK to A, and C.id is FK to B.
  * Physical field identity preserves composite-key alignment at each level of the chain.
  */
-function resolveScalarType(field: PrimaryPhysicalField, metaByClass: Map<string, EntityMetadata>, depth = 0): string {
-  if (depth >= 5) {
-    return 'integer';
+function resolveScalarType(
+  field: PrimaryPhysicalField,
+  metaByClass: Map<string, EntityMetadata>,
+  visitedPath: ReadonlySet<string> = new Set<string>()
+): string {
+  const fieldIdentity = JSON.stringify([field.ownerClassName, field.fieldName]);
+  if (visitedPath.has(fieldIdentity)) {
+    return 'unknown';
   }
+
+  const nextVisitedPath = new Set(visitedPath);
+  nextVisitedPath.add(fieldIdentity);
+
   const type = field.property.type ?? 'integer';
   const refMeta = metaByClass.get(type);
   if (!refMeta) {
@@ -261,11 +271,7 @@ function resolveScalarType(field: PrimaryPhysicalField, metaByClass: Map<string,
       ? primaryFields.find((candidate) => candidate.fieldName === referencedColumnName)
       : undefined;
   const targetField = referencedField ?? primaryFields[field.fieldIndex] ?? primaryFields[0];
-  const nextType = targetField?.property.type ?? type;
-  if (nextType === type) {
-    return type;
-  }
-  return targetField === undefined ? type : resolveScalarType(targetField, metaByClass, depth + 1);
+  return targetField === undefined ? type : resolveScalarType(targetField, metaByClass, nextVisitedPath);
 }
 
 function getPrimaryProps(meta: EntityMetadata): EntityProperty[] {
@@ -284,7 +290,12 @@ function getPrimaryProps(meta: EntityMetadata): EntityProperty[] {
 function getPrimaryPhysicalFields(meta: EntityMetadata): PrimaryPhysicalField[] {
   return getPrimaryProps(meta).flatMap((property) => {
     const fieldNames = property.fieldNames.length > 0 ? property.fieldNames : [property.name];
-    return fieldNames.map((fieldName, fieldIndex) => ({ property, fieldName, fieldIndex }));
+    return fieldNames.map((fieldName, fieldIndex) => ({
+      ownerClassName: meta.className,
+      property,
+      fieldName,
+      fieldIndex,
+    }));
   });
 }
 
