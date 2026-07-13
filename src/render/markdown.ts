@@ -196,6 +196,10 @@ function renderConstraints(constraints: ConstraintModel[]): string {
     const name = c.name ? ` ${renderMarkdownInlineCode(c.name)}` : '';
     const properties = c.properties.map(escapeMarkdownInline).join(', ');
     if (c.type === 'index') {
+      const expression = c.isExpressionUnresolved === true ? '<unresolved expression>' : c.expression;
+      if (expression !== undefined) {
+        return `- Index${name}: expression ${renderMarkdownInlineCode(expression)}`;
+      }
       return `- Index${name}: (${properties})`;
     }
     if (c.type === 'unique') {

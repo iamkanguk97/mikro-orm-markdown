@@ -333,6 +333,55 @@ describe('renderMarkdown — constraints', () => {
     expect(md).toContain('**Constraints:**');
     expect(md).toContain('Index `animal_name_idx`: (name)');
   });
+
+  it('renders resolved and unresolved expression indexes without empty column lists', () => {
+    const docModel: DocumentModel = {
+      title: 'Indexes',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'Account',
+                tableName: 'account',
+                columns: [],
+                isPivot: false,
+                isEmbeddable: false,
+                constraints: [
+                  {
+                    type: 'index',
+                    name: 'lower_email_idx',
+                    properties: [],
+                    expression: 'lower(email_address)',
+                  },
+                  {
+                    type: 'index',
+                    name: 'broken_email_idx',
+                    properties: [],
+                    isExpressionUnresolved: true,
+                  },
+                  { type: 'index', name: 'ordinary_email_idx', properties: ['email_address'] },
+                ],
+              },
+              jsDoc: undefined,
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+
+    expect(md).toContain('- Index `lower_email_idx`: expression `lower(email_address)`');
+    expect(md).toContain('- Index `broken_email_idx`: expression `<unresolved expression>`');
+    expect(md).toContain('- Index `ordinary_email_idx`: (email_address)');
+    expect(md).not.toContain('Index `lower_email_idx`: ()');
+    expect(md).not.toContain('Index `broken_email_idx`: ()');
+  });
 });
 
 describe('renderMarkdown — namespace isolation', () => {
