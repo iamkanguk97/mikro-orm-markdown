@@ -689,8 +689,95 @@ describe('buildDiagramModel — Constraints', () => {
       { type: 'unique', properties: ['email_address'], name: 'property_email_uq' },
       { type: 'unique', properties: ['settings_json'], name: 'account_settings_uq' },
       { type: 'unique', properties: ['organization_id'], name: 'account_org_uq' },
+      {
+        type: 'unique',
+        properties: ['profile_tenant_id', 'profile_id'],
+        name: 'account_profile_uq',
+      },
     ]);
     expect(account.constraints.some((constraint) => constraint.name === 'transient_code_uq')).toBe(false);
+  });
+
+  it('models composite owning one-to-one uniqueness as one ordered constraint', () => {
+    const owner = Object.assign({} as EntityMetadata, {
+      className: 'Account',
+      tableName: 'account',
+      uniques: [{ name: 'account_named_profile_uq', properties: ['namedProfile'] }],
+      properties: {
+        namedProfile: {
+          name: 'namedProfile',
+          fieldNames: ['named_tenant_id', 'named_profile_id'],
+          referencedColumnNames: ['tenant_id', 'id'],
+          type: 'CompositeProfile',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          unique: 'account_named_profile_uq',
+        },
+        implicitProfile: {
+          name: 'implicitProfile',
+          fieldNames: ['implicit_tenant_id', 'implicit_profile_id'],
+          referencedColumnNames: ['tenant_id', 'id'],
+          type: 'CompositeProfile',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          unique: true,
+        },
+        singleProfile: {
+          name: 'singleProfile',
+          fieldNames: ['single_profile_id'],
+          referencedColumnNames: ['id'],
+          type: 'SingleProfile',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          unique: true,
+        },
+      },
+    });
+    const compositeProfile = Object.assign({} as EntityMetadata, {
+      className: 'CompositeProfile',
+      tableName: 'composite_profile',
+      primaryKeys: ['tenant', 'id'],
+      properties: {
+        tenant: {
+          name: 'tenant',
+          fieldNames: ['tenant_id'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          primary: true,
+        },
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const singleProfile = Object.assign({} as EntityMetadata, {
+      className: 'SingleProfile',
+      tableName: 'single_profile',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+
+    const account = buildDiagramModel([owner, compositeProfile, singleProfile]).entities.find(
+      (entity) => entity.className === 'Account'
+    )!;
+
+    expect(
+      account.columns.filter((column) => column.propName === 'namedProfile').map((column) => column.isUnique)
+    ).toEqual([false, false]);
+    expect(
+      account.columns.filter((column) => column.propName === 'implicitProfile').map((column) => column.isUnique)
+    ).toEqual([false, false]);
+    expect(
+      account.columns.filter((column) => column.propName === 'singleProfile').map((column) => column.isUnique)
+    ).toEqual([true]);
+    expect(account.constraints.filter((constraint) => constraint.type === 'unique')).toEqual([
+      {
+        type: 'unique',
+        name: 'account_named_profile_uq',
+        properties: ['named_tenant_id', 'named_profile_id'],
+      },
+      { type: 'unique', properties: ['implicit_tenant_id', 'implicit_profile_id'] },
+    ]);
   });
 
   it('preserves single-field property indexes and deduplicates only an exact tuple', () => {

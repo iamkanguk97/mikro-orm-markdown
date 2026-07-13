@@ -197,6 +197,11 @@ function resolveFormulaExpr(
 function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, EntityMetadata>): ColumnModel[] {
   const fieldNames = prop.fieldNames && prop.fieldNames.length > 0 ? prop.fieldNames : [`${prop.name}_id`];
   const fkTypes = resolveFkTypes(prop, metaByClass, fieldNames.length);
+  const isCompositeOwningOneToOneUnique =
+    prop.kind === ReferenceKind.ONE_TO_ONE &&
+    prop.owner === true &&
+    fieldNames.length > 1 &&
+    (prop.unique === true || typeof prop.unique === 'string');
 
   return fieldNames.map((fieldName, index) => ({
     propName: prop.name,
@@ -204,7 +209,7 @@ function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, E
     type: fkTypes[index] ?? fkTypes[0] ?? 'integer',
     isPrimary: prop.primary === true,
     isForeignKey: true,
-    isUnique: isPropertyColumnUnique(prop),
+    isUnique: isCompositeOwningOneToOneUnique ? false : isPropertyColumnUnique(prop),
     isNullable: prop.nullable === true,
     ...(prop.comment !== undefined && { comment: prop.comment }),
     referencedEntity: prop.type,
@@ -361,11 +366,27 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
   }
 
   for (const prop of Object.values(meta.properties)) {
-    const fieldName = prop.fieldNames?.[0];
+    const fieldNames = prop.fieldNames ?? [];
+    if (
+      prop.kind === ReferenceKind.ONE_TO_ONE &&
+      prop.owner === true &&
+      prop.persist !== false &&
+      fieldNames.length > 1 &&
+      (prop.unique === true || typeof prop.unique === 'string')
+    ) {
+      pushDistinctConstraint(result, uniqueIdentities, {
+        type: 'unique',
+        properties: fieldNames,
+        ...(typeof prop.unique === 'string' && { name: prop.unique }),
+      });
+      continue;
+    }
+
+    const fieldName = fieldNames[0];
     if (
       typeof prop.unique !== 'string' ||
       prop.persist === false ||
-      prop.fieldNames?.length !== 1 ||
+      fieldNames.length !== 1 ||
       fieldName === undefined
     ) {
       continue;
