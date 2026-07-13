@@ -144,7 +144,7 @@ erDiagram
 | username | string | UK |  | Unique login handle. |
 | email | string | UK |  | Contact email (unique). |
 | created_at | datetime |  |  | When the account was created. |
-| profile_id | integer | FK (profile) | Y | Optional one-to-one profile; this side owns the foreign key. |
+| profile_id | integer | FK (profile), UK | Y | Optional one-to-one profile; this side owns the foreign key. |
 
 ### Tag
 
@@ -321,9 +321,9 @@ erDiagram
 | name | string |  |  | Full legal name |
 | email | string |  |  | Billing email. |
 | name_length | integer |  | Y | Number of characters in the name, computed in SQL (no physical column). |
-| address_street | string | [Address] |  | Street line. |
-| address_city | string | [Address] |  | City name. |
-| address_zip_code | string | [Address] | Y | Optional postal / ZIP code. |
+| address_street | string | \[Address\] |  | Street line. |
+| address_city | string | \[Address\] |  | City name. |
+| address_zip_code | string | \[Address\] | Y | Optional postal / ZIP code. |
 
 **Constraints:**
 
