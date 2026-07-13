@@ -13,9 +13,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const testDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(testDir, '../..');
 const cliPath = path.join(repoRoot, 'dist', 'cli.js');
+const exampleDir = path.join(repoRoot, 'examples');
+const committedExampleOutput = path.join(exampleDir, 'ERD.md');
 const exampleConfig = path.join('examples', 'mikro-orm.config.ts');
 const dualDiscoveryConfig = path.join('test', 'fixtures', 'mikro-orm.dual.config.ts');
 const dualDiscoveryTsconfig = path.join('test', 'fixtures', 'tsconfig.dual.json');
+const exampleDescription =
+  'Generated from the entities in examples/entities - a tour of every feature mikro-orm-markdown can render.';
+
+function normalizeLineEndings(value: string): string {
+  return value.replace(/\r\n?/g, '\n');
+}
 
 let outFile: string;
 
@@ -40,6 +48,24 @@ describe('CLI smoke (built bin)', () => {
     const output = fs.readFileSync(outFile, 'utf-8');
     expect(output.startsWith('# Smoke')).toBe(true);
     expect(output).toContain('```mermaid');
+  });
+
+  it('keeps the committed example ERD synchronized with generated output', () => {
+    execFileSync(
+      process.execPath,
+      [cliPath, '-c', 'mikro-orm.config.ts', '-o', outFile, '-t', 'Example Schema', '-d', exampleDescription],
+      {
+        cwd: exampleDir,
+        stdio: 'ignore',
+      }
+    );
+
+    const generatedOutput = normalizeLineEndings(fs.readFileSync(outFile, 'utf-8'));
+    const committedOutput = normalizeLineEndings(fs.readFileSync(committedExampleOutput, 'utf-8'));
+    expect(
+      generatedOutput,
+      'examples/ERD.md is stale; run `npm run example:erd` and commit the generated result.'
+    ).toBe(committedOutput);
   });
 
   it('uses entitiesTs by default for a .ts config with dual discovery paths', () => {
