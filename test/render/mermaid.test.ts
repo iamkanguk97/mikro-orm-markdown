@@ -1045,7 +1045,7 @@ describe('renderErDiagram', () => {
 
     const result = renderErDiagram(model);
 
-    expect(result).toContain('Order_Item {');
+    expect(result).toContain('Order_Item["Order Item"] {');
     expect(result).toContain('string full_name_raw "formula: concat(#quot;first#quot;, #quot;last#quot;) line"');
     expect(result).toContain('Order_Item }o--|| User_Account : "created #quot;by#quot; user"');
     await expect(parseMermaidDiagram(result)).resolves.toMatchObject({ diagramType: 'er' });
