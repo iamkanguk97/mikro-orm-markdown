@@ -75,13 +75,24 @@ export function buildDocumentModel(
     if (jsDoc?.hidden) {
       continue;
     }
-    const columns = model.columns.filter(
-      (col) => !(col.isForeignKey && col.referencedEntity !== undefined && hiddenClasses.has(col.referencedEntity))
+    const hiddenForeignKeyColumns = model.columns.filter(
+      (column) =>
+        column.isForeignKey && column.referencedEntity !== undefined && hiddenClasses.has(column.referencedEntity)
     );
-    const visibleModel = removeHiddenEntityReferences(
-      columns.length === model.columns.length ? model : { ...model, columns },
-      hiddenClasses
-    );
+    const hiddenForeignKeyFieldNames = new Set(hiddenForeignKeyColumns.map((column) => column.fieldName));
+    const visibleModelWithoutHiddenForeignKeys =
+      hiddenForeignKeyFieldNames.size === 0
+        ? model
+        : {
+            ...model,
+            columns: model.columns.filter((column) => !hiddenForeignKeyFieldNames.has(column.fieldName)),
+            constraints: model.constraints.filter(
+              (constraint) =>
+                constraint.type === 'check' ||
+                constraint.properties.every((property) => !hiddenForeignKeyFieldNames.has(property))
+            ),
+          };
+    const visibleModel = removeHiddenEntityReferences(visibleModelWithoutHiddenForeignKeys, hiddenClasses);
     const ownPropDocs = jsDocResult.props.get(model.className) ?? new Map<string, PropJsDocInfo>();
     const propDocs = withEmbeddedPropDocs(ownPropDocs, visibleModel.columns, jsDocResult.props);
     enrichedByClass.set(model.className, { model: visibleModel, jsDoc, propDocs });
