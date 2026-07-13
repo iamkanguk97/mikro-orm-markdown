@@ -144,6 +144,48 @@ describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
     expect(fieldNames).toEqual(['id']);
     expect(fieldNames).not.toContain('secret_id');
   });
+
+  it('drops structured constraints that include a hidden FK column', () => {
+    const order = Object.assign({} as EntityMetadata, {
+      className: 'Order',
+      tableName: 'order',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        status: { name: 'status', fieldNames: ['status'], type: 'string', kind: ReferenceKind.SCALAR },
+        secret: {
+          name: 'secret',
+          fieldNames: ['secret_id'],
+          type: 'Secret',
+          kind: ReferenceKind.MANY_TO_ONE,
+          referencedColumnNames: ['id'],
+        },
+      },
+      indexes: [
+        { name: 'order_secret_lookup_idx', properties: ['status', 'secret'] },
+        { name: 'order_status_idx', properties: ['status'] },
+      ],
+      uniques: [{ name: 'order_secret_uq', properties: ['secret_id'] }],
+      checks: [{ name: 'order_status_check', expression: "status <> ''" }],
+    });
+    const secret = createSimpleEntityMeta('Secret');
+    const jsDoc: JsDocResult = {
+      entities: new Map([['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
+      props: new Map(),
+      sourceFileCount: 0,
+      classNames: new Set(),
+    };
+
+    const docModel = buildDocumentModel([order, secret], jsDoc, 'T');
+    const constraints = docModel.groups
+      .flatMap((group) => group.textEntities)
+      .find((entity) => entity.model.className === 'Order')!.model.constraints;
+
+    expect(constraints).toEqual([
+      { type: 'index', properties: ['status'], name: 'order_status_idx' },
+      { type: 'check', properties: [], expression: "status <> ''", name: 'order_status_check' },
+    ]);
+  });
 });
 
 describe('buildDocumentModel — groups', () => {
