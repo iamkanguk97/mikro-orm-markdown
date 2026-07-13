@@ -1,4 +1,4 @@
-import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
+import { type EntityMetadata, type FormulaTable, ReferenceKind } from '@mikro-orm/core';
 import { describe, expect, it } from 'vitest';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDiagramModel } from '../../src/model/diagram.js';
@@ -170,6 +170,57 @@ describe('buildDiagramModel — @Formula', () => {
     const nameLengthCol = customer!.columns.find((c) => c.propName === 'nameLength');
     // MikroORM applies NamingStrategy to formula properties too: nameLength → name_length
     expect(nameLengthCol!.fieldName).toBe('name_length');
+  });
+
+  it('resolves formula callbacks with physical table, schema, and column metadata', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'SalesOrder',
+      tableName: 'sales_order',
+      schema: 'billing',
+      properties: {
+        grossTotal: {
+          name: 'grossTotal',
+          fieldNames: ['gross_total', 'currency_code'],
+          type: 'decimal',
+          kind: ReferenceKind.SCALAR,
+        },
+        displayTotal: {
+          name: 'displayTotal',
+          fieldNames: ['display_total'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          formula: (table: FormulaTable, columns: Record<string, string>) =>
+            `${table.name}.${columns.grossTotal}|${table.schema}|${table.qualifiedName}|${table.alias}|${String(table)}`,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const displayTotal = model.entities[0]!.columns.find((column) => column.propName === 'displayTotal');
+
+    expect(displayTotal!.formula).toBe('sales_order.gross_total|billing|billing.sales_order|e0|e0');
+  });
+
+  it('keeps a dynamic wildcard schema out of the qualified table name', () => {
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'TenantRecord',
+      tableName: 'tenant_record',
+      schema: '*',
+      properties: {
+        computed: {
+          name: 'computed',
+          fieldNames: ['computed'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          formula: (table: FormulaTable) => `${table.schema}|${table.qualifiedName}`,
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const computed = model.entities[0]!.columns.find((column) => column.propName === 'computed');
+
+    expect(computed!.formula).toBe('undefined|tenant_record');
   });
 
   it('uses a visible fallback when formula resolution fails', () => {
