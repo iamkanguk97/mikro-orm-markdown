@@ -1,8 +1,9 @@
 import * as fs from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
 import {
+  type AtomicWriteFileOperations,
   findNearestTsconfig,
   formatCliError,
   formatCliWarning,
@@ -14,8 +15,24 @@ import {
 } from '../src/cli.js';
 import { StructuredError } from '../src/index.js';
 
+interface MockAtomicWriteFileOperations {
+  mkdir: Mock<AtomicWriteFileOperations['mkdir']>;
+  writeFile: Mock<AtomicWriteFileOperations['writeFile']>;
+  rename: Mock<AtomicWriteFileOperations['rename']>;
+  unlink: Mock<AtomicWriteFileOperations['unlink']>;
+}
+
 describe('CLI helpers', () => {
   let tempDir: string | undefined;
+
+  function createAtomicWriteFileOperations(): MockAtomicWriteFileOperations {
+    return {
+      mkdir: vi.fn<AtomicWriteFileOperations['mkdir']>().mockResolvedValue(undefined),
+      writeFile: vi.fn<AtomicWriteFileOperations['writeFile']>().mockResolvedValue(undefined),
+      rename: vi.fn<AtomicWriteFileOperations['rename']>().mockResolvedValue(undefined),
+      unlink: vi.fn<AtomicWriteFileOperations['unlink']>().mockResolvedValue(undefined),
+    } satisfies AtomicWriteFileOperations;
+  }
 
   afterEach(async () => {
     if (tempDir === undefined) {
@@ -212,12 +229,117 @@ describe('CLI helpers', () => {
     await expect(fs.readFile(outPath, 'utf-8')).resolves.toBe('# ERD\n');
   });
 
-  it('adds output path context when writing fails', async () => {
+  it('atomically replaces an existing output without leaving temporary files', async () => {
     const dir = await createTempDir();
-    const outPath = path.join(dir, 'existing-directory');
-    await fs.mkdir(outPath);
+    const outPath = path.join(dir, 'ERD.md');
+    await fs.writeFile(outPath, '# Old ERD\n', 'utf-8');
 
-    await expect(writeMarkdownFile(outPath, '# ERD\n')).rejects.toThrow(`Cannot write output file: ${outPath}`);
+    await writeMarkdownFile(outPath, '# New ERD\n');
+
+    await expect(fs.readFile(outPath, 'utf-8')).resolves.toBe('# New ERD\n');
+    await expect(fs.readdir(dir)).resolves.toEqual(['ERD.md']);
+  });
+
+  it('writes unique same-directory temporary files before renaming them into place', async () => {
+    const operations = createAtomicWriteFileOperations();
+    const outPath = path.join('virtual', 'docs', 'ERD.md');
+
+    await writeMarkdownFile(outPath, '# First ERD\n', operations);
+    await writeMarkdownFile(outPath, '# Second ERD\n', operations);
+
+    const firstTempPath = operations.writeFile.mock.calls[0]?.[0];
+    const secondTempPath = operations.writeFile.mock.calls[1]?.[0];
+    expect(firstTempPath).toBeDefined();
+    expect(secondTempPath).toBeDefined();
+    expect(path.dirname(firstTempPath!)).toBe(path.dirname(outPath));
+    expect(path.basename(firstTempPath!)).toMatch(/^\.ERD\.md\.[0-9a-f-]+\.tmp$/);
+    expect(secondTempPath).not.toBe(firstTempPath);
+    expect(operations.mkdir).toHaveBeenNthCalledWith(1, path.dirname(outPath));
+    expect(operations.writeFile).toHaveBeenNthCalledWith(1, firstTempPath, '# First ERD\n');
+    expect(operations.rename).toHaveBeenNthCalledWith(1, firstTempPath, outPath);
+    expect(operations.rename).toHaveBeenNthCalledWith(2, secondTempPath, outPath);
+    expect(operations.mkdir.mock.invocationCallOrder[0]).toBeLessThan(
+      operations.writeFile.mock.invocationCallOrder[0]!
+    );
+    expect(operations.writeFile.mock.invocationCallOrder[0]).toBeLessThan(
+      operations.rename.mock.invocationCallOrder[0]!
+    );
+    expect(operations.unlink).not.toHaveBeenCalled();
+  });
+
+  it('preserves the destination and cleans the temporary file when writing fails', async () => {
+    const operations = createAtomicWriteFileOperations();
+    const writeError = Object.assign(new Error('disk full'), { code: 'ENOSPC' });
+    operations.writeFile.mockRejectedValue(writeError);
+    const outPath = path.join('virtual', 'docs', 'ERD.md');
+
+    const failure = await writeMarkdownFile(outPath, '# ERD\n', operations).catch((error: unknown) => error);
+
+    const tempPath = operations.writeFile.mock.calls[0]?.[0];
+    expect(failure).toBeInstanceOf(Error);
+    expect(tempPath).not.toBe(outPath);
+    expect((failure as Error).message).toContain(`Cannot write output file: ${outPath}`);
+    expect((failure as Error).message).toContain('disk full (ENOSPC)');
+    expect((failure as Error & { cause?: unknown }).cause).toBe(writeError);
+    expect(operations.rename).not.toHaveBeenCalled();
+    expect(operations.unlink).toHaveBeenCalledOnce();
+    expect(operations.unlink).toHaveBeenCalledWith(tempPath);
+    expect(operations.unlink).not.toHaveBeenCalledWith(outPath);
+  });
+
+  it('preserves the destination and cleans the temporary file when rename fails', async () => {
+    const operations = createAtomicWriteFileOperations();
+    const renameError = Object.assign(new Error('rename failed'), { code: 'EACCES' });
+    operations.rename.mockRejectedValue(renameError);
+    const outPath = path.join('virtual', 'docs', 'ERD.md');
+
+    const failure = await writeMarkdownFile(outPath, '# ERD\n', operations).catch((error: unknown) => error);
+
+    const tempPath = operations.writeFile.mock.calls[0]?.[0];
+    expect(failure).toBeInstanceOf(Error);
+    expect(tempPath).not.toBe(outPath);
+    expect((failure as Error).message).toContain(`Cannot write output file: ${outPath}`);
+    expect((failure as Error).message).toContain('rename failed (EACCES)');
+    expect((failure as Error & { cause?: unknown }).cause).toBe(renameError);
+    expect(operations.rename).toHaveBeenCalledWith(tempPath, outPath);
+    expect(operations.unlink).toHaveBeenCalledOnce();
+    expect(operations.unlink).toHaveBeenCalledWith(tempPath);
+    expect(operations.unlink).not.toHaveBeenCalledWith(outPath);
+  });
+
+  it('does not remove a colliding temporary file owned by another writer', async () => {
+    const operations = createAtomicWriteFileOperations();
+    const collisionError = Object.assign(new Error('temporary file already exists'), { code: 'EEXIST' });
+    operations.writeFile.mockRejectedValue(collisionError);
+    const outPath = path.join('virtual', 'docs', 'ERD.md');
+
+    const failure = await writeMarkdownFile(outPath, '# ERD\n', operations).catch((error: unknown) => error);
+
+    const tempPath = operations.writeFile.mock.calls[0]?.[0];
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error & { cause?: unknown }).cause).toBe(collisionError);
+    expect(tempPath).not.toBe(outPath);
+    expect(operations.rename).not.toHaveBeenCalled();
+    expect(operations.unlink).not.toHaveBeenCalled();
+  });
+
+  it('keeps the rename failure primary when temporary-file cleanup also fails', async () => {
+    const operations = createAtomicWriteFileOperations();
+    const renameError = Object.assign(new Error('rename failed'), { code: 'EACCES' });
+    const cleanupError = Object.assign(new Error('cleanup failed'), { code: 'EBUSY' });
+    operations.rename.mockRejectedValue(renameError);
+    operations.unlink.mockRejectedValue(cleanupError);
+    const outPath = path.join('virtual', 'docs', 'ERD.md');
+
+    const failure = await writeMarkdownFile(outPath, '# ERD\n', operations).catch((error: unknown) => error);
+
+    const tempPath = operations.writeFile.mock.calls[0]?.[0];
+    expect(failure).toBeInstanceOf(Error);
+    expect((failure as Error & { cause?: unknown }).cause).toBe(renameError);
+    expect((failure as Error).message).toContain(`Cannot remove temporary output file: ${tempPath}`);
+    expect((failure as Error).message).toContain('cleanup failed (EBUSY)');
+    expect(operations.unlink).toHaveBeenCalledWith(tempPath);
+    expect(operations.unlink).not.toHaveBeenCalledWith(outPath);
   });
 });
 
