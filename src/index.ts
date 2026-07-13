@@ -231,7 +231,7 @@ async function loadEntityMetadataWithTsMorphFallback(
 export async function generateMarkdown(options: GenerateMarkdownOptions): Promise<string> {
   const { orm, title = 'Database Schema', description, src, onWarn, mermaid } = options;
 
-  const effectiveOrm = await withTsMorphMetadataProvider(orm, onWarn);
+  const effectiveOrm = await withTsMorphMetadataProvider(orm);
   const { metas, sourcePaths, entitySourcePaths } = await loadEntityMetadataWithTsMorphFallback(
     orm,
     effectiveOrm,
