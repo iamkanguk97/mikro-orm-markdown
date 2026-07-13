@@ -1,12 +1,22 @@
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Entity, type EntityClass, Formula, MetadataStorage, PrimaryKey, Property } from '@mikro-orm/core';
+import {
+  Entity,
+  type EntityClass,
+  Formula,
+  MetadataStorage,
+  PrimaryKey,
+  Property,
+  ReflectMetadataProvider,
+} from '@mikro-orm/core';
 import { MariaDbDriver } from '@mikro-orm/mariadb';
 import { MySqlDriver } from '@mikro-orm/mysql';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
+import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
+import { MetadataLoadError } from '../../src/metadata/load.js';
 import { CoverageAddress, UnusedCoverageAddress } from '../fixtures/embeddable-coverage/Address.js';
 import {
   ErdOnlyEmbeddedOwner,
@@ -117,11 +127,12 @@ describe('generateMarkdown', () => {
     expect(md2).toContain('| name | string |');
   });
 
-  it('falls back to the default provider for explicit-type runtime entities when TsMorph has no source file', async () => {
+  it('falls back to the default provider with a structured warning when TsMorph has no source file', async () => {
     class RuntimeJsUser {}
     Entity()(RuntimeJsUser);
     PrimaryKey({ type: 'integer' })(RuntimeJsUser.prototype, 'id');
     Property({ type: 'string' })(RuntimeJsUser.prototype, 'name');
+    const structuredWarnings: StructuredMessage[] = [];
 
     const md = await generateMarkdown({
       orm: {
@@ -130,11 +141,74 @@ describe('generateMarkdown', () => {
         entities: [RuntimeJsUser],
       },
       title: 'Runtime JS',
+      onWarn: (_message: string, warning?: StructuredMessage) => {
+        if (warning !== undefined) {
+          structuredWarnings.push(warning);
+        }
+      },
     });
 
     expect(md.startsWith('# Runtime JS')).toBe(true);
     expect(md).toContain('### RuntimeJsUser');
     expect(md).toContain('| name | string |');
+    expect(structuredWarnings).toContainEqual(
+      expect.objectContaining({
+        title: 'TypeScript metadata source unavailable',
+        detail: expect.stringContaining('original metadata provider'),
+        fix: expect.stringContaining('entitiesTs'),
+      })
+    );
+  });
+
+  it('does not hide arbitrary failures from the auto-injected metadata provider', async () => {
+    const injectedFailure = new Error('Source file parser not found arbitrary failure');
+    vi.spyOn(TsMorphMetadataProvider.prototype, 'loadEntityMetadata').mockImplementation(() => {
+      throw injectedFailure;
+    });
+
+    const error = await generateMarkdown({ orm: config }).then(
+      () => undefined,
+      (cause: unknown) => cause
+    );
+
+    expect(error).toBeInstanceOf(MetadataLoadError);
+    expect((error as MetadataLoadError).cause).toBe(injectedFailure);
+  });
+
+  it('keeps the auto-injected provider failure primary when fallback also fails', async () => {
+    class RuntimeJsUser {}
+    Entity()(RuntimeJsUser);
+    PrimaryKey({ type: 'integer' })(RuntimeJsUser.prototype, 'id');
+    Property({ type: 'string' })(RuntimeJsUser.prototype, 'name');
+    const fallbackFailure = new Error('configured provider failed');
+    const fallbackSpy = vi.spyOn(ReflectMetadataProvider.prototype, 'loadEntityMetadata').mockImplementation(() => {
+      throw fallbackFailure;
+    });
+    const structuredWarnings: StructuredMessage[] = [];
+
+    const error = await generateMarkdown({
+      orm: {
+        driver: SqliteDriver,
+        dbName: ':memory:',
+        entities: [RuntimeJsUser],
+      },
+      onWarn: (_message: string, warning?: StructuredMessage) => {
+        if (warning !== undefined) {
+          structuredWarnings.push(warning);
+        }
+      },
+    }).then(
+      () => undefined,
+      (cause: unknown) => cause
+    );
+
+    expect(fallbackSpy).toHaveBeenCalled();
+    expect(error).toBeInstanceOf(MetadataLoadError);
+    expect((error as MetadataLoadError).cause).toMatchObject({ name: 'MissingTsMorphSourceError' });
+    expect((error as MetadataLoadError).cause).not.toBe(fallbackFailure);
+    expect(structuredWarnings).not.toContainEqual(
+      expect.objectContaining({ title: 'TypeScript metadata source unavailable' })
+    );
   });
 
   it.each(

@@ -1,6 +1,14 @@
 import type { Options } from '@mikro-orm/core';
 import { emitWarning, type WarnHandler } from './messages.js';
 
+/** Proves that TsMorph checked both declaration and TypeScript sources and found neither. */
+export class MissingTsMorphSourceError extends Error {
+  constructor(readonly sourcePath: string) {
+    super(`No TypeScript metadata source was found for '${sourcePath}'.`);
+    this.name = 'MissingTsMorphSourceError';
+  }
+}
+
 /**
  * When the config does not choose a metadata provider, opt into
  * `TsMorphMetadataProvider` if `@mikro-orm/reflection` is installed.
@@ -18,7 +26,24 @@ export async function withTsMorphMetadataProvider(options: Options, onWarn?: War
 
   try {
     const { TsMorphMetadataProvider } = await import('@mikro-orm/reflection');
-    return { ...options, metadataProvider: TsMorphMetadataProvider };
+    type ReflectionSourceFile = ReturnType<InstanceType<typeof TsMorphMetadataProvider>['getExistingSourceFile']>;
+    class FallbackAwareTsMorphMetadataProvider extends TsMorphMetadataProvider {
+      override getExistingSourceFile(path: string, ext?: string, validate = true): ReflectionSourceFile {
+        const source =
+          ext === undefined
+            ? ((super.getExistingSourceFile(path, '.d.ts', false) as ReflectionSourceFile | undefined) ??
+              (super.getExistingSourceFile(path, '.ts', false) as ReflectionSourceFile | undefined))
+            : (super.getExistingSourceFile(path, ext, false) as ReflectionSourceFile | undefined);
+
+        if (source === undefined && validate) {
+          throw new MissingTsMorphSourceError(path);
+        }
+
+        return source as ReflectionSourceFile;
+      }
+    }
+
+    return { ...options, metadataProvider: FallbackAwareTsMorphMetadataProvider };
   } catch (err) {
     const code =
       err !== null && typeof err === 'object' && 'code' in err ? (err as NodeJS.ErrnoException).code : undefined;
