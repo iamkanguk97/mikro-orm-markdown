@@ -561,7 +561,7 @@ function buildEdge(fromEntity: string, prop: EntityProperty): RelationEdge | nul
     return {
       fromEntity,
       toEntity: prop.type,
-      fromCardinality: '||',
+      fromCardinality: 'o|',
       toCardinality: isNullable ? 'o|' : '||',
       label: prop.name,
     };

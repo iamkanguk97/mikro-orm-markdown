@@ -128,7 +128,7 @@ erDiagram
     integer author_id
     integer parent_id "self-ref"
   }
-  User ||--o| Profile : "profile"
+  User o|--o| Profile : "profile"
   Post }o--|| User : "author"
   Post }o--|{ Tag : "tags"
   Comment }o--|| Post : "post"

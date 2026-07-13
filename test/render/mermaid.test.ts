@@ -379,7 +379,7 @@ describe('buildDiagramModel — self-reference', () => {
     expect(result).not.toContain('Node ||');
   });
 
-  it('non-self-referencing 1:1 still produces a relation edge as before', () => {
+  it('non-null owning 1:1 keeps inverse participation optional', () => {
     const userMeta = Object.assign({} as EntityMetadata, {
       className: 'User',
       tableName: 'user',
@@ -412,11 +412,51 @@ describe('buildDiagramModel — self-reference', () => {
     expect(model.relations[0]).toMatchObject({
       fromEntity: 'User',
       toEntity: 'Profile',
-      fromCardinality: '||',
+      fromCardinality: 'o|',
       toCardinality: '||',
       label: 'profile',
     });
-    expect(renderErDiagram(model)).toContain('User ||--|| Profile : "profile"');
+    expect(renderErDiagram(model)).toContain('User o|--|| Profile : "profile"');
+  });
+
+  it('nullable owning 1:1 keeps both inverse participation and target optional', () => {
+    const userMeta = Object.assign({} as EntityMetadata, {
+      className: 'User',
+      tableName: 'user',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        profile: {
+          name: 'profile',
+          type: 'Profile',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          fieldNames: ['profile_id'],
+          unique: true,
+          nullable: true,
+        },
+      },
+    });
+    const profileMeta = Object.assign({} as EntityMetadata, {
+      className: 'Profile',
+      tableName: 'profile',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+
+    const model = buildDiagramModel([userMeta, profileMeta]);
+
+    expect(model.relations).toHaveLength(1);
+    expect(model.relations[0]).toMatchObject({
+      fromEntity: 'User',
+      toEntity: 'Profile',
+      fromCardinality: 'o|',
+      toCardinality: 'o|',
+      label: 'profile',
+    });
+    expect(renderErDiagram(model)).toContain('User o|--o| Profile : "profile"');
   });
 });
 
