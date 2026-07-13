@@ -51,6 +51,7 @@ erDiagram
 **Constraints:**
 
 - Index `animal_name_idx`: (name)
+- Index: (type)
 
 ### Dog
 
@@ -70,6 +71,7 @@ erDiagram
 **Constraints:**
 
 - Index `animal_name_idx`: (name)
+- Index: (type)
 
 ### Cat
 
@@ -89,6 +91,7 @@ erDiagram
 **Constraints:**
 
 - Index `animal_name_idx`: (name)
+- Index: (type)
 
 ## Blog
 
@@ -184,6 +187,10 @@ erDiagram
 | author_id | integer | FK (author) |  | Author of the post (required — non-null relation). |
 | body_length | integer |  | Y | Character length of the body, computed in SQL at query time (no physical column). |
 
+**Constraints:**
+
+- Index: (author_id)
+
 **Computed columns:**
 
 - `body_length`: `LENGTH(body)`
@@ -201,6 +208,12 @@ erDiagram
 | post_id | integer | FK (post) |  | The post being commented on (required). |
 | author_id | integer | FK (author) | Y | The commenting user, or null for anonymous guests (nullable relation). |
 | parent_id | integer | FK (parent) | Y | Parent comment when this is a threaded reply (self-reference). |
+
+**Constraints:**
+
+- Index: (post_id)
+- Index: (author_id)
+- Index: (parent_id)
 
 ## Reporting
 
@@ -292,6 +305,11 @@ erDiagram
 | order_id | integer | FK (order) |  | The parent order (required). |
 | product_id | integer | FK (product) |  | The product being ordered (required). |
 
+**Constraints:**
+
+- Index: (order_id)
+- Index: (product_id)
+
 ### Order
 
 *Table: `order`*
@@ -307,6 +325,7 @@ erDiagram
 
 **Constraints:**
 
+- Index: (customer_id)
 - Check `order_total_non_negative`: `total_cents >= 0`
 
 ### Customer
