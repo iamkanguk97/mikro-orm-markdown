@@ -45,8 +45,10 @@ export interface ConstraintModel {
   name?: string;
   /** DB field names covered by the constraint. */
   properties: string[];
-  /** For check constraints: the raw SQL expression. */
+  /** Raw SQL for a check constraint or an expression index. */
   expression?: string;
+  /** True when an expression index callback could not be represented safely. */
+  isExpressionUnresolved?: true;
 }
 
 /** A directed relation edge from the owning side to the referenced side. */

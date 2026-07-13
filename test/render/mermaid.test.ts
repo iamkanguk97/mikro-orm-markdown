@@ -1,4 +1,4 @@
-import { type EntityMetadata, type FormulaTable, ReferenceKind } from '@mikro-orm/core';
+import { type EntityMetadata, type FormulaTable, type IndexCallback, ReferenceKind } from '@mikro-orm/core';
 import { describe, expect, it } from 'vitest';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDiagramModel } from '../../src/model/diagram.js';
@@ -861,14 +861,62 @@ describe('buildDiagramModel — Constraints', () => {
       { type: 'index', properties: ['email_address'], name: 'email_entity_idx' },
       { type: 'index', properties: ['first_order', 'second_order'], name: 'ordered_idx' },
       { type: 'index', properties: ['second_order', 'first_order'], name: 'ordered_idx' },
-      { type: 'index', properties: [] },
-      { type: 'index', properties: [] },
+      { type: 'index', properties: [], expression: 'lower(email_address)' },
+      { type: 'index', properties: [], expression: 'upper(email_address)' },
       { type: 'index', properties: ['is_active'] },
       { type: 'index', properties: ['preferences_json'], name: 'preferences_idx' },
       { type: 'index', properties: ['organization_id'], name: 'organization_idx' },
     ]);
     expect(indexes.some((constraint) => constraint.name === 'transient_search_idx')).toBe(false);
     expect(indexes.some((constraint) => constraint.name === 'composite_relation_idx')).toBe(false);
+  });
+
+  it('resolves expression indexes or records an explicit unresolved state', () => {
+    const callbackExpression: IndexCallback<Record<string, unknown>> = (
+      table: { name: string; schema?: string; toString: () => string },
+      columns: Record<string, string>,
+      indexName: string
+    ): string => `create index ${indexName} on ${table} (${columns.email})`;
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'Account',
+      tableName: 'account_entry',
+      schema: 'audit',
+      indexes: [
+        { name: 'lower_email_idx', expression: 'lower(email_address)' },
+        { name: 'callback_email_idx', expression: callbackExpression },
+        {
+          name: 'failing_email_idx',
+          expression: () => {
+            throw new Error('cannot resolve index');
+          },
+        },
+        { name: 'non_string_email_idx', expression: () => ({ sql: 'lower(email_address)' }) as unknown as string },
+        { name: 'ordinary_email_idx', properties: ['email'] },
+      ],
+      properties: {
+        email: {
+          name: 'email',
+          fieldNames: ['email_address'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+        },
+      },
+    });
+
+    const account = buildDiagramModel([meta]).entities[0]!;
+
+    expect(account.constraints).toEqual([
+      { type: 'index', name: 'lower_email_idx', properties: [], expression: 'lower(email_address)' },
+      {
+        type: 'index',
+        name: 'callback_email_idx',
+        properties: [],
+        expression: 'create index callback_email_idx on audit.account_entry (email_address)',
+      },
+      { type: 'index', name: 'failing_email_idx', properties: [], isExpressionUnresolved: true },
+      { type: 'index', name: 'non_string_email_idx', properties: [], isExpressionUnresolved: true },
+      { type: 'index', name: 'ordinary_email_idx', properties: ['email_address'] },
+    ]);
   });
 });
 

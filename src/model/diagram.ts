@@ -1,4 +1,4 @@
-import type { EntityMetadata, EntityProperty, FormulaTable } from '@mikro-orm/core';
+import type { EntityMetadata, EntityProperty, FormulaTable, IndexCallback } from '@mikro-orm/core';
 import { ReferenceKind } from '@mikro-orm/core';
 import type { ColumnModel, ConstraintModel, DiagramModel, EntityModel, RelationEdge } from './types.js';
 
@@ -177,20 +177,47 @@ function resolveFormulaExpr(
       qualifiedName: schema ? `${schema}.${owningMeta.tableName}` : owningMeta.tableName,
       toString: () => FORMULA_ALIAS,
     };
-    const columns: Record<string, string> = {};
-    for (const property of Object.values(owningMeta.properties)) {
-      const fieldName = property.fieldNames?.[0];
-      if (fieldName !== undefined) {
-        columns[property.name] = fieldName;
-      }
-    }
-
-    const result = cb(table, columns);
+    const result = cb(table, buildPhysicalColumnMapping(owningMeta));
     // The callback is typed to return a string, but a misbehaving formula can
     // return anything; coerce so downstream string handling never crashes.
     return typeof result === 'string' ? result : String(result);
   } catch {
     return UNRESOLVED_FORMULA;
+  }
+}
+
+function buildPhysicalColumnMapping(meta: EntityMetadata): Record<string, string> {
+  const columns: Record<string, string> = {};
+  for (const property of Object.values(meta.properties)) {
+    const fieldName = property.fieldNames?.[0];
+    if (fieldName !== undefined) {
+      columns[property.name] = fieldName;
+    }
+  }
+  return columns;
+}
+
+function resolveIndexExpression(
+  expression: string | IndexCallback<Record<string, unknown>>,
+  meta: EntityMetadata,
+  indexName: string | undefined
+): string | undefined {
+  if (typeof expression === 'string') {
+    return expression;
+  }
+
+  try {
+    const schema = meta.schema === '*' ? undefined : meta.schema;
+    const tableName = meta.tableName;
+    const table = {
+      name: tableName,
+      ...(schema !== undefined && { schema }),
+      toString: (): string => (schema ? `${schema}.${tableName}` : tableName),
+    };
+    const result = expression(table, buildPhysicalColumnMapping(meta), indexName ?? '');
+    return typeof result === 'string' ? result : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -324,14 +351,20 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
 
   for (const idx of meta.indexes ?? []) {
     const props = idx.properties;
+    const expression =
+      idx.expression === undefined
+        ? undefined
+        : resolveIndexExpression(idx.expression as string | IndexCallback<Record<string, unknown>>, meta, idx.name);
     const constraint: ConstraintModel = {
       type: 'index',
       properties: resolveConstraintProperties(meta, props),
       ...(idx.name !== undefined && { name: idx.name }),
+      ...(expression !== undefined && { expression }),
+      ...(idx.expression !== undefined && expression === undefined && { isExpressionUnresolved: true }),
     };
 
-    // Expression indexes have no property tuple until their expression is
-    // modelled separately, so they cannot share this tuple-based identity.
+    // Preserve expression declarations independently: an unresolved callback
+    // does not expose enough stable information for tuple-based deduplication.
     if (idx.expression !== undefined) {
       result.push(constraint);
       continue;
