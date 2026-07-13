@@ -7,6 +7,7 @@ import type { ColumnModel, EntityModel, RelationEdge } from './types.js';
 // Mermaid cardinality tokens upgrading the "many" side from zero-or-more to one-or-more.
 const FROM_ONE_OR_MORE = '}|';
 const TO_ONE_OR_MORE = '|{';
+const DEFAULT_NAMESPACE = 'default';
 
 /** An entity with its structural model and JSDoc info merged together. */
 export interface EnrichedEntity {
@@ -100,17 +101,17 @@ export function buildDocumentModel(
     }
   }
   if (anyUntagged) {
-    groupNames.add('default');
+    groupNames.add(DEFAULT_NAMESPACE);
   }
 
   const groups: NamespaceGroup[] = [];
   for (const groupName of groupNames) {
-    const isDefault = groupName === 'default';
+    const isDefault = groupName === DEFAULT_NAMESPACE;
 
     const erdEntities = [...enrichedByClass.values()]
       .filter(({ jsDoc }) => belongsToGroupForErd(jsDoc, groupName, isDefault))
       .map((entity): EnrichedEntity | null => {
-        if (isCrossNamespaceInGroup(entity.jsDoc, groupName, isDefault)) {
+        if (isCrossNamespaceInGroup(entity.jsDoc, groupName)) {
           const pkColumns = entity.model.columns.filter((col) => col.isPrimary);
           // If no PK columns remain (e.g. FK-as-PK to a @hidden entity was filtered out),
           // exclude the entity entirely: an empty box with dangling arrows is misleading.
@@ -135,10 +136,10 @@ export function buildDocumentModel(
 
   // Sort alphabetically; "default" is always last.
   groups.sort((a, b) => {
-    if (a.name === 'default') {
+    if (a.name === DEFAULT_NAMESPACE) {
       return 1;
     }
-    if (b.name === 'default') {
+    if (b.name === DEFAULT_NAMESPACE) {
       return -1;
     }
     return a.name.localeCompare(b.name);
@@ -262,23 +263,15 @@ function hasNoNamespaceTags(jsDoc: EntityJsDocInfo | undefined): boolean {
 }
 
 function belongsToGroupForErd(jsDoc: EntityJsDocInfo | undefined, groupName: string, isDefault: boolean): boolean {
-  if (isDefault) {
-    return hasNoNamespaceTags(jsDoc);
-  }
-  if (!jsDoc) {
-    return false;
-  }
-  return jsDoc.namespaces.includes(groupName) || jsDoc.erdNamespaces.includes(groupName);
+  const isExplicitlyIncluded =
+    jsDoc !== undefined && (jsDoc.namespaces.includes(groupName) || jsDoc.erdNamespaces.includes(groupName));
+  return isExplicitlyIncluded || (isDefault && hasNoNamespaceTags(jsDoc));
 }
 
 function belongsToGroupForText(jsDoc: EntityJsDocInfo | undefined, groupName: string, isDefault: boolean): boolean {
-  if (isDefault) {
-    return hasNoNamespaceTags(jsDoc);
-  }
-  if (!jsDoc) {
-    return false;
-  }
-  return jsDoc.namespaces.includes(groupName) || jsDoc.describeNamespaces.includes(groupName);
+  const isExplicitlyIncluded =
+    jsDoc !== undefined && (jsDoc.namespaces.includes(groupName) || jsDoc.describeNamespaces.includes(groupName));
+  return isExplicitlyIncluded || (isDefault && hasNoNamespaceTags(jsDoc));
 }
 
 /**
@@ -286,8 +279,8 @@ function belongsToGroupForText(jsDoc: EntityJsDocInfo | undefined, groupName: st
  * home section is another namespace. Entities with only @erd tags have no text
  * home section, so their ERD section renders the full model.
  */
-function isCrossNamespaceInGroup(jsDoc: EntityJsDocInfo | undefined, groupName: string, isDefault: boolean): boolean {
-  if (isDefault || !jsDoc) {
+function isCrossNamespaceInGroup(jsDoc: EntityJsDocInfo | undefined, groupName: string): boolean {
+  if (!jsDoc) {
     return false;
   }
   const hasHomeNamespace = jsDoc.namespaces.length > 0 || jsDoc.describeNamespaces.length > 0;
