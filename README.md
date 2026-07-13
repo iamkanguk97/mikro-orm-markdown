@@ -161,8 +161,12 @@ This turns the ERD edge `Post }o--|| Author` into `Post }|--|| Author`. It is a 
 
 A relation edge has **two ends, set independently**:
 
-- **Singular side** (`@ManyToOne`, or the owning `@OneToOne`) — read from your schema automatically, no tag needed: _exactly-one_ (`||`) by default, or _zero-or-one_ (`o|`) when `nullable: true`.
-- **Collection side** (`@OneToMany` / `@ManyToMany`) — _zero-or-more_ by default; `@atLeastOne` raises that side to _one-or-more_. Mermaid uses `}o` → `}|` or `o{` → `|{` depending on which side of the edge the collection is rendered on.
+- **FK target side** (`@ManyToOne`, or the owning `@OneToOne`) — read from your schema automatically, no tag needed: _exactly-one_ (`||`) by default, or _zero-or-one_ (`o|`) when `nullable: true`.
+- **Many-to-one collection side** — _zero-or-more_ by default; `@atLeastOne` raises that side to _one-or-more_. Mermaid uses `}o` → `}|` depending on which side of the edge the collection is rendered on.
+- **Owning one-to-one inverse side** — always _zero-or-one_ (`o|`) from the physical schema. A unique FK guarantees that at most one owner can reference a target row, but it does not require every target row to be referenced.
+- **Many-to-many collection side** — _zero-or-more_ by default; `@atLeastOne` raises that side to _one-or-more_. Mermaid uses `}o` → `}|` or `o{` → `|{` depending on which side of the edge the collection is rendered on.
+
+Therefore an owning one-to-one renders as `Owner o|--|| Target` for a non-null FK and `Owner o|--o| Target` for a nullable FK. The marker next to `Owner` describes how many owner rows may reference one target row; FK nullability controls only the marker next to `Target`.
 
 The four combinations (`Post` ↔ `Author`):
 
