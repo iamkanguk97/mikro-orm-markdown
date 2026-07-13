@@ -196,11 +196,12 @@ function renderConstraints(constraints: ConstraintModel[]): string {
     const name = c.name ? ` ${renderMarkdownInlineCode(c.name)}` : '';
     const properties = c.properties.map(escapeMarkdownInline).join(', ');
     if (c.type === 'index') {
+      const predicate = c.predicate === undefined ? '' : ` where ${renderMarkdownInlineCode(c.predicate)}`;
       const expression = c.isExpressionUnresolved === true ? '<unresolved expression>' : c.expression;
       if (expression !== undefined) {
-        return `- Index${name}: expression ${renderMarkdownInlineCode(expression)}`;
+        return `- Index${name}: expression ${renderMarkdownInlineCode(expression)}${predicate}`;
       }
-      return `- Index${name}: (${properties})`;
+      return `- Index${name}: (${properties})${predicate}`;
     }
     if (c.type === 'unique') {
       return `- Unique${name}: (${properties})`;

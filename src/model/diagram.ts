@@ -221,6 +221,39 @@ function resolveIndexExpression(
   }
 }
 
+function resolveIndexPredicate(indexType: unknown): string | undefined {
+  if (typeof indexType !== 'object' || indexType === null || !('predicate' in indexType)) {
+    return undefined;
+  }
+
+  const predicate = indexType.predicate;
+  if (typeof predicate !== 'object' || predicate === null || !('toQuery' in predicate)) {
+    return undefined;
+  }
+
+  const toQuery = predicate.toQuery;
+  if (typeof toQuery !== 'function') {
+    return undefined;
+  }
+
+  try {
+    const query = toQuery.call(predicate);
+    if (typeof query !== 'string') {
+      return undefined;
+    }
+
+    const normalized = query.trim();
+    const prefix = /^select\s+\*\s+where\s+/i.exec(normalized)?.[0];
+    if (prefix === undefined) {
+      return undefined;
+    }
+
+    return normalized.slice(prefix.length).trim() || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, EntityMetadata>): ColumnModel[] {
   const fieldNames = prop.fieldNames && prop.fieldNames.length > 0 ? prop.fieldNames : [`${prop.name}_id`];
   const fkTypes = resolveFkTypes(prop, metaByClass, fieldNames.length);
@@ -351,6 +384,7 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
 
   for (const idx of meta.indexes ?? []) {
     const props = idx.properties;
+    const predicate = resolveIndexPredicate(idx.type);
     const expression =
       idx.expression === undefined
         ? undefined
@@ -361,6 +395,7 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
       ...(idx.name !== undefined && { name: idx.name }),
       ...(expression !== undefined && { expression }),
       ...(idx.expression !== undefined && expression === undefined && { isExpressionUnresolved: true }),
+      ...(predicate !== undefined && { predicate }),
     };
 
     // Preserve expression declarations independently: an unresolved callback
@@ -448,7 +483,14 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
 }
 
 function pushDistinctConstraint(result: ConstraintModel[], identities: Set<string>, constraint: ConstraintModel): void {
-  const identity = JSON.stringify([constraint.type, constraint.name ?? null, constraint.properties]);
+  const identity = JSON.stringify([
+    constraint.type,
+    constraint.name ?? null,
+    constraint.properties,
+    constraint.expression ?? null,
+    constraint.isExpressionUnresolved ?? false,
+    constraint.predicate ?? null,
+  ]);
   if (identities.has(identity)) {
     return;
   }

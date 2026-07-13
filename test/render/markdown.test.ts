@@ -382,6 +382,56 @@ describe('renderMarkdown — constraints', () => {
     expect(md).not.toContain('Index `lower_email_idx`: ()');
     expect(md).not.toContain('Index `broken_email_idx`: ()');
   });
+
+  it('renders partial-index predicates separately and escapes them as inline code', () => {
+    const docModel: DocumentModel = {
+      title: 'Partial indexes',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'Account',
+                tableName: 'account',
+                columns: [],
+                isPivot: false,
+                isEmbeddable: false,
+                constraints: [
+                  { type: 'index', name: 'email_idx', properties: ['email_address'] },
+                  {
+                    type: 'index',
+                    name: 'partial_email_idx',
+                    properties: ['email_address'],
+                    predicate: 'status = `active` AND deleted_at IS NULL',
+                  },
+                  {
+                    type: 'index',
+                    name: 'lower_email_idx',
+                    properties: [],
+                    expression: 'lower(email_address)',
+                    predicate: 'deleted_at IS NULL',
+                  },
+                ],
+              },
+              jsDoc: undefined,
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+
+    expect(md).toContain('- Index `email_idx`: (email_address)');
+    expect(md).toContain(
+      '- Index `partial_email_idx`: (email_address) where ``status = `active` AND deleted_at IS NULL``'
+    );
+    expect(md).toContain('- Index `lower_email_idx`: expression `lower(email_address)` where `deleted_at IS NULL`');
+  });
 });
 
 describe('renderMarkdown — namespace isolation', () => {

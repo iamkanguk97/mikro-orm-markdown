@@ -918,6 +918,85 @@ describe('buildDiagramModel — Constraints', () => {
       { type: 'index', name: 'ordinary_email_idx', properties: ['email_address'] },
     ]);
   });
+
+  it('preserves partial-index predicates independently from fields and expressions', () => {
+    const activePredicate = {
+      query: "  SELECT * WHERE deleted_at IS NULL AND status = 'active'  ",
+      toQuery(): string {
+        return this.query;
+      },
+    };
+    const archivedPredicate = {
+      toQuery: (): string => "select * where status = 'archived'",
+    };
+    const meta = Object.assign({} as EntityMetadata, {
+      className: 'Account',
+      tableName: 'account',
+      indexes: [
+        { name: 'shared_email_idx', properties: ['email'] },
+        { name: 'shared_email_idx', properties: ['email'], type: { predicate: activePredicate } },
+        { name: 'shared_email_idx', properties: ['email'], type: { predicate: archivedPredicate } },
+        {
+          name: 'lower_active_email_idx',
+          expression: 'lower(email_address)',
+          type: { predicate: activePredicate },
+        },
+        { name: 'options_are_not_predicates_idx', properties: ['email'], options: { where: 'discard me' } },
+        {
+          name: 'invalid_predicate_idx',
+          properties: ['email'],
+          type: { predicate: { toQuery: (): string => 'select *' } },
+        },
+        {
+          name: 'throwing_predicate_idx',
+          properties: ['email'],
+          type: {
+            predicate: {
+              toQuery: (): string => {
+                throw new Error('cannot serialize predicate');
+              },
+            },
+          },
+        },
+      ],
+      properties: {
+        email: {
+          name: 'email',
+          fieldNames: ['email_address'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+        },
+      },
+    });
+
+    const account = buildDiagramModel([meta]).entities[0]!;
+
+    expect(account.constraints).toEqual([
+      { type: 'index', name: 'shared_email_idx', properties: ['email_address'] },
+      {
+        type: 'index',
+        name: 'shared_email_idx',
+        properties: ['email_address'],
+        predicate: "deleted_at IS NULL AND status = 'active'",
+      },
+      {
+        type: 'index',
+        name: 'shared_email_idx',
+        properties: ['email_address'],
+        predicate: "status = 'archived'",
+      },
+      {
+        type: 'index',
+        name: 'lower_active_email_idx',
+        properties: [],
+        expression: 'lower(email_address)',
+        predicate: "deleted_at IS NULL AND status = 'active'",
+      },
+      { type: 'index', name: 'options_are_not_predicates_idx', properties: ['email_address'] },
+      { type: 'index', name: 'invalid_predicate_idx', properties: ['email_address'] },
+      { type: 'index', name: 'throwing_predicate_idx', properties: ['email_address'] },
+    ]);
+  });
 });
 
 describe('buildDiagramModel — non-abstract STI root (M1)', () => {
