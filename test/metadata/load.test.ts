@@ -129,6 +129,15 @@ describe('loadEntityMetadata', () => {
     expect(sourcePaths.some((p) => p.endsWith(path.join('fixtures', 'entities', 'Author.ts')))).toBe(true);
   });
 
+  it('retains the normalized source path for each discovered entity class', async () => {
+    const { entitySourcePaths } = await loadEntityMetadata(config);
+    const authorSource = entitySourcePaths.get('Author');
+
+    expect(authorSource).toBeDefined();
+    expect(path.isAbsolute(authorSource!)).toBe(true);
+    expect(authorSource).toBe(path.resolve('test/fixtures/entities/Author.ts'));
+  });
+
   it('sourcePaths excludes pivot tables that have no declared file', async () => {
     const { sourcePaths } = await loadEntityMetadata(config);
 
