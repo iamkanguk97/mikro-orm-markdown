@@ -537,6 +537,93 @@ describe('buildDiagramModel — Constraints', () => {
     return buildDiagramModel(metas);
   }
 
+  function makePropertyUniqueMetas(): EntityMetadata[] {
+    const account = Object.assign({} as EntityMetadata, {
+      className: 'Account',
+      tableName: 'account',
+      primaryKeys: ['id'],
+      uniques: [
+        { name: 'entity_email_uq', properties: ['email'] },
+        { name: 'property_email_uq', properties: ['email'] },
+      ],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        legacyCode: {
+          name: 'legacyCode',
+          fieldNames: ['legacy_code'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          unique: true,
+        },
+        transientCode: {
+          name: 'transientCode',
+          fieldNames: ['transient_code'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          persist: false,
+          unique: 'transient_code_uq',
+        },
+        email: {
+          name: 'email',
+          fieldNames: ['email_address'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          unique: 'property_email_uq',
+        },
+        settings: {
+          name: 'settings',
+          fieldNames: ['settings_json'],
+          type: 'Settings',
+          kind: ReferenceKind.EMBEDDED,
+          object: true,
+          unique: 'account_settings_uq',
+        },
+        organization: {
+          name: 'organization',
+          fieldNames: ['organization_id'],
+          referencedColumnNames: ['id'],
+          type: 'Organization',
+          kind: ReferenceKind.MANY_TO_ONE,
+          unique: 'account_org_uq',
+        },
+        compositeProfile: {
+          name: 'compositeProfile',
+          fieldNames: ['profile_tenant_id', 'profile_id'],
+          referencedColumnNames: ['tenant_id', 'id'],
+          type: 'CompositeProfile',
+          kind: ReferenceKind.ONE_TO_ONE,
+          owner: true,
+          unique: 'account_profile_uq',
+        },
+      },
+    });
+    const organization = Object.assign({} as EntityMetadata, {
+      className: 'Organization',
+      tableName: 'organization',
+      primaryKeys: ['id'],
+      properties: {
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+    const compositeProfile = Object.assign({} as EntityMetadata, {
+      className: 'CompositeProfile',
+      tableName: 'composite_profile',
+      primaryKeys: ['tenant', 'id'],
+      properties: {
+        tenant: {
+          name: 'tenant',
+          fieldNames: ['tenant_id'],
+          type: 'integer',
+          kind: ReferenceKind.SCALAR,
+          primary: true,
+        },
+        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      },
+    });
+
+    return [account, organization, compositeProfile];
+  }
+
   it('Animal entity has index constraint collected', async () => {
     const model = await getModel();
     const animal = model.entities.find((e) => e.className === 'Animal');
@@ -575,6 +662,35 @@ describe('buildDiagramModel — Constraints', () => {
     expect(invoice.constraints.find((c) => c.name === 'invoice_reference_uq')?.properties).toEqual([
       'external_reference',
     ]);
+  });
+
+  it('marks boolean and named single-field property uniques across column kinds', () => {
+    const account = buildDiagramModel(makePropertyUniqueMetas()).entities.find(
+      (entity) => entity.className === 'Account'
+    )!;
+
+    expect(account.columns.find((column) => column.propName === 'legacyCode')?.isUnique).toBe(true);
+    expect(account.columns.find((column) => column.propName === 'email')?.isUnique).toBe(true);
+    expect(account.columns.find((column) => column.propName === 'settings')?.isUnique).toBe(true);
+    expect(account.columns.find((column) => column.propName === 'organization')?.isUnique).toBe(true);
+    expect(account.columns.find((column) => column.propName === 'transientCode')).toBeUndefined();
+    expect(
+      account.columns.filter((column) => column.propName === 'compositeProfile').map((column) => column.isUnique)
+    ).toEqual([false, false]);
+  });
+
+  it('preserves distinct named unique identities and deduplicates only an exact tuple', () => {
+    const account = buildDiagramModel(makePropertyUniqueMetas()).entities.find(
+      (entity) => entity.className === 'Account'
+    )!;
+
+    expect(account.constraints.filter((constraint) => constraint.type === 'unique')).toEqual([
+      { type: 'unique', properties: ['email_address'], name: 'entity_email_uq' },
+      { type: 'unique', properties: ['email_address'], name: 'property_email_uq' },
+      { type: 'unique', properties: ['settings_json'], name: 'account_settings_uq' },
+      { type: 'unique', properties: ['organization_id'], name: 'account_org_uq' },
+    ]);
+    expect(account.constraints.some((constraint) => constraint.name === 'transient_code_uq')).toBe(false);
   });
 });
 

@@ -72,7 +72,7 @@ function buildColumns(
           type: 'json',
           isPrimary: false,
           isForeignKey: false,
-          isUnique: prop.unique === true,
+          isUnique: isPropertyColumnUnique(prop),
           isNullable: prop.nullable === true,
           ...(prop.comment !== undefined && { comment: prop.comment }),
           embeddedIn: prop.array === true ? `${prop.type}[]` : prop.type,
@@ -132,7 +132,7 @@ function buildColumns(
         type: prop.type ?? 'unknown',
         isPrimary: prop.primary === true,
         isForeignKey: false,
-        isUnique: prop.unique === true,
+        isUnique: isPropertyColumnUnique(prop),
         isNullable: prop.nullable === true,
         ...(prop.comment !== undefined && { comment: prop.comment }),
         ...(formulaExpr !== undefined && { formula: formulaExpr }),
@@ -204,11 +204,18 @@ function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, E
     type: fkTypes[index] ?? fkTypes[0] ?? 'integer',
     isPrimary: prop.primary === true,
     isForeignKey: true,
-    isUnique: prop.unique === true,
+    isUnique: isPropertyColumnUnique(prop),
     isNullable: prop.nullable === true,
     ...(prop.comment !== undefined && { comment: prop.comment }),
     referencedEntity: prop.type,
   }));
+}
+
+function isPropertyColumnUnique(prop: EntityProperty): boolean {
+  if (prop.unique === true) {
+    return true;
+  }
+  return typeof prop.unique === 'string' && prop.persist !== false && prop.fieldNames?.length === 1;
 }
 
 interface PrimaryPhysicalField {
@@ -307,6 +314,7 @@ function getPrimaryPhysicalFields(meta: EntityMetadata): PrimaryPhysicalField[] 
 /** Collects indexes, unique constraints, and check constraints from entity-level metadata. */
 function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
   const result: ConstraintModel[] = [];
+  const uniqueIdentities = new Set<string>();
 
   for (const idx of meta.indexes ?? []) {
     const props = idx.properties;
@@ -319,10 +327,27 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
 
   for (const uniq of meta.uniques ?? []) {
     const props = uniq.properties;
-    result.push({
+    pushDistinctUnique(result, uniqueIdentities, {
       type: 'unique',
       properties: resolveConstraintProperties(meta, props),
       ...(uniq.name !== undefined && { name: uniq.name }),
+    });
+  }
+
+  for (const prop of Object.values(meta.properties)) {
+    const fieldName = prop.fieldNames?.[0];
+    if (
+      typeof prop.unique !== 'string' ||
+      prop.persist === false ||
+      prop.fieldNames?.length !== 1 ||
+      fieldName === undefined
+    ) {
+      continue;
+    }
+    pushDistinctUnique(result, uniqueIdentities, {
+      type: 'unique',
+      name: prop.unique,
+      properties: [fieldName],
     });
   }
 
@@ -340,6 +365,15 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
   }
 
   return result;
+}
+
+function pushDistinctUnique(result: ConstraintModel[], identities: Set<string>, constraint: ConstraintModel): void {
+  const identity = JSON.stringify([constraint.type, constraint.name ?? null, constraint.properties]);
+  if (identities.has(identity)) {
+    return;
+  }
+  identities.add(identity);
+  result.push(constraint);
 }
 
 function resolveConstraintProperties(meta: EntityMetadata, props: string | string[] | undefined): string[] {
