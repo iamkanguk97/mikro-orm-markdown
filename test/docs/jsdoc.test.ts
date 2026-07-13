@@ -225,12 +225,52 @@ describe('loadJsDoc — @atLeastOne', () => {
 });
 
 describe('loadJsDoc — @hidden and @erd/@describe', () => {
-  it('parses @hidden tag correctly', () => {
-    // Use inline source via a temp glob that matches a known hidden entity.
-    // We test the tag parsing logic with a specially crafted fixture.
-    // (In real use, users add @hidden to their entity class JSDoc)
-    const result = loadJsDoc([FIXTURES_GLOB]);
-    // None of current fixtures use @hidden — all should have hidden=false
-    expect([...result.entities.values()].every((e) => !e.hidden)).toBe(true);
+  it('parses every supported tag, explicit default values, and duplicate tags from source', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-supported-tags-'));
+    const sourcePath = path.join(dir, 'TaggedEntity.ts');
+    fs.writeFileSync(
+      sourcePath,
+      `
+        /**
+         * Tagged entity description.
+         * @namespace default
+         * @namespace Sales
+         * @namespace Sales
+         * @erd default
+         * @erd Overview
+         * @erd Overview
+         * @describe default
+         * @describe Details
+         * @describe Details
+         * @hidden
+         */
+        export class TaggedEntity {
+          /**
+           * Required links.
+           * @atLeastOne
+           * @atLeastOne
+           */
+          links!: string[];
+        }
+      `,
+      'utf-8'
+    );
+
+    try {
+      const result = loadJsDoc([sourcePath]);
+      const entity = result.entities.get('TaggedEntity');
+      const links = result.props.get('TaggedEntity')?.get('links');
+
+      expect(entity).toEqual({
+        description: 'Tagged entity description.',
+        namespaces: ['default', 'Sales', 'Sales'],
+        erdNamespaces: ['default', 'Overview', 'Overview'],
+        describeNamespaces: ['default', 'Details', 'Details'],
+        hidden: true,
+      });
+      expect(links).toEqual({ description: 'Required links.', atLeastOne: true });
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
