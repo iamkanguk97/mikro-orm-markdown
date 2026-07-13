@@ -2,15 +2,7 @@ import type { EntityMetadata, EntityProperty, FormulaTable } from '@mikro-orm/co
 import { ReferenceKind } from '@mikro-orm/core';
 import type { ColumnModel, ConstraintModel, DiagramModel, EntityModel, RelationEdge } from './types.js';
 
-// Dummy table descriptor used when resolving formula expressions for documentation.
-// String-based formulas ignore both arguments; function-based formulas use the alias.
-const FORMULA_DUMMY_TABLE: FormulaTable = {
-  alias: 'e0',
-  name: '',
-  qualifiedName: '',
-  toString: () => 'e0',
-};
-
+const FORMULA_ALIAS = 'e0';
 const UNRESOLVED_FORMULA = '<unresolved>';
 
 /**
@@ -100,7 +92,7 @@ function buildColumns(
     // For @Formula columns, formula is set on a SCALAR-kinded property
     const formulaExpr: string | undefined =
       prop.formula !== undefined
-        ? resolveFormulaExpr(prop.formula as (table: FormulaTable, cols: Record<string, string>) => string)
+        ? resolveFormulaExpr(prop.formula as (table: FormulaTable, cols: Record<string, string>) => string, owningMeta)
         : undefined;
 
     // Shadow property (persist: false, e.g. a cached/computed runtime value or a
@@ -166,21 +158,34 @@ function buildColumns(
 }
 
 /**
- * Calls the FormulaCallback with a dummy table and column proxy to extract the SQL expression.
- * String-based formulas (most common) ignore their arguments and return the literal string.
- * Function-based formulas use the alias/column names from the dummy objects.
+ * Calls the FormulaCallback with the same physical metadata shape MikroORM provides at query time.
+ * String-based formulas (most common) ignore both arguments and return the literal string.
+ * Function-based formulas can use the table, schema, stable alias, and physical column names.
  * Returns a visible fallback on unexpected errors so generated docs do not hide
  * that the expression could not be resolved.
  */
-function resolveFormulaExpr(cb: (table: FormulaTable, cols: Record<string, string>) => string): string {
+function resolveFormulaExpr(
+  cb: (table: FormulaTable, cols: Record<string, string>) => string,
+  owningMeta: EntityMetadata
+): string {
   try {
-    const cols = new Proxy<Record<string, string>>(
-      {},
-      {
-        get: (_target: Record<string, string>, key: string | symbol): string => (typeof key === 'string' ? key : ''),
+    const schema = owningMeta.schema === '*' ? undefined : owningMeta.schema;
+    const table: FormulaTable = {
+      alias: FORMULA_ALIAS,
+      name: owningMeta.tableName,
+      ...(schema !== undefined && { schema }),
+      qualifiedName: schema ? `${schema}.${owningMeta.tableName}` : owningMeta.tableName,
+      toString: () => FORMULA_ALIAS,
+    };
+    const columns: Record<string, string> = {};
+    for (const property of Object.values(owningMeta.properties)) {
+      const fieldName = property.fieldNames?.[0];
+      if (fieldName !== undefined) {
+        columns[property.name] = fieldName;
       }
-    );
-    const result = cb(FORMULA_DUMMY_TABLE, cols);
+    }
+
+    const result = cb(table, columns);
     // The callback is typed to return a string, but a misbehaving formula can
     // return anything; coerce so downstream string handling never crashes.
     return typeof result === 'string' ? result : String(result);
