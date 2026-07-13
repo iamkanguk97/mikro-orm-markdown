@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { emitWarning, flattenMessage, StructuredError, type StructuredMessage } from '../src/messages.js';
 
 const FULL_MESSAGE: StructuredMessage = {
@@ -24,12 +24,31 @@ describe('flattenMessage', () => {
 });
 
 describe('emitWarning', () => {
-  it('calls the handler with the flat message and the structured message', () => {
-    const onWarn = vi.fn();
-    emitWarning(onWarn, FULL_MESSAGE);
+  it('passes the flat message and the structure to handlers declaring two parameters', () => {
+    const calls: [string, StructuredMessage | undefined][] = [];
+    emitWarning((message, warning) => {
+      calls.push([message, warning]);
+    }, FULL_MESSAGE);
 
-    expect(onWarn).toHaveBeenCalledOnce();
-    expect(onWarn).toHaveBeenCalledWith(flattenMessage(FULL_MESSAGE), FULL_MESSAGE);
+    expect(calls).toEqual([[flattenMessage(FULL_MESSAGE), FULL_MESSAGE]]);
+  });
+
+  it('passes only the flat message to handlers declaring a single parameter', () => {
+    const calls: string[] = [];
+    emitWarning((message) => {
+      calls.push(message);
+    }, FULL_MESSAGE);
+
+    expect(calls).toEqual([flattenMessage(FULL_MESSAGE)]);
+  });
+
+  it('passes only the flat message to variadic handlers like console.warn', () => {
+    const calls: unknown[][] = [];
+    emitWarning((...args: unknown[]) => {
+      calls.push(args);
+    }, FULL_MESSAGE);
+
+    expect(calls).toEqual([[flattenMessage(FULL_MESSAGE)]]);
   });
 
   it('does nothing when no handler is given', () => {

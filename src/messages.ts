@@ -23,6 +23,10 @@ export interface StructuredMessage {
 /**
  * Receives non-fatal warnings. `message` is always present and self-contained;
  * `warning` carries the structured form when the emitter provides one.
+ *
+ * The structured argument is only passed to handlers that declare a second
+ * parameter — variadic loggers passed directly (e.g. `onWarn: console.warn`)
+ * keep receiving just the flat message string.
  */
 export type WarnHandler = (message: string, warning?: StructuredMessage) => void;
 
@@ -35,9 +39,24 @@ export function flattenMessage(structured: StructuredMessage): string {
   return parts.join(' ');
 }
 
-/** Emits a structured warning through an optional handler, flattening it for the message argument. */
+/**
+ * Emits a structured warning through an optional handler, flattening it for
+ * the message argument.
+ *
+ * Handlers that declare fewer than two parameters receive only the flat
+ * message: passing the structured payload unconditionally would leak an extra
+ * object into variadic loggers used directly (e.g. `onWarn: console.warn`).
+ */
 export function emitWarning(onWarn: WarnHandler | undefined, warning: StructuredMessage): void {
-  onWarn?.(flattenMessage(warning), warning);
+  if (onWarn === undefined) {
+    return;
+  }
+
+  if (onWarn.length >= 2) {
+    onWarn(flattenMessage(warning), warning);
+  } else {
+    onWarn(flattenMessage(warning));
+  }
 }
 
 /**

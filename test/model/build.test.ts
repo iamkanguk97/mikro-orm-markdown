@@ -1,7 +1,8 @@
 import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type { JsDocResult } from '../../src/docs/jsdoc.js';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
+import type { StructuredMessage } from '../../src/messages.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDocumentModel, type DocumentModel } from '../../src/model/build.js';
 import config from '../fixtures/mikro-orm.config.js';
@@ -74,12 +75,14 @@ describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
       classNames: new Set(),
     };
 
-    const onWarn = vi.fn();
-    buildDocumentModel([parent], jsDoc, 'T', undefined, onWarn);
+    const calls: [string, StructuredMessage | undefined][] = [];
+    buildDocumentModel([parent], jsDoc, 'T', undefined, (message, warning) => {
+      calls.push([message, warning]);
+    });
 
-    expect(onWarn).toHaveBeenCalledOnce();
-    expect(String(onWarn.mock.calls[0]?.[0])).toContain('@atLeastOne on Parent.children');
-    expect(onWarn.mock.calls[0]?.[1]).toMatchObject({ title: '@atLeastOne had no effect' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0]).toContain('@atLeastOne on Parent.children');
+    expect(calls[0]?.[1]).toMatchObject({ title: '@atLeastOne had no effect' });
   });
 });
 

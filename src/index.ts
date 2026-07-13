@@ -29,8 +29,10 @@ export interface GenerateMarkdownOptions {
   src?: string[];
   /**
    * Receives non-fatal warnings (e.g. JSDoc cannot be read from compiled JS).
-   * The first argument is always a flat, self-contained message; long guidance
-   * warnings also pass a `StructuredMessage` as the second argument.
+   * The first argument is always a flat, self-contained message. Handlers that
+   * declare a second parameter also receive a `StructuredMessage` for long
+   * guidance warnings; variadic loggers passed directly (`onWarn: console.warn`)
+   * keep receiving just the string.
    */
   onWarn?: WarnHandler;
   /**
