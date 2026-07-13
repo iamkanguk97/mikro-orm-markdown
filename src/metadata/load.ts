@@ -31,6 +31,24 @@ async function closeDiscoveryResources(orm: MikroORM): Promise<unknown[]> {
   return results.flatMap((result) => (result.status === 'rejected' ? [result.reason] : []));
 }
 
+function attachCleanupErrors(discoveryError: unknown, cleanupErrors: unknown[]): void {
+  const canHaveProperties =
+    (typeof discoveryError === 'object' && discoveryError !== null) || typeof discoveryError === 'function';
+  if (!canHaveProperties) {
+    return;
+  }
+
+  try {
+    Object.defineProperty(discoveryError, 'cleanupErrors', {
+      value: cleanupErrors,
+      enumerable: false,
+    });
+  } catch {
+    // A frozen error or defensive Proxy cannot be annotated. Preserve the
+    // original discovery failure instead of replacing it with an attachment error.
+  }
+}
+
 function collectEntitySchemaNames(options: Options): string[] {
   const configuredEntities = [...(options.entities ?? []), ...(options.entitiesTs ?? [])];
   const names: string[] = [];
@@ -206,10 +224,7 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
     const cleanupErrors = await closeDiscoveryResources(orm);
     if (cleanupErrors.length > 0) {
       if (discoveryFailed) {
-        Object.defineProperty(discoveryError as object, 'cleanupErrors', {
-          value: cleanupErrors,
-          enumerable: false,
-        });
+        attachCleanupErrors(discoveryError, cleanupErrors);
       } else {
         throw new AggregateError(cleanupErrors, 'Failed to close MikroORM discovery cache adapters.');
       }

@@ -180,6 +180,31 @@ describe('loadEntityMetadata', () => {
     expect(descriptor?.enumerable).toBe(false);
   });
 
+  it('never replaces a non-extensible discovery error while reporting cleanup failures', async () => {
+    const discoveryError = Object.preventExtensions(new TypeError('metadata discovery failed'));
+    const metadataCleanupError = new Error('metadata cache close failed');
+    const resultCleanupError = new Error('result cache close failed');
+    const closeMetadataCache = vi.fn().mockRejectedValue(metadataCleanupError);
+    const closeResultCache = vi.fn().mockRejectedValue(resultCleanupError);
+
+    vi.spyOn(MikroORM, 'init').mockResolvedValue({
+      getMetadata: () => ({
+        getAll: () => {
+          throw discoveryError;
+        },
+      }),
+      config: {
+        getMetadataCacheAdapter: () => ({ close: closeMetadataCache }),
+        getResultCacheAdapter: () => ({ close: closeResultCache }),
+      },
+    } as never);
+
+    await expect(loadEntityMetadata(config)).rejects.toBe(discoveryError);
+    expect(closeMetadataCache).toHaveBeenCalledOnce();
+    expect(closeResultCache).toHaveBeenCalledOnce();
+    expect(Object.hasOwn(discoveryError, 'cleanupErrors')).toBe(false);
+  });
+
   it('throws an AggregateError containing every cleanup-only failure', async () => {
     class DecoratedEntity {}
     Object.defineProperty(DecoratedEntity, '__path', { value: import.meta.url });
