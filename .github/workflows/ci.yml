@@ -41,7 +41,9 @@ jobs:
         run: npm run build
 
       - name: Pack tarball
-        run: npm pack --pack-destination "$RUNNER_TEMP/tarball"
+        run: |
+          mkdir -p "$RUNNER_TEMP/tarball"
+          npm pack --pack-destination "$RUNNER_TEMP/tarball"
 
       - name: Upload tarball artifact
         uses: actions/upload-artifact@v4
