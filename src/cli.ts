@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { randomUUID } from 'node:crypto';
 import * as syncFs from 'node:fs';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
@@ -271,12 +272,90 @@ function formatFileSystemError(cause: unknown): string {
   return String(cause);
 }
 
-export async function writeMarkdownFile(outPath: string, markdown: string): Promise<void> {
+function hasFileSystemErrorCode(cause: unknown, code: string): boolean {
+  return cause instanceof Error && 'code' in cause && cause.code === code;
+}
+
+export interface AtomicWriteFileOperations {
+  mkdir(directoryPath: string): Promise<void>;
+  writeFile(tempPath: string, markdown: string): Promise<void>;
+  rename(tempPath: string, outPath: string): Promise<void>;
+  unlink(tempPath: string): Promise<void>;
+}
+
+const nodeAtomicWriteFileOperations: AtomicWriteFileOperations = {
+  async mkdir(directoryPath: string): Promise<void> {
+    await fs.mkdir(directoryPath, { recursive: true });
+  },
+  async writeFile(tempPath: string, markdown: string): Promise<void> {
+    await fs.writeFile(tempPath, markdown, { encoding: 'utf-8', flag: 'wx' });
+  },
+  async rename(tempPath: string, outPath: string): Promise<void> {
+    await fs.rename(tempPath, outPath);
+  },
+  async unlink(tempPath: string): Promise<void> {
+    try {
+      await fs.unlink(tempPath);
+    } catch (cause) {
+      if (!hasFileSystemErrorCode(cause, 'ENOENT')) {
+        throw cause;
+      }
+    }
+  },
+};
+
+function createOutputWriteError(
+  outPath: string,
+  tempPath: string,
+  cause: unknown,
+  cleanupFailure?: { cause: unknown }
+): Error {
+  let message = `Cannot write output file: ${outPath}\n${formatFileSystemError(cause)}`;
+
+  if (cleanupFailure !== undefined) {
+    message += `\nCannot remove temporary output file: ${tempPath}\n${formatFileSystemError(cleanupFailure.cause)}`;
+  }
+
+  return new Error(message, { cause });
+}
+
+export async function writeMarkdownFile(
+  outPath: string,
+  markdown: string,
+  operations: AtomicWriteFileOperations = nodeAtomicWriteFileOperations
+): Promise<void> {
+  const directoryPath = path.dirname(outPath);
+  const tempPath = path.join(directoryPath, `.${path.basename(outPath)}.${randomUUID()}.tmp`);
+  let shouldCleanTemp = false;
+
   try {
-    await fs.mkdir(path.dirname(outPath), { recursive: true });
-    await fs.writeFile(outPath, markdown, 'utf-8');
+    await operations.mkdir(directoryPath);
+    shouldCleanTemp = true;
+
+    try {
+      await operations.writeFile(tempPath, markdown);
+    } catch (cause) {
+      // Exclusive creation means an EEXIST path belongs to another writer.
+      // Never remove a temporary file that this invocation did not create.
+      if (hasFileSystemErrorCode(cause, 'EEXIST')) {
+        shouldCleanTemp = false;
+      }
+      throw cause;
+    }
+
+    await operations.rename(tempPath, outPath);
+    shouldCleanTemp = false;
   } catch (cause) {
-    throw new Error(`Cannot write output file: ${outPath}\n${formatFileSystemError(cause)}`, { cause });
+    let cleanupFailure: { cause: unknown } | undefined;
+    if (shouldCleanTemp) {
+      try {
+        await operations.unlink(tempPath);
+      } catch (cleanupCause) {
+        cleanupFailure = { cause: cleanupCause };
+      }
+    }
+
+    throw createOutputWriteError(outPath, tempPath, cause, cleanupFailure);
   }
 }
 
