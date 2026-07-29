@@ -3,6 +3,7 @@ import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/js
 import { causeChain } from './error-chain.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
 import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
+import { isRenderableMeta } from './metadata/renderable.js';
 import { buildDocumentModel, type DocumentModel } from './model/build.js';
 import { MissingTsMorphSourceError, withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
@@ -111,10 +112,8 @@ function assertExplicitEntityJsDocSourceCoverage(
   jsDocResult: JsDocResult,
   onWarn?: WarnHandler
 ): void {
-  const isRenderable = (meta: EntityMetadata): boolean => !meta.pivotTable && !meta.embeddable;
-
   const missingConcrete = metas
-    .filter((meta) => isRenderable(meta) && !meta.abstract)
+    .filter((meta) => isRenderableMeta(meta) && !meta.abstract)
     .map((meta) => meta.className)
     .filter((className) => !jsDocResult.classNames.has(className));
 
@@ -131,7 +130,7 @@ function assertExplicitEntityJsDocSourceCoverage(
   // base-class file that --src may not cover. Warn rather than error so the user
   // knows @hidden/@namespace won't apply to them.
   const missingAbstract = metas
-    .filter((meta) => isRenderable(meta) && meta.abstract)
+    .filter((meta) => isRenderableMeta(meta) && meta.abstract)
     .map((meta) => meta.className)
     .filter((className) => !jsDocResult.classNames.has(className));
 

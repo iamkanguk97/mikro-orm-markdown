@@ -1,6 +1,7 @@
 import type { EntityClass, EntityMetadata, Options } from '@mikro-orm/core';
 import { EntitySchema, MetadataStorage, MikroORM } from '@mikro-orm/core';
 import { normalizeSourcePath } from '../source-path.js';
+import { isRenderableMeta } from './renderable.js';
 
 /** Errors thrown during metadata loading */
 export class MetadataLoadError extends Error {
@@ -97,11 +98,6 @@ function hasDecoratorMarker(target: EntityClass<unknown>): boolean {
     return true;
   }
   return '__path' in target;
-}
-
-/** Entities collectEntitySchemaNames's pre-discovery scan cannot reason about: pivot tables and embeddables are not user-facing entities. */
-function isRenderableMeta(meta: EntityMetadata): boolean {
-  return !meta.pivotTable && !meta.embeddable;
 }
 
 /**

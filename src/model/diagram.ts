@@ -1,5 +1,6 @@
 import type { EntityMetadata, EntityProperty, FormulaTable, IndexCallback } from '@mikro-orm/core';
 import { ReferenceKind } from '@mikro-orm/core';
+import { isRenderableMeta } from '../metadata/renderable.js';
 import type { ColumnModel, ConstraintModel, DiagramModel, EntityModel, RelationEdge } from './types.js';
 
 const FORMULA_ALIAS = 'e0';
@@ -16,7 +17,7 @@ export function buildDiagramModel(metas: EntityMetadata[]): DiagramModel {
   const metaByClass = new Map(metas.map((m) => [m.className, m]));
 
   const entities: EntityModel[] = metas
-    .filter((meta) => !meta.pivotTable && !meta.embeddable)
+    .filter((meta) => isRenderableMeta(meta))
     .map((meta) => buildEntityModel(meta, metaByClass));
 
   const relations: RelationEdge[] = buildRelationEdges(metas);
@@ -521,7 +522,7 @@ function buildRelationEdges(metas: EntityMetadata[]): RelationEdge[] {
   const edges: RelationEdge[] = [];
 
   for (const meta of metas) {
-    if (meta.pivotTable || meta.embeddable) {
+    if (!isRenderableMeta(meta)) {
       continue;
     }
 
