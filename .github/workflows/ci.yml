@@ -7,19 +7,19 @@ on:
     branches: [main]
 
 jobs:
-  ci:
+  # Contributor tooling (Biome, commitlint, vitest, tsup) is validated once on
+  # Node 22; the package's Node 18/20/22 runtime promise is validated by the
+  # consumer jobs below against the packed artifact.
+  quality:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x, 22.x]
 
     steps:
       - uses: actions/checkout@v7
 
-      - name: Use Node.js ${{ matrix.node-version }}
+      - name: Use Node.js 22
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node-version }}
+          node-version: 22.x
           cache: 'npm'
 
       - name: Install dependencies
@@ -40,5 +40,39 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Package smoke (npm tarball install)
-        run: npm run test:pack
+      - name: Pack tarball
+        run: npm pack --pack-destination "$RUNNER_TEMP/tarball"
+
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-tarball
+          path: ${{ runner.temp }}/tarball/*.tgz
+          if-no-files-found: error
+          retention-days: 7
+
+  consumer:
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Download tarball artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-tarball
+          path: tarball
+
+      # No `npm ci`: the smoke script uses Node builtins only, so this job
+      # exercises the installed package exactly as a consumer would.
+      - name: Package smoke against the packed artifact
+        run: node scripts/pack-smoke.mjs tarball/*.tgz
