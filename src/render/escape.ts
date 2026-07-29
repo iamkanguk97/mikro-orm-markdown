@@ -1,5 +1,8 @@
-const MARKDOWN_INLINE_SPECIAL_CHARS = /[\\`|*#\[\]]/g;
+const MARKDOWN_INLINE_SPECIAL_CHARS = /[\\`|*#\[\]~]/g;
 const MARKDOWN_EMPHASIS_UNDERSCORE = /(?<![a-zA-Z0-9])_|_(?![a-zA-Z0-9])/g;
+const MARKDOWN_BULLET_LINE = /^[-+](?:\s|$)/;
+const MARKDOWN_HYPHEN_ONLY_LINE = /^-[-\s]*$/;
+const MARKDOWN_ORDERED_MARKER = /^(\d{1,9})([.)])(?=\s|$)/;
 const MERMAID_IDENTIFIER_INVALID_CHARS = /[^a-zA-Z0-9_]/g;
 
 function normalizeInlineText(value: string): string {
@@ -28,6 +31,19 @@ function escapedLines(value: string): string[] {
   return splitNormalizedLines(value).map((line) => escapeMarkdownInline(line));
 }
 
+/**
+ * Escapes a line-leading list marker, ordered-list marker, or hyphen-only
+ * thematic-break/setext line so a description line renders as literal text
+ * instead of becoming document structure. Only block-level contexts
+ * (paragraphs, blockquotes) need this; table cells are inline-only.
+ */
+function escapeLeadingBlockMarker(line: string): string {
+  if (MARKDOWN_BULLET_LINE.test(line) || MARKDOWN_HYPHEN_ONLY_LINE.test(line)) {
+    return `\\${line}`;
+  }
+  return line.replace(MARKDOWN_ORDERED_MARKER, '$1\\$2');
+}
+
 export function escapeMarkdownTableCell(value: string): string {
   return escapedLines(value).join('<br>');
 }
@@ -39,12 +55,12 @@ export function escapeMarkdownTableCell(value: string): string {
  * accepts as free-form multi-line text.
  */
 export function escapeMarkdownParagraph(value: string): string {
-  return escapedLines(value).join('  \n');
+  return escapedLines(value).map(escapeLeadingBlockMarker).join('  \n');
 }
 
 export function renderMarkdownBlockQuote(value: string): string {
   return escapedLines(value)
-    .map((line) => `> ${line}`)
+    .map((line) => `> ${escapeLeadingBlockMarker(line)}`)
     .join('\n');
 }
 
