@@ -101,6 +101,29 @@ try {
   const [packed] = JSON.parse(packOutput);
   const tarballPath = path.join(packDir, path.basename(packed.filename));
 
+  step('reject MikroORM v7 as an unsupported peer');
+  const v7Dir = path.join(workDir, 'v7-consumer');
+  mkdirSync(v7Dir);
+  writeFileSync(path.join(v7Dir, 'package.json'), '{"private":true,"type":"module"}\n');
+  let v7Accepted = true;
+  try {
+    execFileSync(
+      'npm',
+      ['install', '--dry-run', '--ignore-scripts', '--no-audit', '--no-fund', tarballPath, '@mikro-orm/core@^7.0.0'],
+      { cwd: v7Dir, stdio: 'pipe', encoding: 'utf-8' }
+    );
+  } catch (error) {
+    const stderr = String(error?.stderr ?? '');
+    if (!stderr.includes('ERESOLVE')) {
+      throw new Error(`expected an ERESOLVE peer conflict for @mikro-orm/core@^7, got: ${stderr.slice(0, 400)}`);
+    }
+    v7Accepted = false;
+  }
+  if (v7Accepted) {
+    throw new Error('npm resolved @mikro-orm/core@^7 next to the package; the peer range must reject v7');
+  }
+  process.stdout.write('[pack-smoke] npm rejected @mikro-orm/core@^7 against the declared peer range\n');
+
   step('install the tarball with explicit MikroORM v6 peers');
   writeFileSync(path.join(consumerDir, 'package.json'), '{"private":true,"type":"module"}\n');
   run(
