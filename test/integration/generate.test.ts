@@ -197,29 +197,30 @@ describe('generateMarkdown', () => {
     );
   });
 
-  it.each(
-    sqlDriverSmokeCases
-  )('generates markdown from %s metadata without a live database connection', async (name, driver, dbName) => {
-    const connectSpy = vi.spyOn(driver.prototype, 'connect');
+  it.each(sqlDriverSmokeCases)(
+    'generates markdown from %s metadata without a live database connection',
+    async (name, driver, dbName) => {
+      const connectSpy = vi.spyOn(driver.prototype, 'connect');
 
-    const md = await generateMarkdown({
-      orm: {
-        ...config,
-        driver,
-        dbName,
-      },
-      title: `${name} Driver Smoke`,
-    });
+      const md = await generateMarkdown({
+        orm: {
+          ...config,
+          driver,
+          dbName,
+        },
+        title: `${name} Driver Smoke`,
+      });
 
-    expect(connectSpy).not.toHaveBeenCalled();
-    expect(md.startsWith(`# ${name} Driver Smoke`)).toBe(true);
-    expect(md).toContain('```mermaid');
-    expect(md).toContain('erDiagram');
-    expect(md).toContain('### Author');
-    expect(md).toContain('### Post');
-    expect(md).toContain('| name |');
-    expect(md).toContain('Post }|--|| Author : "author"');
-  });
+      expect(connectSpy).not.toHaveBeenCalled();
+      expect(md.startsWith(`# ${name} Driver Smoke`)).toBe(true);
+      expect(md).toContain('```mermaid');
+      expect(md).toContain('erDiagram');
+      expect(md).toContain('### Author');
+      expect(md).toContain('### Post');
+      expect(md).toContain('| name |');
+      expect(md).toContain('Post }|--|| Author : "author"');
+    }
+  );
 
   it('rejects explicit src paths that match no source files', async () => {
     const pending = generateMarkdown({
