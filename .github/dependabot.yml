@@ -7,6 +7,11 @@ updates:
       time: '09:00'
       timezone: 'Asia/Seoul'
     open-pull-requests-limit: 5
+    ignore:
+      # MikroORM v7 requires Node >=22.17 and is not a verified peer; the
+      # supported range is v6 until the migration tracked in #61 lands.
+      - dependency-name: '@mikro-orm/*'
+        update-types: ['version-update:semver-major']
     groups:
       mikro-orm:
         patterns:
