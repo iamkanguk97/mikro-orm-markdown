@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command, Option } from 'commander';
+import { DEFAULT_TITLE } from './defaults.js';
 import { causeChain, errorMessage } from './error-chain.js';
 import { generateMarkdown, StructuredError, type StructuredMessage } from './index.js';
 import type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
@@ -91,65 +92,11 @@ export async function loadOrmOptions(
   try {
     if (isTypeScriptConfig) {
       await unregisterActiveTsxLoader();
-
-      let register: typeof import('tsx/esm/api')['register'];
-      try {
-        ({ register } = await import('tsx/esm/api'));
-      } catch {
-        throw new Error('TypeScript config files require the "tsx" package.\nInstall it with: npm install -D tsx');
-      }
-
-      let tsconfig: string | undefined;
-      if (tsconfigPath !== undefined) {
-        tsconfig = path.resolve(tsconfigPath);
-        if (!syncFs.existsSync(tsconfig)) {
-          throw new Error(`--tsconfig file not found: ${tsconfig}`);
-        }
-      } else {
-        tsconfig = findNearestTsconfig(configPath);
-      }
-
-      unregisterTsx = register(tsconfig !== undefined ? { tsconfig } : {});
+      unregisterTsx = await registerTsxForConfig(configPath, tsconfigPath);
     }
 
-    const configUrl = toConfigImportSpecifier(configPath);
-    let mod: { default?: unknown };
-    try {
-      mod = (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
-    } catch (cause) {
-      if (isTypeScriptConfig) {
-        const detail = errorMessage(cause);
-        throw new Error(
-          `Failed to load TypeScript config.\n${detail}\n\n` +
-            'If this looks like a decorator/metadata error, the tsconfig applied to your ' +
-            'entity files is likely missing "experimentalDecorators" / "emitDecoratorMetadata".\n' +
-            'Make sure a tsconfig.json with those options sits next to your config file, ' +
-            'or pass one explicitly with --tsconfig <path>.',
-          { cause }
-        );
-      }
-      throw cause;
-    }
-
-    if (mod.default === undefined) {
-      throw new Error('Config file must use a default export, e.g. `export default defineConfig({ ... })`.');
-    }
-
-    const config = mod.default;
-    if (typeof config === 'function' || config instanceof Promise) {
-      throw new Error(
-        'Config file default export must be a configuration object, not a function or Promise.\n' +
-          'Resolve it first, or use the programmatic API instead (see README).'
-      );
-    }
-    if (typeof config !== 'object' || config === null || Array.isArray(config)) {
-      throw new Error(
-        'Config file default export must be a configuration object, not a primitive value or array.\n' +
-          'Export a plain MikroORM options object instead.'
-      );
-    }
-
-    const options = config as Options;
+    const mod = await importConfigModule(configPath, isTypeScriptConfig);
+    const options = assertConfigShape(mod);
     const withPreferTs =
       isTypeScriptConfig && options.preferTs === undefined ? { ...options, preferTs: true } : options;
     shouldKeepTsxRegistered = loadOptions.keepTsxRegistered === true;
@@ -164,6 +111,76 @@ export async function loadOrmOptions(
       }
     }
   }
+}
+
+/**
+ * Registers the tsx loader so plain `node` can import a `.ts` config, using
+ * the tsconfig resolved next to the config file (or the explicit --tsconfig
+ * path). Returns the loader's unregister callback.
+ */
+async function registerTsxForConfig(configPath: string, tsconfigPath?: string): Promise<() => Promise<void>> {
+  let register: typeof import('tsx/esm/api')['register'];
+  try {
+    ({ register } = await import('tsx/esm/api'));
+  } catch {
+    throw new Error('TypeScript config files require the "tsx" package.\nInstall it with: npm install -D tsx');
+  }
+
+  let tsconfig: string | undefined;
+  if (tsconfigPath !== undefined) {
+    tsconfig = path.resolve(tsconfigPath);
+    if (!syncFs.existsSync(tsconfig)) {
+      throw new Error(`--tsconfig file not found: ${tsconfig}`);
+    }
+  } else {
+    tsconfig = findNearestTsconfig(configPath);
+  }
+
+  return register(tsconfig !== undefined ? { tsconfig } : {});
+}
+
+/** Imports the config module, rewriting TypeScript loader failures with decorator/tsconfig guidance. */
+async function importConfigModule(configPath: string, isTypeScriptConfig: boolean): Promise<{ default?: unknown }> {
+  const configUrl = toConfigImportSpecifier(configPath);
+  try {
+    return (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
+  } catch (cause) {
+    if (isTypeScriptConfig) {
+      const detail = errorMessage(cause);
+      throw new Error(
+        `Failed to load TypeScript config.\n${detail}\n\n` +
+          'If this looks like a decorator/metadata error, the tsconfig applied to your ' +
+          'entity files is likely missing "experimentalDecorators" / "emitDecoratorMetadata".\n' +
+          'Make sure a tsconfig.json with those options sits next to your config file, ' +
+          'or pass one explicitly with --tsconfig <path>.',
+        { cause }
+      );
+    }
+    throw cause;
+  }
+}
+
+/** Validates that the config module's default export is a plain MikroORM options object. */
+function assertConfigShape(mod: { default?: unknown }): Options {
+  if (mod.default === undefined) {
+    throw new Error('Config file must use a default export, e.g. `export default defineConfig({ ... })`.');
+  }
+
+  const config = mod.default;
+  if (typeof config === 'function' || config instanceof Promise) {
+    throw new Error(
+      'Config file default export must be a configuration object, not a function or Promise.\n' +
+        'Resolve it first, or use the programmatic API instead (see README).'
+    );
+  }
+  if (typeof config !== 'object' || config === null || Array.isArray(config)) {
+    throw new Error(
+      'Config file default export must be a configuration object, not a primitive value or array.\n' +
+        'Export a plain MikroORM options object instead.'
+    );
+  }
+
+  return config as Options;
 }
 
 /**
@@ -413,7 +430,7 @@ const program = new Command()
   .description('Generate Mermaid ERD + markdown docs from MikroORM entities')
   .requiredOption('-c, --config <path>', 'MikroORM config file path')
   .option('-o, --out <path>', 'Output markdown file path', './ERD.md')
-  .option('-t, --title <string>', 'Document title', 'Database Schema')
+  .option('-t, --title <string>', 'Document title', DEFAULT_TITLE)
   .option('-d, --description <string>', 'Optional description paragraph shown below the title')
   .option(
     '--tsconfig <path>',

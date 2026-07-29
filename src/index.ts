@@ -1,4 +1,5 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
+import { DEFAULT_TITLE } from './defaults.js';
 import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
 import { causeChain } from './error-chain.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
@@ -218,7 +219,7 @@ async function loadEntityMetadataWithTsMorphFallback(
  * ```
  */
 export async function generateMarkdown(options: GenerateMarkdownOptions): Promise<string> {
-  const { orm, title = 'Database Schema', description, src, onWarn, mermaid } = options;
+  const { orm, title = DEFAULT_TITLE, description, src, onWarn, mermaid } = options;
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm);
   const { metas, sourcePaths, entitySourcePaths } = await loadEntityMetadataWithTsMorphFallback(
