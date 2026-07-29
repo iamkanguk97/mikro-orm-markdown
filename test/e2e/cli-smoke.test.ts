@@ -1,8 +1,8 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { REPO_ROOT } from '../helpers/paths.js';
 import { makeTempDir } from '../helpers/temp-dir.js';
 
 // Exercises the built CLI exactly as a user runs it (`node dist/cli.js ...`),
@@ -10,10 +10,8 @@ import { makeTempDir } from '../helpers/temp-dir.js';
 // would have caught the cwd/tsconfig regression (H1): the helper/programmatic
 // tests bypass the real bin and the working-directory-sensitive config load.
 
-const testDir = path.dirname(fileURLToPath(import.meta.url));
-const repoRoot = path.resolve(testDir, '../..');
-const cliPath = path.join(repoRoot, 'dist', 'cli.js');
-const exampleDir = path.join(repoRoot, 'examples');
+const cliPath = path.join(REPO_ROOT, 'dist', 'cli.js');
+const exampleDir = path.join(REPO_ROOT, 'examples');
 const committedExampleOutput = path.join(exampleDir, 'ERD.md');
 const exampleConfig = path.join('examples', 'mikro-orm.config.ts');
 const dualDiscoveryConfig = path.join('test', 'fixtures', 'mikro-orm.dual.config.ts');
@@ -28,14 +26,14 @@ function normalizeLineEndings(value: string): string {
 describe('CLI smoke (built bin)', () => {
   beforeAll(() => {
     // Build so we run the real shipped artifact, not the TypeScript source.
-    execFileSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'ignore' });
+    execFileSync('npm', ['run', 'build'], { cwd: REPO_ROOT, stdio: 'ignore' });
   });
 
   it('generates markdown from a .ts config when run from the repo root', () => {
     const outFile = path.join(makeTempDir('cli-smoke-'), 'ERD.md');
     // cwd is the repo root, not examples/ — the failure mode H1 fixed.
     execFileSync('node', [cliPath, '-c', exampleConfig, '-o', outFile, '-t', 'Smoke'], {
-      cwd: repoRoot,
+      cwd: REPO_ROOT,
       stdio: 'ignore',
     });
 
@@ -69,7 +67,7 @@ describe('CLI smoke (built bin)', () => {
       'node',
       [cliPath, '-c', dualDiscoveryConfig, '--tsconfig', dualDiscoveryTsconfig, '-o', outFile, '-t', 'Dual Discovery'],
       {
-        cwd: repoRoot,
+        cwd: REPO_ROOT,
         stdio: 'ignore',
       }
     );
@@ -81,7 +79,7 @@ describe('CLI smoke (built bin)', () => {
 
   it('rejects invalid Mermaid option choices through Commander validation', () => {
     const result = spawnSync('node', [cliPath, '-c', exampleConfig, '--mermaid-layout', 'grid'], {
-      cwd: repoRoot,
+      cwd: REPO_ROOT,
       encoding: 'utf-8',
     });
 
