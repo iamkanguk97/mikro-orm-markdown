@@ -1,9 +1,9 @@
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import * as path from 'path';
 import { describe, expect, it, vi } from 'vitest';
 import { bindJsDocToEntitySources, loadJsDoc } from '../../src/docs/jsdoc.js';
+import { makeTempDir } from '../helpers/temp-dir.js';
 
 const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
 const FIXTURES_GLOB = path.resolve(TEST_DIR, '../fixtures/entities/*.ts');
@@ -20,24 +20,21 @@ describe('loadJsDoc', () => {
   });
 
   it('never throws on an unreadable file and still parses valid sources (M6)', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-m6-'));
+    const dir = makeTempDir('jsdoc-m6-');
     const unreadable = path.join(dir, 'Unreadable.ts');
     fs.writeFileSync(unreadable, 'export class Unreadable {}\n');
     fs.chmodSync(unreadable, 0o000);
     const onWarn = vi.fn();
 
-    try {
-      const result = loadJsDoc([unreadable, FIXTURES_GLOB], onWarn);
-      // The bad path is absorbed; valid fixtures are still parsed.
-      expect(result.entities.get('Author')).toBeDefined();
-      expect(result.sourceFileCount).toBeGreaterThan(0);
-      expect(result.classNames).toContain('Author');
-      expect(onWarn).toHaveBeenCalledOnce();
-      expect(String(onWarn.mock.calls[0]?.[0])).toContain('Could not load JSDoc source path');
-    } finally {
-      fs.chmodSync(unreadable, 0o644);
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    const result = loadJsDoc([unreadable, FIXTURES_GLOB], onWarn);
+
+    // The bad path is absorbed; valid fixtures are still parsed.
+    expect(result.entities.get('Author')).toBeDefined();
+    expect(result.sourceFileCount).toBeGreaterThan(0);
+    expect(result.classNames).toContain('Author');
+    expect(onWarn).toHaveBeenCalledOnce();
+    expect(String(onWarn.mock.calls[0]?.[0])).toContain('Could not load JSDoc source path');
+    fs.chmodSync(unreadable, 0o644);
   });
 
   it('reports zero source files for unmatched explicit paths', () => {
@@ -126,22 +123,18 @@ describe('loadJsDoc', () => {
   });
 
   it('deduplicates symlink aliases before checking compiled-source ambiguity', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-source-alias-'));
+    const dir = makeTempDir('jsdoc-source-alias-');
     const aliasPath = path.join(dir, 'CollisionEntity.ts');
     fs.symlinkSync(COLLISION_ENTITY_SOURCE, aliasPath);
 
-    try {
-      const loaded = loadJsDoc([COLLISION_ENTITY_SOURCE, aliasPath]);
-      const collisions = loaded.declarations.filter((declaration) => declaration.className === 'CollisionEntity');
+    const loaded = loadJsDoc([COLLISION_ENTITY_SOURCE, aliasPath]);
+    const collisions = loaded.declarations.filter((declaration) => declaration.className === 'CollisionEntity');
 
-      expect(collisions).toHaveLength(1);
-      const bound = bindJsDocToEntitySources(loaded, new Map([['CollisionEntity', '/virtual/CollisionEntity']]), {
-        allowCompiledSourceFallback: true,
-      });
-      expect(bound.entities.get('CollisionEntity')?.description).toBe('Entity source description');
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    expect(collisions).toHaveLength(1);
+    const bound = bindJsDocToEntitySources(loaded, new Map([['CollisionEntity', '/virtual/CollisionEntity']]), {
+      allowCompiledSourceFallback: true,
+    });
+    expect(bound.entities.get('CollisionEntity')?.description).toBe('Entity source description');
   });
 
   it('exact-matches an entity source path that still needs normalization', () => {
@@ -190,7 +183,7 @@ describe('loadJsDoc — property descriptions', () => {
   });
 
   it('extracts property descriptions from getter accessors and constructor parameter properties', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-accessors-'));
+    const dir = makeTempDir('jsdoc-accessors-');
     const sourcePath = path.join(dir, 'AccessorEntity.ts');
     fs.writeFileSync(
       sourcePath,
@@ -212,15 +205,11 @@ describe('loadJsDoc — property descriptions', () => {
       'utf-8'
     );
 
-    try {
-      const result = loadJsDoc([sourcePath]);
-      const props = result.props.get('AccessorEntity');
+    const result = loadJsDoc([sourcePath]);
+    const props = result.props.get('AccessorEntity');
 
-      expect(props?.get('displayName')?.description).toBe('Constructor-declared {@link User} display name');
-      expect(props?.get('score')?.description).toBe('Getter-declared score');
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    expect(props?.get('displayName')?.description).toBe('Constructor-declared {@link User} display name');
+    expect(props?.get('score')?.description).toBe('Getter-declared score');
   });
 });
 
@@ -238,7 +227,7 @@ describe('loadJsDoc — @atLeastOne', () => {
   });
 
   it('parses @atLeastOne on getter accessors and constructor parameter properties', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-at-least-one-accessors-'));
+    const dir = makeTempDir('jsdoc-at-least-one-accessors-');
     const sourcePath = path.join(dir, 'RelationEntity.ts');
     fs.writeFileSync(
       sourcePath,
@@ -264,21 +253,17 @@ describe('loadJsDoc — @atLeastOne', () => {
       'utf-8'
     );
 
-    try {
-      const result = loadJsDoc([sourcePath]);
-      const props = result.props.get('RelationEntity');
+    const result = loadJsDoc([sourcePath]);
+    const props = result.props.get('RelationEntity');
 
-      expect(props?.get('constructorItems')?.atLeastOne).toBe(true);
-      expect(props?.get('getterItems')?.atLeastOne).toBe(true);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    expect(props?.get('constructorItems')?.atLeastOne).toBe(true);
+    expect(props?.get('getterItems')?.atLeastOne).toBe(true);
   });
 });
 
 describe('loadJsDoc — @hidden and @erd/@describe', () => {
   it('parses every supported tag, explicit default values, and duplicate tags from source', () => {
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'jsdoc-supported-tags-'));
+    const dir = makeTempDir('jsdoc-supported-tags-');
     const sourcePath = path.join(dir, 'TaggedEntity.ts');
     fs.writeFileSync(
       sourcePath,
@@ -308,21 +293,17 @@ describe('loadJsDoc — @hidden and @erd/@describe', () => {
       'utf-8'
     );
 
-    try {
-      const result = loadJsDoc([sourcePath]);
-      const entity = result.entities.get('TaggedEntity');
-      const links = result.props.get('TaggedEntity')?.get('links');
+    const result = loadJsDoc([sourcePath]);
+    const entity = result.entities.get('TaggedEntity');
+    const links = result.props.get('TaggedEntity')?.get('links');
 
-      expect(entity).toEqual({
-        description: 'Tagged entity description.',
-        namespaces: ['default', 'Sales', 'Sales'],
-        erdNamespaces: ['default', 'Overview', 'Overview'],
-        describeNamespaces: ['default', 'Details', 'Details'],
-        hidden: true,
-      });
-      expect(links).toEqual({ description: 'Required links.', atLeastOne: true });
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
+    expect(entity).toEqual({
+      description: 'Tagged entity description.',
+      namespaces: ['default', 'Sales', 'Sales'],
+      erdNamespaces: ['default', 'Overview', 'Overview'],
+      describeNamespaces: ['default', 'Details', 'Details'],
+      hidden: true,
+    });
+    expect(links).toEqual({ description: 'Required links.', atLeastOne: true });
   });
 });

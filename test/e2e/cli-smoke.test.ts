@@ -1,9 +1,9 @@
 import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { makeTempDir } from '../helpers/temp-dir.js';
 
 // Exercises the built CLI exactly as a user runs it (`node dist/cli.js ...`),
 // from the repository root, against a .ts config. This is the only test that
@@ -25,20 +25,14 @@ function normalizeLineEndings(value: string): string {
   return value.replace(/\r\n?/g, '\n');
 }
 
-let outFile: string;
-
 describe('CLI smoke (built bin)', () => {
   beforeAll(() => {
     // Build so we run the real shipped artifact, not the TypeScript source.
     execFileSync('npm', ['run', 'build'], { cwd: repoRoot, stdio: 'ignore' });
-    outFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'cli-smoke-')), 'ERD.md');
-  });
-
-  afterAll(() => {
-    fs.rmSync(path.dirname(outFile), { recursive: true, force: true });
   });
 
   it('generates markdown from a .ts config when run from the repo root', () => {
+    const outFile = path.join(makeTempDir('cli-smoke-'), 'ERD.md');
     // cwd is the repo root, not examples/ — the failure mode H1 fixed.
     execFileSync('node', [cliPath, '-c', exampleConfig, '-o', outFile, '-t', 'Smoke'], {
       cwd: repoRoot,
@@ -51,6 +45,7 @@ describe('CLI smoke (built bin)', () => {
   });
 
   it('keeps the committed example ERD synchronized with generated output', () => {
+    const outFile = path.join(makeTempDir('cli-smoke-'), 'ERD.md');
     execFileSync(
       process.execPath,
       [cliPath, '-c', 'mikro-orm.config.ts', '-o', outFile, '-t', 'Example Schema', '-d', exampleDescription],
@@ -69,6 +64,7 @@ describe('CLI smoke (built bin)', () => {
   });
 
   it('uses entitiesTs by default for a .ts config with dual discovery paths', () => {
+    const outFile = path.join(makeTempDir('cli-smoke-'), 'ERD.md');
     execFileSync(
       'node',
       [cliPath, '-c', dualDiscoveryConfig, '--tsconfig', dualDiscoveryTsconfig, '-o', outFile, '-t', 'Dual Discovery'],
