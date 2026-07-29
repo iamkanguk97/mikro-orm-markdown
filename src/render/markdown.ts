@@ -1,5 +1,6 @@
 import type { DocumentModel, EnrichedEntity, NamespaceGroup } from '../model/build.js';
 import type { ColumnModel, ConstraintModel, DiagramModel } from '../model/types.js';
+import { DISCRIMINATOR_LABEL, embeddedLabel } from './column-markers.js';
 import {
   escapeMarkdownInline,
   escapeMarkdownParagraph,
@@ -173,10 +174,10 @@ function resolveColumnKey(col: ColumnModel): string {
     return 'UK';
   }
   if (col.isDiscriminator) {
-    return 'discriminator';
+    return DISCRIMINATOR_LABEL;
   }
   if (col.embeddedIn !== undefined) {
-    return `[${col.embeddedIn}]`;
+    return embeddedLabel(col.embeddedIn);
   }
   return '';
 }
