@@ -514,6 +514,58 @@ describe('renderMarkdown — escaping', () => {
     expect(md).toContain('*STI root — discriminator column: ``kind`type``*');
     expect(md).toContain('- Check ``check`name``: `` score > `min` ``');
   });
+
+  it('escapes block-level list markers, thematic breaks, and strikethrough in descriptions', () => {
+    const docModel: DocumentModel = {
+      title: 'Schema',
+      description: '- not a bullet\n1. not a step\n---\n~~not struck~~\nversion 1.2 - stable',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'Note',
+                tableName: 'note',
+                columns: [
+                  {
+                    propName: 'body',
+                    fieldName: 'body',
+                    type: 'string',
+                    isPrimary: false,
+                    isForeignKey: false,
+                    isUnique: false,
+                    isNullable: false,
+                  },
+                ],
+                constraints: [],
+              },
+              jsDoc: {
+                description: '- hidden bullet\n2) not a step',
+                namespaces: [],
+                erdNamespaces: [],
+                describeNamespaces: [],
+                hidden: false,
+              },
+              propDocs: new Map([['body', { description: '- stays inline ~~gone~~', atLeastOne: false }]]),
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+
+    // Paragraph lines cannot start a list, horizontal rule, or strikethrough…
+    expect(md).toContain('\\- not a bullet  \n1\\. not a step  \n\\---  \n\\~\\~not struck\\~\\~');
+    // …while mid-line punctuation stays untouched.
+    expect(md).toContain('version 1.2 - stable');
+    expect(md).toContain('> \\- hidden bullet\n> 2\\) not a step');
+    // Table cells are inline-only: block markers stay raw, strikethrough is escaped.
+    expect(md).toContain('| body | string |  |  | - stays inline \\~\\~gone\\~\\~ |');
+  });
 });
 
 describe('renderMarkdown — composite keys', () => {
