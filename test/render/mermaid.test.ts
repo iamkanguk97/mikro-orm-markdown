@@ -451,14 +451,10 @@ describe('normalizeType', () => {
     expect(normalizeType(input)).toBe(expected);
   });
 
-  it.each([
-    'bytea',
-    'blob',
-    'geometry',
-    "enum('a','b')",
-    'text[]',
-    'unknown',
-  ])('passes unrecognized type %s through unchanged', (input) => {
-    expect(normalizeType(input)).toBe(input);
-  });
+  it.each(['bytea', 'blob', 'geometry', "enum('a','b')", 'text[]', 'unknown'])(
+    'passes unrecognized type %s through unchanged',
+    (input) => {
+      expect(normalizeType(input)).toBe(input);
+    }
+  );
 });
