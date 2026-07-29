@@ -1,4 +1,4 @@
-import { type EntityMetadata, ReferenceKind } from '@mikro-orm/core';
+import { type EntityMetadata, type EntityProperty, ReferenceKind } from '@mikro-orm/core';
 import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo, PropJsDocMap } from '../docs/jsdoc.js';
 import { emitWarning, type WarnHandler } from '../messages.js';
 import { buildDiagramModel } from './diagram.js';
@@ -58,16 +58,7 @@ export function buildDocumentModel(
   const { entities: diagramEntities, relations } = buildDiagramModel(metas);
   const metadataByClass = new Map(metas.map((meta) => [meta.className, meta]));
   const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props, onWarn);
-
-  // Classes excluded via @hidden — FK columns pointing at them would otherwise
-  // dangle (their edge is dropped, but the column would still reference a target
-  // that no longer appears anywhere).
-  const hiddenClasses = new Set<string>();
-  for (const model of diagramEntities) {
-    if (jsDocResult.entities.get(model.className)?.hidden) {
-      hiddenClasses.add(model.className);
-    }
-  }
+  const hiddenClasses = collectHiddenClasses(diagramEntities, jsDocResult);
 
   // Build enriched entity map, filtering out @hidden entities.
   const enrichedByClass = new Map<string, EnrichedEntity>();
@@ -76,74 +67,15 @@ export function buildDocumentModel(
     if (jsDoc?.hidden) {
       continue;
     }
-    const hiddenForeignKeyColumns = model.columns.filter(
-      (column) =>
-        column.isForeignKey && column.referencedEntity !== undefined && hiddenClasses.has(column.referencedEntity)
+    enrichedByClass.set(
+      model.className,
+      buildEnrichedEntity(model, jsDoc, jsDocResult, metadataByClass, hiddenClasses)
     );
-    const hiddenForeignKeyFieldNames = new Set(hiddenForeignKeyColumns.map((column) => column.fieldName));
-    const visibleModelWithoutHiddenForeignKeys =
-      hiddenForeignKeyFieldNames.size === 0
-        ? model
-        : {
-            ...model,
-            columns: model.columns.filter((column) => !hiddenForeignKeyFieldNames.has(column.fieldName)),
-            constraints: model.constraints.filter(
-              (constraint) =>
-                constraint.type === 'check' ||
-                constraint.properties.every((property) => !hiddenForeignKeyFieldNames.has(property))
-            ),
-          };
-    const visibleModel = removeHiddenEntityReferences(visibleModelWithoutHiddenForeignKeys, hiddenClasses);
-    const stiPropDocs = withInheritedStiPropDocs(model, metadataByClass, jsDocResult.props, hiddenClasses);
-    const propDocs = withEmbeddedPropDocs(stiPropDocs, visibleModel.columns, jsDocResult.props);
-    enrichedByClass.set(model.className, { model: visibleModel, jsDoc, propDocs });
-  }
-
-  // Collect all unique namespace names referenced by any entity.
-  const groupNames = new Set<string>();
-  let anyUntagged = false;
-  for (const { jsDoc } of enrichedByClass.values()) {
-    const allNs = [...(jsDoc?.namespaces ?? []), ...(jsDoc?.erdNamespaces ?? []), ...(jsDoc?.describeNamespaces ?? [])];
-    if (allNs.length === 0) {
-      anyUntagged = true;
-    } else {
-      for (const ns of allNs) {
-        groupNames.add(ns);
-      }
-    }
-  }
-  if (anyUntagged) {
-    groupNames.add(DEFAULT_NAMESPACE);
   }
 
   const groups: NamespaceGroup[] = [];
-  for (const groupName of groupNames) {
-    const isDefault = groupName === DEFAULT_NAMESPACE;
-
-    const erdEntities = [...enrichedByClass.values()]
-      .filter(({ jsDoc }) => belongsToGroup(jsDoc, groupName, isDefault, 'erdNamespaces'))
-      .map((entity): EnrichedEntity | null => {
-        if (isCrossNamespaceInGroup(entity.jsDoc, groupName)) {
-          const pkColumns = entity.model.columns.filter((col) => col.isPrimary);
-          // If no PK columns remain (e.g. FK-as-PK to a @hidden entity was filtered out),
-          // exclude the entity entirely: an empty box with dangling arrows is misleading.
-          if (pkColumns.length === 0) {
-            return null;
-          }
-          return { ...entity, model: { ...entity.model, columns: pkColumns } };
-        }
-        return entity;
-      })
-      .filter((entity): entity is EnrichedEntity => entity !== null);
-
-    const textEntities = [...enrichedByClass.values()].filter(({ jsDoc }) =>
-      belongsToGroup(jsDoc, groupName, isDefault, 'describeNamespaces')
-    );
-
-    const erdClassNames = new Set(erdEntities.map((e) => e.model.className));
-    const erdRelations = allRelations.filter((r) => erdClassNames.has(r.fromEntity) && erdClassNames.has(r.toEntity));
-
-    groups.push({ name: groupName, erdEntities, textEntities, erdRelations });
+  for (const groupName of collectGroupNames(enrichedByClass.values())) {
+    groups.push(buildNamespaceGroup(groupName, enrichedByClass, allRelations));
   }
 
   // Sort alphabetically; "default" is always last.
@@ -160,7 +92,106 @@ export function buildDocumentModel(
   return { title, groups, ...(description !== undefined && { description }) };
 }
 
-function removeHiddenEntityReferences(model: EntityModel, hiddenClasses: Set<string>): EntityModel {
+/**
+ * Classes excluded via @hidden — FK columns pointing at them would otherwise
+ * dangle (their edge is dropped, but the column would still reference a target
+ * that no longer appears anywhere).
+ */
+function collectHiddenClasses(diagramEntities: EntityModel[], jsDocResult: JsDocResult): Set<string> {
+  const hiddenClasses = new Set<string>();
+  for (const model of diagramEntities) {
+    if (jsDocResult.entities.get(model.className)?.hidden) {
+      hiddenClasses.add(model.className);
+    }
+  }
+  return hiddenClasses;
+}
+
+/** Merges one diagram entity with its JSDoc, pruning columns and constraints that reference @hidden targets. */
+function buildEnrichedEntity(
+  model: EntityModel,
+  jsDoc: EntityJsDocInfo | undefined,
+  jsDocResult: JsDocResult,
+  metadataByClass: ReadonlyMap<string, EntityMetadata>,
+  hiddenClasses: ReadonlySet<string>
+): EnrichedEntity {
+  const hiddenForeignKeyColumns = model.columns.filter(
+    (column) =>
+      column.isForeignKey && column.referencedEntity !== undefined && hiddenClasses.has(column.referencedEntity)
+  );
+  const hiddenForeignKeyFieldNames = new Set(hiddenForeignKeyColumns.map((column) => column.fieldName));
+  const visibleModelWithoutHiddenForeignKeys =
+    hiddenForeignKeyFieldNames.size === 0
+      ? model
+      : {
+          ...model,
+          columns: model.columns.filter((column) => !hiddenForeignKeyFieldNames.has(column.fieldName)),
+          constraints: model.constraints.filter(
+            (constraint) =>
+              constraint.type === 'check' ||
+              constraint.properties.every((property) => !hiddenForeignKeyFieldNames.has(property))
+          ),
+        };
+  const visibleModel = removeHiddenEntityReferences(visibleModelWithoutHiddenForeignKeys, hiddenClasses);
+  const stiPropDocs = withInheritedStiPropDocs(model, metadataByClass, jsDocResult.props, hiddenClasses);
+  const propDocs = withEmbeddedPropDocs(stiPropDocs, visibleModel.columns, jsDocResult.props);
+  return { model: visibleModel, jsDoc, propDocs };
+}
+
+/** Collects all unique namespace names referenced by any entity; untagged entities add the "default" group. */
+function collectGroupNames(enriched: Iterable<EnrichedEntity>): Set<string> {
+  const groupNames = new Set<string>();
+  let anyUntagged = false;
+  for (const { jsDoc } of enriched) {
+    const allNs = [...(jsDoc?.namespaces ?? []), ...(jsDoc?.erdNamespaces ?? []), ...(jsDoc?.describeNamespaces ?? [])];
+    if (allNs.length === 0) {
+      anyUntagged = true;
+    } else {
+      for (const ns of allNs) {
+        groupNames.add(ns);
+      }
+    }
+  }
+  if (anyUntagged) {
+    groupNames.add(DEFAULT_NAMESPACE);
+  }
+  return groupNames;
+}
+
+function buildNamespaceGroup(
+  groupName: string,
+  enrichedByClass: ReadonlyMap<string, EnrichedEntity>,
+  allRelations: RelationEdge[]
+): NamespaceGroup {
+  const isDefault = groupName === DEFAULT_NAMESPACE;
+
+  const erdEntities = [...enrichedByClass.values()]
+    .filter(({ jsDoc }) => belongsToGroup(jsDoc, groupName, isDefault, 'erdNamespaces'))
+    .map((entity): EnrichedEntity | null => {
+      if (isCrossNamespaceInGroup(entity.jsDoc, groupName)) {
+        const pkColumns = entity.model.columns.filter((col) => col.isPrimary);
+        // If no PK columns remain (e.g. FK-as-PK to a @hidden entity was filtered out),
+        // exclude the entity entirely: an empty box with dangling arrows is misleading.
+        if (pkColumns.length === 0) {
+          return null;
+        }
+        return { ...entity, model: { ...entity.model, columns: pkColumns } };
+      }
+      return entity;
+    })
+    .filter((entity): entity is EnrichedEntity => entity !== null);
+
+  const textEntities = [...enrichedByClass.values()].filter(({ jsDoc }) =>
+    belongsToGroup(jsDoc, groupName, isDefault, 'describeNamespaces')
+  );
+
+  const erdClassNames = new Set(erdEntities.map((e) => e.model.className));
+  const erdRelations = allRelations.filter((r) => erdClassNames.has(r.fromEntity) && erdClassNames.has(r.toEntity));
+
+  return { name: groupName, erdEntities, textEntities, erdRelations };
+}
+
+function removeHiddenEntityReferences(model: EntityModel, hiddenClasses: ReadonlySet<string>): EntityModel {
   if (model.extendsEntity === undefined || !hiddenClasses.has(model.extendsEntity)) {
     return model;
   }
@@ -265,36 +296,18 @@ function applyAtLeastOne(
         continue;
       }
 
-      let edge: RelationEdge | undefined;
-      // 1:N collection — the edge comes from the m:1 owning side; bump its "many" (from) side.
-      if (prop.kind === ReferenceKind.ONE_TO_MANY && prop.mappedBy) {
-        edge = adjusted.find(
-          (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
-        );
-        if (edge) {
-          edge.fromCardinality = FROM_ONE_OR_MORE;
-        }
-      }
-      // M:N owning collection — edge built from this prop; the other (to) side becomes one-or-more.
-      else if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.owner === true) {
-        edge = adjusted.find((e) => e.fromEntity === className && e.toEntity === prop.type && e.label === propName);
-        if (edge) {
-          edge.toCardinality = TO_ONE_OR_MORE;
-        }
-      }
-      // M:N inverse collection — edge built from the owner; this (from) side becomes one-or-more.
-      else if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.mappedBy) {
-        edge = adjusted.find(
-          (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
-        );
-        if (edge) {
-          edge.fromCardinality = FROM_ONE_OR_MORE;
+      const match = findAtLeastOneEdge(adjusted, className, propName, prop);
+      if (match) {
+        if (match.side === 'from') {
+          match.edge.fromCardinality = FROM_ONE_OR_MORE;
+        } else {
+          match.edge.toCardinality = TO_ONE_OR_MORE;
         }
       }
 
       // No matching edge: a unidirectional @OneToMany (no mappedBy) or a label
       // mismatch leaves the cardinality unchanged. Warn instead of failing silently.
-      if (!edge) {
+      if (!match) {
         emitWarning(onWarn, {
           title: '@atLeastOne had no effect',
           detail: `@atLeastOne on ${className}.${propName} had no effect: no matching relation edge was found.`,
@@ -307,6 +320,40 @@ function applyAtLeastOne(
   }
 
   return adjusted;
+}
+
+/**
+ * Finds the rendered edge a collection property's @atLeastOne applies to, and
+ * which end of that edge is the collection ("many") side. Edges are always
+ * built from the owning side, so an inverse collection matches back via its
+ * mappedBy label.
+ */
+function findAtLeastOneEdge(
+  adjusted: RelationEdge[],
+  className: string,
+  propName: string,
+  prop: EntityProperty
+): { edge: RelationEdge; side: 'from' | 'to' } | undefined {
+  // 1:N collection — the edge comes from the m:1 owning side; bump its "many" (from) side.
+  if (prop.kind === ReferenceKind.ONE_TO_MANY && prop.mappedBy) {
+    const edge = adjusted.find(
+      (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
+    );
+    return edge ? { edge, side: 'from' } : undefined;
+  }
+  // M:N owning collection — edge built from this prop; the other (to) side becomes one-or-more.
+  if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.owner === true) {
+    const edge = adjusted.find((e) => e.fromEntity === className && e.toEntity === prop.type && e.label === propName);
+    return edge ? { edge, side: 'to' } : undefined;
+  }
+  // M:N inverse collection — edge built from the owner; this (from) side becomes one-or-more.
+  if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.mappedBy) {
+    const edge = adjusted.find(
+      (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
+    );
+    return edge ? { edge, side: 'from' } : undefined;
+  }
+  return undefined;
 }
 
 function hasNoNamespaceTags(jsDoc: EntityJsDocInfo | undefined): boolean {
