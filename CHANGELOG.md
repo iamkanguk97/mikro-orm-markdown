@@ -5,6 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-07-29
+
+### Added
+
+- The CLI renders long guidance warnings and structured errors as readable multi-line sections with detail, impact, and fix lines
+
+### Fixed
+
+- CLI output is written atomically through a same-directory temporary file and rename, so a failed write can no longer truncate or delete an existing document
+- Descriptions beginning with list markers or thematic-break lines, or containing `~`, now render as literal text instead of becoming Markdown lists, horizontal rules, or strikethrough
+- Composite foreign-key column types stay aligned across multiple FK-as-PK hops, and recursive FK cycles resolve without the previous arbitrary recursion-depth fallback
+- Mermaid quoted text encodes `"` and `#` safely, and Unicode or sanitized entity/column identifiers no longer collide in generated diagrams
+- JSDoc metadata and explicit `src` coverage bind to source declarations (normalized path plus class identity), so an unrelated class sharing an entity's name can no longer satisfy coverage or leak its tags; embeddable sources are validated in explicit coverage
+- Index and unique fidelity: property-level named indexes and uniques are preserved, expression and partial indexes render their metadata instead of empty column lists, and composite one-to-one uniqueness models as a single ordered constraint
+- Constraints referencing FK columns of `@hidden` entities are removed from the rendered output
+- STI child entities inherit parent property documentation, with child JSDoc overriding the parent's
+- `@Formula` callbacks receive physical table and column metadata instead of empty names and TypeScript property keys
+- Owning one-to-one relations render inverse participation as zero-or-one, matching the physical schema guarantee
+- Entities tagged with an explicit `@namespace default` (or `@erd`/`@describe default`) are no longer dropped from generated documentation
+- Metadata discovery errors survive cache-cleanup failures, including non-extensible errors, and cleanup-only failures surface as an `AggregateError`
+- A missing `@mikro-orm/reflection` peer is distinguished from a broken transitive import, and the metadata-provider fallback no longer depends on English error text
+- Structured warning payloads are gated behind warn-handler arity, so variadic loggers such as `console.warn` keep single-line output
+
+### Changed
+
+- `@mikro-orm/core` and `@mikro-orm/reflection` peer ranges are capped to `>=6.0.0 <7`; MikroORM 7 requires Node >= 22.17 and is tracked as a separate migration target
+- The package smoke test now installs the packed tarball with explicit MikroORM v6 peers and generates a real document through the installed ESM API, CJS API, and CLI binary, and CI validates the artifact on Node 18/20/22 consumer jobs without repository dev dependencies
+- Internal source and test refactor with no behavior change: shared error-chain/renderable/column-marker/default modules, decomposed diagram/document/CLI builders, and consolidated test helpers
+
 ## [0.1.2] - 2026-07-06
 
 ### Fixed
