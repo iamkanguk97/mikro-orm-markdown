@@ -143,6 +143,21 @@ describe('loadJsDoc', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  it('exact-matches an entity source path that still needs normalization', () => {
+    const loaded = loadJsDoc([COLLISION_ENTITY_SOURCE]);
+    // Same file addressed through a redundant "./" segment — only the entity
+    // side is unnormalized; declaration paths are normalized by loadJsDoc.
+    const unnormalized = COLLISION_ENTITY_SOURCE.replace(
+      `${path.sep}CollisionEntity.ts`,
+      `${path.sep}.${path.sep}CollisionEntity.ts`
+    );
+
+    const bound = bindJsDocToEntitySources(loaded, new Map([['CollisionEntity', unnormalized]]));
+
+    expect(bound.classNames).toContain('CollisionEntity');
+    expect(bound.entities.get('CollisionEntity')?.description).toBe('Entity source description');
+  });
 });
 
 describe('loadJsDoc — property descriptions', () => {

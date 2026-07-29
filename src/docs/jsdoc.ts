@@ -1,7 +1,7 @@
 import type { ClassDeclaration, JSDoc as MorphJsDoc, ParameterDeclaration } from 'ts-morph';
 import { Project, ts } from 'ts-morph';
 import { errorMessage } from '../error-chain.js';
-import { StructuredError } from '../messages.js';
+import { StructuredError, type WarnHandler } from '../messages.js';
 import { normalizeSourcePath } from '../source-path.js';
 
 /** JSDoc information extracted from an entity class. */
@@ -69,7 +69,7 @@ const TYPESCRIPT_SOURCE = /\.(c|m)?tsx?$/i;
  * Returns empty maps if no source files are given or no JSDoc is found.
  * Never throws — errors are reported through onWarn so missing docs don't block generation.
  */
-export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => void): LoadedJsDocResult {
+export function loadJsDoc(filePaths: string[], onWarn?: WarnHandler): LoadedJsDocResult {
   const entities: EntityJsDocMap = new Map();
   const props: PropJsDocMap = new Map();
   const classNames = new Set<string>();
@@ -112,7 +112,7 @@ export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => voi
           continue;
         }
         const sourcePath = normalizeSourcePath(sourceFile.getFilePath());
-        const declarationKey = JSON.stringify([sourcePath, className]);
+        const declarationKey = declarationIdentity(sourcePath, className);
         if (declarationKeys.has(declarationKey)) {
           continue;
         }
@@ -155,17 +155,34 @@ export function bindJsDocToEntitySources(
   const props: PropJsDocMap = new Map();
   const classNames = new Set<string>();
 
+  // Index the declarations once instead of scanning them per entity. Their
+  // sourcePath is already normalized by loadJsDoc, so only the entity side
+  // needs normalizing. First declaration wins on a duplicate identity, and
+  // candidate lists keep insertion order — matching the previous find/filter.
+  const declarationsByIdentity = new Map<string, JsDocDeclaration>();
+  const typeScriptDeclarationsByClassName = new Map<string, JsDocDeclaration[]>();
+  for (const declaration of jsDocResult.declarations) {
+    const identity = declarationIdentity(declaration.sourcePath, declaration.className);
+    if (!declarationsByIdentity.has(identity)) {
+      declarationsByIdentity.set(identity, declaration);
+    }
+    if (TYPESCRIPT_SOURCE.test(declaration.sourcePath)) {
+      const candidates = typeScriptDeclarationsByClassName.get(declaration.className);
+      if (candidates === undefined) {
+        typeScriptDeclarationsByClassName.set(declaration.className, [declaration]);
+      } else {
+        candidates.push(declaration);
+      }
+    }
+  }
+
   for (const [className, sourcePath] of entitySourcePaths) {
     const canUseTypeScriptFallback =
       options.allowCompiledSourceFallback === true && !TYPESCRIPT_SOURCE.test(sourcePath);
-    const exactDeclaration = jsDocResult.declarations.find(
-      (candidate) =>
-        candidate.className === className &&
-        normalizeSourcePath(candidate.sourcePath) === normalizeSourcePath(sourcePath)
+    const exactDeclaration = declarationsByIdentity.get(
+      declarationIdentity(normalizeSourcePath(sourcePath), className)
     );
-    const fallbackCandidates = jsDocResult.declarations.filter(
-      (candidate) => candidate.className === className && TYPESCRIPT_SOURCE.test(candidate.sourcePath)
-    );
+    const fallbackCandidates = typeScriptDeclarationsByClassName.get(className) ?? [];
     if (exactDeclaration === undefined && canUseTypeScriptFallback && fallbackCandidates.length > 1) {
       const candidatePaths = fallbackCandidates.map((candidate) => candidate.sourcePath).sort();
       throw new StructuredError({
@@ -198,6 +215,10 @@ export function bindJsDocToEntitySources(
   return { entities, props, sourceFileCount: jsDocResult.sourceFileCount, classNames };
 }
 
+function declarationIdentity(sourcePath: string, className: string): string {
+  return JSON.stringify([sourcePath, className]);
+}
+
 function hasGlobPattern(filePath: string): boolean {
   return /[*?[\]{}]/.test(filePath);
 }
@@ -206,12 +227,12 @@ function collectPropJsDocs(cls: ClassDeclaration): Map<string, PropJsDocInfo> {
   const propMap = new Map<string, PropJsDocInfo>();
 
   for (const prop of [...cls.getProperties(), ...cls.getGetAccessors()]) {
-    const info = parsePropJsDoc(prop.getJsDocs());
+    const info = parsePropInfo(fromMorphJsDocs(prop.getJsDocs()));
     addPropInfo(propMap, prop.getName(), info);
   }
 
   for (const prop of getConstructorParameterProperties(cls)) {
-    const info = parseCompilerPropJsDoc(ts.getJSDocCommentsAndTags(prop.compilerNode));
+    const info = parsePropInfo(fromCompilerJsDocs(ts.getJSDocCommentsAndTags(prop.compilerNode)));
     addPropInfo(propMap, prop.getName(), info);
   }
 
@@ -270,44 +291,46 @@ function parseEntityJsDoc(jsDocs: MorphJsDoc[]): EntityJsDocInfo {
   };
 }
 
-function parsePropJsDoc(jsDocs: MorphJsDoc[]): PropJsDocInfo {
-  let description: string | undefined;
-  let atLeastOne = false;
-
-  for (const doc of jsDocs) {
-    const desc = doc.getDescription().trim();
-    if (desc && description === undefined) {
-      description = desc;
-    }
-    for (const tag of doc.getTags()) {
-      if (tag.getTagName() === 'atLeastOne') {
-        atLeastOne = true;
-      }
-    }
-  }
-
-  return { ...(description !== undefined && { description }), atLeastOne };
+/** One JSDoc block reduced to what property parsing needs, regardless of which API produced it. */
+interface JsDocBlock {
+  description?: string;
+  tagNames: string[];
 }
 
-function parseCompilerPropJsDoc(jsDocs: readonly (ts.JSDoc | ts.JSDocTag)[]): PropJsDocInfo {
+function fromMorphJsDocs(jsDocs: MorphJsDoc[]): JsDocBlock[] {
+  return jsDocs.map((doc) => {
+    const description = doc.getDescription().trim();
+    return {
+      ...(description !== '' && { description }),
+      tagNames: doc.getTags().map((tag) => tag.getTagName()),
+    };
+  });
+}
+
+/** Constructor parameter properties only surface through the raw compiler API, where a bare tag is its own block. */
+function fromCompilerJsDocs(jsDocs: readonly (ts.JSDoc | ts.JSDocTag)[]): JsDocBlock[] {
+  return jsDocs.map((doc) => {
+    if (ts.isJSDoc(doc)) {
+      const description = formatCompilerJsDocComment(doc.comment);
+      return {
+        ...(description !== undefined && { description }),
+        tagNames: (doc.tags ?? []).map((tag) => tag.tagName.getText()),
+      };
+    }
+    return { tagNames: [doc.tagName.getText()] };
+  });
+}
+
+/** The first non-empty description wins; @atLeastOne in any block marks the property. */
+function parsePropInfo(blocks: JsDocBlock[]): PropJsDocInfo {
   let description: string | undefined;
   let atLeastOne = false;
 
-  for (const doc of jsDocs) {
-    if (ts.isJSDoc(doc)) {
-      const desc = formatCompilerJsDocComment(doc.comment);
-      if (desc && description === undefined) {
-        description = desc;
-      }
-      for (const tag of doc.tags ?? []) {
-        if (tag.tagName.getText() === 'atLeastOne') {
-          atLeastOne = true;
-        }
-      }
-      continue;
+  for (const block of blocks) {
+    if (block.description !== undefined && description === undefined) {
+      description = block.description;
     }
-
-    if (doc.tagName.getText() === 'atLeastOne') {
+    if (block.tagNames.includes('atLeastOne')) {
       atLeastOne = true;
     }
   }
