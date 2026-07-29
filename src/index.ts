@@ -1,5 +1,6 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
 import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
+import { causeChain } from './error-chain.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
 import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
 import { buildDocumentModel, type DocumentModel } from './model/build.js';
@@ -162,18 +163,7 @@ function assertExplicitEmbeddableJsDocSourceCoverage(jsDocResult: JsDocResult, d
 }
 
 function hasMissingTsMorphSourceError(err: unknown): boolean {
-  const seen = new Set<unknown>();
-  let current: unknown = err;
-
-  while (current !== null && typeof current === 'object' && !seen.has(current)) {
-    if (current instanceof MissingTsMorphSourceError) {
-      return true;
-    }
-    seen.add(current);
-    current = (current as { cause?: unknown }).cause;
-  }
-
-  return false;
+  return causeChain(err).some((entry) => entry instanceof MissingTsMorphSourceError);
 }
 
 async function loadEntityMetadataWithTsMorphFallback(

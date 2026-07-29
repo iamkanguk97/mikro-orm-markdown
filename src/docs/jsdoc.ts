@@ -1,5 +1,6 @@
 import type { ClassDeclaration, JSDoc as MorphJsDoc, ParameterDeclaration } from 'ts-morph';
 import { Project, ts } from 'ts-morph';
+import { errorMessage } from '../error-chain.js';
 import { StructuredError } from '../messages.js';
 import { normalizeSourcePath } from '../source-path.js';
 
@@ -98,7 +99,7 @@ export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => voi
         onWarn?.(`No JSDoc source file matched path: ${filePath}`);
       }
     } catch (err) {
-      onWarn?.(`Could not load JSDoc source path "${filePath}": ${formatUnknownError(err)}`);
+      onWarn?.(`Could not load JSDoc source path "${filePath}": ${errorMessage(err)}`);
     }
   }
 
@@ -137,7 +138,7 @@ export function loadJsDoc(filePaths: string[], onWarn?: (message: string) => voi
         });
       }
     } catch (err) {
-      onWarn?.(`Could not parse JSDoc source file "${sourceFile.getFilePath()}": ${formatUnknownError(err)}`);
+      onWarn?.(`Could not parse JSDoc source file "${sourceFile.getFilePath()}": ${errorMessage(err)}`);
     }
   }
 
@@ -195,10 +196,6 @@ export function bindJsDocToEntitySources(
   }
 
   return { entities, props, sourceFileCount: jsDocResult.sourceFileCount, classNames };
-}
-
-function formatUnknownError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 function hasGlobPattern(filePath: string): boolean {

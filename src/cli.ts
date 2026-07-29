@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command, Option } from 'commander';
+import { causeChain, errorMessage } from './error-chain.js';
 import { generateMarkdown, StructuredError, type StructuredMessage } from './index.js';
 import type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
 import { MERMAID_LAYOUTS, MERMAID_THEMES } from './render/mermaid.js';
@@ -117,7 +118,7 @@ export async function loadOrmOptions(
       mod = (await import(/* @vite-ignore */ configUrl)) as { default?: unknown };
     } catch (cause) {
       if (isTypeScriptConfig) {
-        const detail = cause instanceof Error ? cause.message : String(cause);
+        const detail = errorMessage(cause);
         throw new Error(
           `Failed to load TypeScript config.\n${detail}\n\n` +
             'If this looks like a decorator/metadata error, the tsconfig applied to your ' +
@@ -175,18 +176,15 @@ export async function loadOrmOptions(
  */
 export function formatErrorChain(err: unknown): string {
   const lines: string[] = [];
-  const seen = new Set<unknown>();
-  let current: unknown = err;
 
-  while (current instanceof Error && !seen.has(current)) {
-    seen.add(current);
-    lines.push(current.message);
-    current = (current as { cause?: unknown }).cause;
-  }
-
-  // A non-Error cause at the end of the chain still carries information.
-  if (current !== undefined && !(current instanceof Error)) {
-    lines.push(String(current));
+  for (const entry of causeChain(err)) {
+    if (!(entry instanceof Error)) {
+      // A non-Error link still carries information, but nothing behind it is
+      // trustworthy enough to format — stop the chain there.
+      lines.push(String(entry));
+      break;
+    }
+    lines.push(entry.message);
   }
 
   return lines.map((line, i) => (i === 0 ? line : `  ↳ caused by: ${line}`)).join('\n');
@@ -264,12 +262,8 @@ export function formatCliError(err: unknown): string {
 }
 
 function formatFileSystemError(cause: unknown): string {
-  if (cause instanceof Error) {
-    const code = 'code' in cause && typeof cause.code === 'string' ? ` (${cause.code})` : '';
-    return `${cause.message}${code}`;
-  }
-
-  return String(cause);
+  const code = cause instanceof Error && 'code' in cause && typeof cause.code === 'string' ? ` (${cause.code})` : '';
+  return `${errorMessage(cause)}${code}`;
 }
 
 function hasFileSystemErrorCode(cause: unknown, code: string): boolean {
@@ -381,9 +375,7 @@ async function run(opts: CliOptions): Promise<void> {
   try {
     ormOptions = await loadOrmOptions(configPath, opts.tsconfig, { keepTsxRegistered: true });
   } catch (err) {
-    process.stderr.write(
-      `Error: Cannot load config: ${configPath}\n${err instanceof Error ? err.message : String(err)}\n`
-    );
+    process.stderr.write(`Error: Cannot load config: ${configPath}\n${errorMessage(err)}\n`);
     process.exit(1);
   }
 
@@ -409,7 +401,7 @@ async function run(opts: CliOptions): Promise<void> {
   try {
     await writeMarkdownFile(outPath, markdown);
   } catch (err) {
-    process.stderr.write(`Error: ${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`Error: ${errorMessage(err)}\n`);
     process.exit(1);
   }
 
@@ -461,7 +453,7 @@ function isDirectCliExecution(): boolean {
 
 if (isDirectCliExecution()) {
   program.parseAsync(process.argv).catch((err: unknown) => {
-    process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    process.stderr.write(`${errorMessage(err)}\n`);
     process.exit(1);
   });
 }
