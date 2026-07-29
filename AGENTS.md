@@ -136,7 +136,7 @@ Refs: #42
 - **No `src/` changes without tests.** Every behaviour change needs a corresponding test.
 - **Biome enforces formatting.** Run `npm run lint:fix` before committing; the pre-commit hook runs lint-staged automatically.
 - **Dual build output.** `dist/index.js` (ESM) + `dist/index.cjs` (CJS) + `dist/cli.js`. Always verify with `npm run test:pack` after build changes.
-- **Peer dependencies.** `@mikro-orm/core` ≥6 and `tsx` (optional) are peers, not bundled. Do not add them to `dependencies`.
+- **Peer dependencies.** `@mikro-orm/core` ≥6 <7 and `tsx` (optional) are peers, not bundled. Do not add them to `dependencies`. MikroORM v7 is unsupported (needs Node ≥22.17); widening the range is a deliberate migration, not a version bump.
 - **Node ≥18.19.0** is the minimum runtime target.
 - **`src/` is pure ESM.** Use `.js` extensions on relative imports (TypeScript resolves them to `.ts` at compile time).
 - **Use `node:` specifiers for Node builtins** (`node:path`, `node:fs`, …) in both `src/` and `test/`.
