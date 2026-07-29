@@ -6,24 +6,25 @@ import type { StructuredMessage } from '../../src/messages.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDocumentModel } from '../../src/model/build.js';
 import config from '../fixtures/mikro-orm.config.js';
+import { makeEntityMeta, makeSimpleEntityMeta, pkProperty } from '../helpers/entity-meta.js';
 import { getFixtureDocModel, getFixtureMetas } from '../helpers/pipeline.js';
 
 function createManyToManyMetas(): EntityMetadata[] {
-  const post = Object.assign({} as EntityMetadata, {
+  const post = makeEntityMeta({
     className: 'Post',
     tableName: 'post',
     primaryKeys: ['id'],
     properties: {
-      id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      id: pkProperty(),
       tags: { name: 'tags', type: 'Tag', kind: ReferenceKind.MANY_TO_MANY, owner: true },
     },
   });
-  const tag = Object.assign({} as EntityMetadata, {
+  const tag = makeEntityMeta({
     className: 'Tag',
     tableName: 'tag',
     primaryKeys: ['id'],
     properties: {
-      id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+      id: pkProperty(),
       posts: { name: 'posts', type: 'Post', kind: ReferenceKind.MANY_TO_MANY, mappedBy: 'tags' },
     },
   });
@@ -38,17 +39,6 @@ function createAtLeastOneJsDoc(className: string, propName: string): JsDocResult
     sourceFileCount: 0,
     classNames: new Set(),
   };
-}
-
-function createSimpleEntityMeta(className: string): EntityMetadata {
-  return Object.assign({} as EntityMetadata, {
-    className,
-    tableName: className.toLowerCase(),
-    primaryKeys: ['id'],
-    properties: {
-      id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
-    },
-  });
 }
 
 function createStiEntityMeta(
@@ -69,7 +59,7 @@ function createStiEntityMeta(
     ])
   );
 
-  return Object.assign({} as EntityMetadata, {
+  return makeEntityMeta({
     className,
     tableName: 'sti_entity',
     primaryKeys: propertyNames.includes('id') ? ['id'] : [],
@@ -83,12 +73,12 @@ function createStiEntityMeta(
 describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
   it('warns when @atLeastOne cannot be matched to a relation edge', () => {
     // A unidirectional @OneToMany (no mappedBy) produces no edge to adjust.
-    const parent = Object.assign({} as EntityMetadata, {
+    const parent = makeEntityMeta({
       className: 'Parent',
       tableName: 'parent',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         children: { name: 'children', type: 'Child', kind: ReferenceKind.ONE_TO_MANY },
       },
     });
@@ -130,12 +120,12 @@ describe('buildDocumentModel — @atLeastOne many-to-many', () => {
 
 describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
   it('drops FK columns that reference a hidden entity', () => {
-    const order = Object.assign({} as EntityMetadata, {
+    const order = makeEntityMeta({
       className: 'Order',
       tableName: 'order',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         secret: {
           name: 'secret',
           fieldNames: ['secret_id'],
@@ -145,12 +135,12 @@ describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
         },
       },
     });
-    const secret = Object.assign({} as EntityMetadata, {
+    const secret = makeEntityMeta({
       className: 'Secret',
       tableName: 'secret',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
       },
     });
     const jsDoc: JsDocResult = {
@@ -169,12 +159,12 @@ describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
   });
 
   it('drops structured constraints that include a hidden FK column', () => {
-    const order = Object.assign({} as EntityMetadata, {
+    const order = makeEntityMeta({
       className: 'Order',
       tableName: 'order',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         status: { name: 'status', fieldNames: ['status'], type: 'string', kind: ReferenceKind.SCALAR },
         secret: {
           name: 'secret',
@@ -191,7 +181,7 @@ describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
       uniques: [{ name: 'order_secret_uq', properties: ['secret_id'] }],
       checks: [{ name: 'order_status_check', expression: "status <> ''" }],
     });
-    const secret = createSimpleEntityMeta('Secret');
+    const secret = makeSimpleEntityMeta('Secret');
     const jsDoc: JsDocResult = {
       entities: new Map([['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
       props: new Map(),
@@ -253,8 +243,8 @@ describe('buildDocumentModel — groups', () => {
 
 describe('buildDocumentModel — explicit default namespace', () => {
   it('includes explicit and untagged entities together in the default ERD and text sections', () => {
-    const payment = createSimpleEntityMeta('Payment');
-    const auditLog = createSimpleEntityMeta('AuditLog');
+    const payment = makeSimpleEntityMeta('Payment');
+    const auditLog = makeSimpleEntityMeta('AuditLog');
     const jsDoc: JsDocResult = {
       entities: new Map([
         ['Payment', { namespaces: ['default'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
@@ -272,8 +262,8 @@ describe('buildDocumentModel — explicit default namespace', () => {
   });
 
   it('respects @erd and @describe scopes when they explicitly target default', () => {
-    const erdOnly = createSimpleEntityMeta('ErdOnly');
-    const textOnly = createSimpleEntityMeta('TextOnly');
+    const erdOnly = makeSimpleEntityMeta('ErdOnly');
+    const textOnly = makeSimpleEntityMeta('TextOnly');
     const jsDoc: JsDocResult = {
       entities: new Map([
         ['ErdOnly', { namespaces: [], erdNamespaces: ['default'], describeNamespaces: [], hidden: false }],
@@ -292,12 +282,12 @@ describe('buildDocumentModel — explicit default namespace', () => {
   });
 
   it('keeps the PK-only projection for @erd default used as a foreign namespace', () => {
-    const widget = Object.assign({} as EntityMetadata, {
+    const widget = makeEntityMeta({
       className: 'Widget',
       tableName: 'widget',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
@@ -323,13 +313,13 @@ describe('buildDocumentModel — explicit default namespace', () => {
   });
 
   it('retains relations between entities explicitly assigned to default', () => {
-    const customer = createSimpleEntityMeta('Customer');
-    const order = Object.assign({} as EntityMetadata, {
+    const customer = makeSimpleEntityMeta('Customer');
+    const order = makeEntityMeta({
       className: 'Order',
       tableName: 'order',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         customer: {
           name: 'customer',
           fieldNames: ['customer_id'],
@@ -434,24 +424,24 @@ describe('buildDocumentModel — @hidden', () => {
   });
 
   it('removes STI extends references to hidden root entities', () => {
-    const animal = Object.assign({} as EntityMetadata, {
+    const animal = makeEntityMeta({
       className: 'Animal',
       tableName: 'animal',
       discriminatorColumn: 'type',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         type: { name: 'type', fieldNames: ['type'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
-    const dog = Object.assign({} as EntityMetadata, {
+    const dog = makeEntityMeta({
       className: 'Dog',
       tableName: 'animal',
       extends: 'Animal',
       discriminatorValue: 'dog',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
@@ -604,12 +594,12 @@ describe('buildDocumentModel — STI property documentation inheritance', () => 
 
 describe('buildDocumentModel — cross-namespace @erd', () => {
   it('shows full columns for an entity that is included only via @erd', () => {
-    const statsMeta = Object.assign({} as EntityMetadata, {
+    const statsMeta = makeEntityMeta({
       className: 'DailyStats',
       tableName: 'daily_stats',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         day: { name: 'day', fieldNames: ['day'], type: 'date', kind: ReferenceKind.SCALAR },
         views: { name: 'views', fieldNames: ['views'], type: 'integer', kind: ReferenceKind.SCALAR },
       },
@@ -631,12 +621,12 @@ describe('buildDocumentModel — cross-namespace @erd', () => {
   });
 
   it('shows only PK columns for entities that appear via @erd in a foreign namespace', () => {
-    const widgetMeta = Object.assign({} as EntityMetadata, {
+    const widgetMeta = makeEntityMeta({
       className: 'Widget',
       tableName: 'widget',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
         code: { name: 'code', fieldNames: ['code'], type: 'string', kind: ReferenceKind.SCALAR },
       },
@@ -663,12 +653,12 @@ describe('buildDocumentModel — cross-namespace @erd', () => {
   });
 
   it('entity with @namespace on both groups shows full columns in both', () => {
-    const nodeMeta = Object.assign({} as EntityMetadata, {
+    const nodeMeta = makeEntityMeta({
       className: 'Node',
       tableName: 'node',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         label: { name: 'label', fieldNames: ['label'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
@@ -695,12 +685,12 @@ describe('buildDocumentModel — cross-namespace @erd edge cases', () => {
   it('treats @describe as a home namespace — shows full columns in ERD even with @erd', () => {
     // Bug #2: @describe X @erd X without @namespace X should NOT be treated as cross-namespace.
     // The entity's home is GroupB (via @describe), so GroupB ERD should show all columns.
-    const itemMeta = Object.assign({} as EntityMetadata, {
+    const itemMeta = makeEntityMeta({
       className: 'Item',
       tableName: 'item',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         title: { name: 'title', fieldNames: ['title'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
@@ -722,15 +712,15 @@ describe('buildDocumentModel — cross-namespace @erd edge cases', () => {
   it('excludes cross-namespace entity from ERD when it has no PK columns to show', () => {
     // Bug #3: If the only column is a FK-as-PK to a @hidden entity, pkColumns = [] after
     // the hidden-FK filter. The entity should be dropped entirely, not rendered as an empty box.
-    const hiddenMeta = Object.assign({} as EntityMetadata, {
+    const hiddenMeta = makeEntityMeta({
       className: 'Secret',
       tableName: 'secret',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
       },
     });
-    const sharedPkMeta = Object.assign({} as EntityMetadata, {
+    const sharedPkMeta = makeEntityMeta({
       className: 'SharedPk',
       tableName: 'shared_pk',
       properties: {

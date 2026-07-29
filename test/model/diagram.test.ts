@@ -2,6 +2,7 @@ import { type EntityMetadata, type FormulaTable, type IndexCallback, ReferenceKi
 import { describe, expect, it } from 'vitest';
 import { buildDiagramModel } from '../../src/model/diagram.js';
 import { renderErDiagram } from '../../src/render/mermaid.js';
+import { makeEntityMeta, pkProperty } from '../helpers/entity-meta.js';
 import { getFixtureDiagramModel } from '../helpers/pipeline.js';
 
 // ─── buildDiagramModel (integration: uses real MikroORM metadata) ─────────────
@@ -154,7 +155,7 @@ describe('buildDiagramModel — @Formula', () => {
   });
 
   it('resolves formula callbacks with physical table, schema, and column metadata', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'SalesOrder',
       tableName: 'sales_order',
       schema: 'billing',
@@ -183,7 +184,7 @@ describe('buildDiagramModel — @Formula', () => {
   });
 
   it('keeps a dynamic wildcard schema out of the qualified table name', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'TenantRecord',
       tableName: 'tenant_record',
       schema: '*',
@@ -205,7 +206,7 @@ describe('buildDiagramModel — @Formula', () => {
   });
 
   it('uses a visible fallback when formula resolution fails', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'Report',
       tableName: 'report',
       properties: {
@@ -230,12 +231,12 @@ describe('buildDiagramModel — @Formula', () => {
   });
 
   it('does not crash on a scalar with no type or an FK with no fieldNames (L4)', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'Loose',
       tableName: 'loose',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         // scalar with no `type`
         mystery: { name: 'mystery', fieldNames: ['mystery'], kind: ReferenceKind.SCALAR },
         // FK with no `fieldNames`
@@ -256,7 +257,7 @@ describe('buildDiagramModel — @Formula', () => {
   });
 
   it('captures @Enum allowed values on the column (M5)', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'Account',
       tableName: 'account',
       properties: {
@@ -277,7 +278,7 @@ describe('buildDiagramModel — @Formula', () => {
   });
 
   it('coerces a non-string formula return value to a string (M4)', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'Rep',
       tableName: 'rep',
       properties: {
@@ -303,12 +304,12 @@ describe('buildDiagramModel — @Formula', () => {
 
 describe('buildDiagramModel — self-reference', () => {
   function makeSelfReferencingManyToOne(): EntityMetadata {
-    return Object.assign({} as EntityMetadata, {
+    return makeEntityMeta({
       className: 'Employee',
       tableName: 'employee',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         manager: {
           name: 'manager',
           type: 'Employee',
@@ -321,12 +322,12 @@ describe('buildDiagramModel — self-reference', () => {
   }
 
   function makeSelfReferencingOneToOne(): EntityMetadata {
-    return Object.assign({} as EntityMetadata, {
+    return makeEntityMeta({
       className: 'Node',
       tableName: 'node',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         twin: {
           name: 'twin',
           type: 'Node',
@@ -361,12 +362,12 @@ describe('buildDiagramModel — self-reference', () => {
   });
 
   it('non-null owning 1:1 keeps inverse participation optional', () => {
-    const userMeta = Object.assign({} as EntityMetadata, {
+    const userMeta = makeEntityMeta({
       className: 'User',
       tableName: 'user',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         profile: {
           name: 'profile',
           type: 'Profile',
@@ -378,12 +379,12 @@ describe('buildDiagramModel — self-reference', () => {
         },
       },
     });
-    const profileMeta = Object.assign({} as EntityMetadata, {
+    const profileMeta = makeEntityMeta({
       className: 'Profile',
       tableName: 'profile',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
       },
     });
 
@@ -401,12 +402,12 @@ describe('buildDiagramModel — self-reference', () => {
   });
 
   it('nullable owning 1:1 keeps both inverse participation and target optional', () => {
-    const userMeta = Object.assign({} as EntityMetadata, {
+    const userMeta = makeEntityMeta({
       className: 'User',
       tableName: 'user',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         profile: {
           name: 'profile',
           type: 'Profile',
@@ -418,12 +419,12 @@ describe('buildDiagramModel — self-reference', () => {
         },
       },
     });
-    const profileMeta = Object.assign({} as EntityMetadata, {
+    const profileMeta = makeEntityMeta({
       className: 'Profile',
       tableName: 'profile',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
       },
     });
 
@@ -443,12 +444,12 @@ describe('buildDiagramModel — self-reference', () => {
 
 describe('buildDiagramModel — persist: false (shadow properties)', () => {
   it('excludes a shadow property (persist: false, no formula) from the columns', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'User',
       tableName: 'user',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         email: { name: 'email', fieldNames: ['email'], type: 'string', kind: ReferenceKind.SCALAR },
         // Shadow property: exists on the entity, but MikroORM never persists it.
         fullNameCache: {
@@ -472,7 +473,7 @@ describe('buildDiagramModel — persist: false (shadow properties)', () => {
   it('still renders an @Formula column even though it is also persist: false', () => {
     // @Formula properties are persist: false internally too, but they are a real,
     // documented feature (a SELECT-time expression) and must keep rendering.
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'Customer',
       tableName: 'customer',
       properties: {
@@ -549,7 +550,7 @@ describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
 
 describe('buildDiagramModel — Constraints', () => {
   function makePropertyUniqueMetas(): EntityMetadata[] {
-    const account = Object.assign({} as EntityMetadata, {
+    const account = makeEntityMeta({
       className: 'Account',
       tableName: 'account',
       primaryKeys: ['id'],
@@ -558,7 +559,7 @@ describe('buildDiagramModel — Constraints', () => {
         { name: 'property_email_uq', properties: ['email'] },
       ],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         legacyCode: {
           name: 'legacyCode',
           fieldNames: ['legacy_code'],
@@ -608,15 +609,15 @@ describe('buildDiagramModel — Constraints', () => {
         },
       },
     });
-    const organization = Object.assign({} as EntityMetadata, {
+    const organization = makeEntityMeta({
       className: 'Organization',
       tableName: 'organization',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
       },
     });
-    const compositeProfile = Object.assign({} as EntityMetadata, {
+    const compositeProfile = makeEntityMeta({
       className: 'CompositeProfile',
       tableName: 'composite_profile',
       primaryKeys: ['tenant', 'id'],
@@ -628,7 +629,7 @@ describe('buildDiagramModel — Constraints', () => {
           kind: ReferenceKind.SCALAR,
           primary: true,
         },
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
       },
     });
 
@@ -645,7 +646,7 @@ describe('buildDiagramModel — Constraints', () => {
   });
 
   it('uses DB field names for index and unique constraint properties', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'Invoice',
       tableName: 'invoice',
       indexes: [{ name: 'invoice_issued_at_idx', properties: ['issuedAt'] }],
@@ -710,7 +711,7 @@ describe('buildDiagramModel — Constraints', () => {
   });
 
   it('models composite owning one-to-one uniqueness as one ordered constraint', () => {
-    const owner = Object.assign({} as EntityMetadata, {
+    const owner = makeEntityMeta({
       className: 'Account',
       tableName: 'account',
       uniques: [{ name: 'account_named_profile_uq', properties: ['namedProfile'] }],
@@ -744,7 +745,7 @@ describe('buildDiagramModel — Constraints', () => {
         },
       },
     });
-    const compositeProfile = Object.assign({} as EntityMetadata, {
+    const compositeProfile = makeEntityMeta({
       className: 'CompositeProfile',
       tableName: 'composite_profile',
       primaryKeys: ['tenant', 'id'],
@@ -756,15 +757,15 @@ describe('buildDiagramModel — Constraints', () => {
           kind: ReferenceKind.SCALAR,
           primary: true,
         },
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
       },
     });
-    const singleProfile = Object.assign({} as EntityMetadata, {
+    const singleProfile = makeEntityMeta({
       className: 'SingleProfile',
       tableName: 'single_profile',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
       },
     });
 
@@ -792,7 +793,7 @@ describe('buildDiagramModel — Constraints', () => {
   });
 
   it('preserves single-field property indexes and deduplicates only an exact tuple', () => {
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'IndexedAccount',
       tableName: 'indexed_account',
       indexes: [
@@ -888,7 +889,7 @@ describe('buildDiagramModel — Constraints', () => {
       columns: Record<string, string>,
       indexName: string
     ): string => `create index ${indexName} on ${table} (${columns.email})`;
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'Account',
       tableName: 'account_entry',
       schema: 'audit',
@@ -940,7 +941,7 @@ describe('buildDiagramModel — Constraints', () => {
     const archivedPredicate = {
       toQuery: (): string => "select * where status = 'archived'",
     };
-    const meta = Object.assign({} as EntityMetadata, {
+    const meta = makeEntityMeta({
       className: 'Account',
       tableName: 'account',
       indexes: [
@@ -1014,14 +1015,14 @@ describe('buildDiagramModel — non-abstract STI root (M1)', () => {
   // A non-abstract STI root is assigned its own discriminatorValue by MikroORM,
   // and its property list includes the child-only columns marked inherited=true.
   function makeNonAbstractStiRoot(): EntityMetadata {
-    return Object.assign({} as EntityMetadata, {
+    return makeEntityMeta({
       className: 'Vehicle',
       tableName: 'vehicle',
       discriminatorColumn: 'type',
       discriminatorValue: 'vehicle',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
         type: { name: 'type', fieldNames: ['type'], type: 'string', kind: ReferenceKind.SCALAR },
         // child-only column that MikroORM surfaces on the root as inherited
@@ -1043,12 +1044,12 @@ describe('buildDiagramModel — non-abstract STI root (M1)', () => {
 
 describe('buildDiagramModel — object/array embedded as single JSON column (M2)', () => {
   function makeOrgWithObjectEmbeddeds(): EntityMetadata {
-    return Object.assign({} as EntityMetadata, {
+    return makeEntityMeta({
       className: 'Org',
       tableName: 'org',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty(),
         // object embedded → single JSON column "addr"
         addr: { name: 'addr', fieldNames: ['addr'], type: 'Addr', kind: ReferenceKind.EMBEDDED, object: true },
         'addr~street': {
@@ -1098,7 +1099,7 @@ describe('buildDiagramModel — object/array embedded as single JSON column (M2)
 
 describe('buildDiagramModel — composite foreign keys', () => {
   it('expands every FK fieldName and preserves referenced PK types', () => {
-    const tenantMeta = Object.assign({} as EntityMetadata, {
+    const tenantMeta = makeEntityMeta({
       className: 'TenantAccount',
       tableName: 'tenant_account',
       primaryKeys: ['regionCode', 'accountId'],
@@ -1119,7 +1120,7 @@ describe('buildDiagramModel — composite foreign keys', () => {
         },
       },
     });
-    const auditLogMeta = Object.assign({} as EntityMetadata, {
+    const auditLogMeta = makeEntityMeta({
       className: 'AuditLog',
       tableName: 'audit_log',
       properties: {
@@ -1165,15 +1166,15 @@ describe('buildDiagramModel — FK-as-PK chain (supertype-subtype)', () => {
     // EntityA: id uuid (scalar PK)
     // EntityB: id PK+FK → EntityA  (B's PK is A's class name until resolved)
     // EntityC: id PK+FK → EntityB  (C should ultimately resolve to uuid, not 'EntityB')
-    const entityA = Object.assign({} as EntityMetadata, {
+    const entityA = makeEntityMeta({
       className: 'EntityA',
       tableName: 'entity_a',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty('id', 'uuid'),
       },
     });
-    const entityB = Object.assign({} as EntityMetadata, {
+    const entityB = makeEntityMeta({
       className: 'EntityB',
       tableName: 'entity_b',
       properties: {
@@ -1188,7 +1189,7 @@ describe('buildDiagramModel — FK-as-PK chain (supertype-subtype)', () => {
         },
       },
     });
-    const entityC = Object.assign({} as EntityMetadata, {
+    const entityC = makeEntityMeta({
       className: 'EntityC',
       tableName: 'entity_c',
       properties: {
@@ -1219,16 +1220,16 @@ describe('buildDiagramModel — composite FK-as-PK chain', () => {
     // A has composite PK (id1: uuid, id2: integer).
     // B's composite PK is FK-as-PK to A — B.b1 → A.id1, B.b2 → A.id2.
     // resolveFkTypes for B must return [uuid, integer] in order, not [uuid, uuid].
-    const entityA = Object.assign({} as EntityMetadata, {
+    const entityA = makeEntityMeta({
       className: 'EntityA',
       tableName: 'entity_a',
       primaryKeys: ['id1', 'id2'],
       properties: {
-        id1: { name: 'id1', fieldNames: ['id1'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
-        id2: { name: 'id2', fieldNames: ['id2'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id1: pkProperty('id1', 'uuid'),
+        id2: pkProperty('id2', 'integer'),
       },
     });
-    const entityB = Object.assign({} as EntityMetadata, {
+    const entityB = makeEntityMeta({
       className: 'EntityB',
       tableName: 'entity_b',
       properties: {
@@ -1256,16 +1257,16 @@ describe('buildDiagramModel — composite FK-as-PK chain', () => {
 
 describe('buildDiagramModel — composite FK-as-PK type resolution', () => {
   it('preserves mixed scalar types across multiple composite FK hops', () => {
-    const entityA = Object.assign({} as EntityMetadata, {
+    const entityA = makeEntityMeta({
       className: 'EntityA',
       tableName: 'entity_a',
       primaryKeys: ['id1', 'id2'],
       properties: {
-        id1: { name: 'id1', fieldNames: ['id1'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
-        id2: { name: 'id2', fieldNames: ['id2'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id1: pkProperty('id1', 'uuid'),
+        id2: pkProperty('id2', 'integer'),
       },
     });
-    const entityB = Object.assign({} as EntityMetadata, {
+    const entityB = makeEntityMeta({
       className: 'EntityB',
       tableName: 'entity_b',
       primaryKeys: ['entityA'],
@@ -1280,7 +1281,7 @@ describe('buildDiagramModel — composite FK-as-PK type resolution', () => {
         },
       },
     });
-    const entityC = Object.assign({} as EntityMetadata, {
+    const entityC = makeEntityMeta({
       className: 'EntityC',
       tableName: 'entity_c',
       primaryKeys: ['entityB'],
@@ -1305,16 +1306,16 @@ describe('buildDiagramModel — composite FK-as-PK type resolution', () => {
   });
 
   it('preserves reordered referenced-column types at the next composite FK hop', () => {
-    const entityA = Object.assign({} as EntityMetadata, {
+    const entityA = makeEntityMeta({
       className: 'EntityA',
       tableName: 'entity_a',
       primaryKeys: ['id1', 'id2'],
       properties: {
-        id1: { name: 'id1', fieldNames: ['id1'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
-        id2: { name: 'id2', fieldNames: ['id2'], type: 'integer', kind: ReferenceKind.SCALAR, primary: true },
+        id1: pkProperty('id1', 'uuid'),
+        id2: pkProperty('id2', 'integer'),
       },
     });
-    const entityB = Object.assign({} as EntityMetadata, {
+    const entityB = makeEntityMeta({
       className: 'EntityB',
       tableName: 'entity_b',
       primaryKeys: ['entityA'],
@@ -1329,7 +1330,7 @@ describe('buildDiagramModel — composite FK-as-PK type resolution', () => {
         },
       },
     });
-    const entityC = Object.assign({} as EntityMetadata, {
+    const entityC = makeEntityMeta({
       className: 'EntityC',
       tableName: 'entity_c',
       primaryKeys: ['entityB'],
@@ -1361,7 +1362,7 @@ describe('buildDiagramModel — cycle-aware FK-as-PK type resolution', () => {
     fieldName: string,
     referencedColumnName: string
   ): EntityMetadata {
-    return Object.assign({} as EntityMetadata, {
+    return makeEntityMeta({
       className,
       tableName: className.toLowerCase(),
       primaryKeys: ['id'],
@@ -1379,12 +1380,12 @@ describe('buildDiagramModel — cycle-aware FK-as-PK type resolution', () => {
   }
 
   it('resolves a UUID through six acyclic FK-as-PK hops', () => {
-    const entityA = Object.assign({} as EntityMetadata, {
+    const entityA = makeEntityMeta({
       className: 'EntityA',
       tableName: 'entity_a',
       primaryKeys: ['id'],
       properties: {
-        id: { name: 'id', fieldNames: ['id'], type: 'uuid', kind: ReferenceKind.SCALAR, primary: true },
+        id: pkProperty('id', 'uuid'),
       },
     });
     const chain = ['EntityB', 'EntityC', 'EntityD', 'EntityE', 'EntityF', 'EntityG'].map((className, index, names) =>
