@@ -46,7 +46,7 @@ jobs:
           npm pack --pack-destination "$RUNNER_TEMP/tarball"
 
       - name: Upload tarball artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: npm-tarball
           path: ${{ runner.temp }}/tarball/*.tgz
@@ -69,7 +69,7 @@ jobs:
           node-version: ${{ matrix.node-version }}
 
       - name: Download tarball artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: npm-tarball
           path: tarball
