@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import * as path from 'path';
+import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { bindJsDocToEntitySources, loadJsDoc } from '../../src/docs/jsdoc.js';
 import { COLLISION_DTO_SOURCE, COLLISION_ENTITY_SOURCE, ENTITY_FIXTURES_GLOB, fixturePath } from '../helpers/paths.js';

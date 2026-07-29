@@ -13,7 +13,7 @@ import { MySqlDriver } from '@mikro-orm/mysql';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { SqliteDriver } from '@mikro-orm/sqlite';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
 import { MetadataLoadError } from '../../src/metadata/load.js';
 import { CoverageAddress, UnusedCoverageAddress } from '../fixtures/embeddable-coverage/Address.js';
@@ -64,10 +64,6 @@ const sqlDriverSmokeCases = [
   ['MySQL', MySqlDriver, 'mikro_orm_markdown_test'],
   ['MariaDB', MariaDbDriver, 'mikro_orm_markdown_test'],
 ] as const;
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe('generateMarkdown', () => {
   it('returns a non-empty markdown string', async () => {

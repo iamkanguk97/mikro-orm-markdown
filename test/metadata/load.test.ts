@@ -1,16 +1,12 @@
+import * as path from 'node:path';
 import { EntitySchema, MikroORM } from '@mikro-orm/core';
 import { SqliteDriver } from '@mikro-orm/sqlite';
-import * as path from 'path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
 import { inMemorySqliteOptions } from '../helpers/orm.js';
 
 describe('loadEntityMetadata', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('returns EntityMetadata for all fixture entities', async () => {
     const { metas } = await loadEntityMetadata(config);
     const classNames = metas.map((m) => m.className);
