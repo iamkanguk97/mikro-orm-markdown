@@ -7,6 +7,7 @@ import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDocumentModel } from '../../src/model/build.js';
 import config from '../fixtures/mikro-orm.config.js';
 import { makeEntityMeta, makeSimpleEntityMeta, pkProperty } from '../helpers/entity-meta.js';
+import { makeJsDocResult } from '../helpers/jsdoc.js';
 import { getFixtureDocModel, getFixtureMetas } from '../helpers/pipeline.js';
 
 function createManyToManyMetas(): EntityMetadata[] {
@@ -33,12 +34,9 @@ function createManyToManyMetas(): EntityMetadata[] {
 }
 
 function createAtLeastOneJsDoc(className: string, propName: string): JsDocResult {
-  return {
-    entities: new Map(),
+  return makeJsDocResult({
     props: new Map([[className, new Map([[propName, { atLeastOne: true }]])]]),
-    sourceFileCount: 0,
-    classNames: new Set(),
-  };
+  });
 }
 
 function createStiEntityMeta(
@@ -82,12 +80,7 @@ describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
         children: { name: 'children', type: 'Child', kind: ReferenceKind.ONE_TO_MANY },
       },
     });
-    const jsDoc: JsDocResult = {
-      entities: new Map(),
-      props: new Map([['Parent', new Map([['children', { atLeastOne: true }]])]]),
-      sourceFileCount: 0,
-      classNames: new Set(),
-    };
+    const jsDoc = createAtLeastOneJsDoc('Parent', 'children');
 
     const calls: [string, StructuredMessage | undefined][] = [];
     buildDocumentModel([parent], jsDoc, 'T', undefined, (message, warning) => {
@@ -143,12 +136,9 @@ describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
         id: pkProperty(),
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
-      props: new Map(),
-      sourceFileCount: 0,
-      classNames: new Set(),
-    };
+    });
 
     const docModel = buildDocumentModel([order, secret], jsDoc, 'T');
     const orderEntity = docModel.groups.flatMap((g) => g.textEntities).find((e) => e.model.className === 'Order');
@@ -182,12 +172,9 @@ describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
       checks: [{ name: 'order_status_check', expression: "status <> ''" }],
     });
     const secret = makeSimpleEntityMeta('Secret');
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
-      props: new Map(),
-      sourceFileCount: 0,
-      classNames: new Set(),
-    };
+    });
 
     const docModel = buildDocumentModel([order, secret], jsDoc, 'T');
     const constraints = docModel.groups
@@ -219,11 +206,7 @@ describe('buildDocumentModel — groups', () => {
   it('"default" is sorted last when it exists', async () => {
     const metas = await getFixtureMetas();
     // Pass empty jsDocResult so no JSDoc loaded → all entities fall into "default"
-    const docModel = buildDocumentModel(
-      metas,
-      { entities: new Map(), props: new Map(), sourceFileCount: 0, classNames: new Set() },
-      'T'
-    );
+    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T');
     const groupNames = docModel.groups.map((g) => g.name);
     expect(groupNames[groupNames.length - 1]).toBe('default');
   });
@@ -245,14 +228,12 @@ describe('buildDocumentModel — explicit default namespace', () => {
   it('includes explicit and untagged entities together in the default ERD and text sections', () => {
     const payment = makeSimpleEntityMeta('Payment');
     const auditLog = makeSimpleEntityMeta('AuditLog');
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['Payment', { namespaces: ['default'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['Payment', 'AuditLog']),
-    };
+    });
 
     const docModel = buildDocumentModel([payment, auditLog], jsDoc, 'T');
     const defaultGroup = docModel.groups.find((group) => group.name === 'default');
@@ -264,15 +245,13 @@ describe('buildDocumentModel — explicit default namespace', () => {
   it('respects @erd and @describe scopes when they explicitly target default', () => {
     const erdOnly = makeSimpleEntityMeta('ErdOnly');
     const textOnly = makeSimpleEntityMeta('TextOnly');
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['ErdOnly', { namespaces: [], erdNamespaces: ['default'], describeNamespaces: [], hidden: false }],
         ['TextOnly', { namespaces: [], erdNamespaces: [], describeNamespaces: ['default'], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['ErdOnly', 'TextOnly']),
-    };
+    });
 
     const docModel = buildDocumentModel([erdOnly, textOnly], jsDoc, 'T');
     const defaultGroup = docModel.groups.find((group) => group.name === 'default');
@@ -291,14 +270,12 @@ describe('buildDocumentModel — explicit default namespace', () => {
         name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['Widget', { namespaces: ['Home'], erdNamespaces: ['default'], describeNamespaces: [], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['Widget']),
-    };
+    });
 
     const docModel = buildDocumentModel([widget], jsDoc, 'T');
     const defaultWidget = docModel.groups
@@ -329,15 +306,13 @@ describe('buildDocumentModel — explicit default namespace', () => {
         },
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['Customer', { namespaces: ['default'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
         ['Order', { namespaces: ['default'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['Customer', 'Order']),
-    };
+    });
 
     const docModel = buildDocumentModel([customer, order], jsDoc, 'T');
     const defaultRelations = docModel.groups.find((group) => group.name === 'default')?.erdRelations;
@@ -445,12 +420,10 @@ describe('buildDocumentModel — @hidden', () => {
         name: { name: 'name', fieldNames: ['name'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([['Animal', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['Animal', 'Dog']),
-    };
+    });
 
     const docModel = buildDocumentModel([animal, dog], jsDoc, 'T');
     const dogEntity = docModel.groups.flatMap((group) => group.textEntities).find((e) => e.model.className === 'Dog');
@@ -470,8 +443,7 @@ describe('buildDocumentModel — STI property documentation inheritance', () => 
       extendsEntity: 'Middle',
       discriminatorValue: 'leaf',
     });
-    const jsDoc: JsDocResult = {
-      entities: new Map(),
+    const jsDoc = makeJsDocResult({
       props: new Map([
         [
           'Root',
@@ -495,9 +467,8 @@ describe('buildDocumentModel — STI property documentation inheritance', () => 
           ]),
         ],
       ]),
-      sourceFileCount: 0,
       classNames: new Set(['Root', 'Middle', 'Leaf']),
-    };
+    });
 
     const leafEntity = buildDocumentModel([root, middle, leaf], jsDoc, 'T')
       .groups.flatMap((group) => group.textEntities)
@@ -521,7 +492,7 @@ describe('buildDocumentModel — STI property documentation inheritance', () => 
       extendsEntity: 'HiddenMiddle',
       discriminatorValue: 'leaf',
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['HiddenMiddle', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }],
       ]),
@@ -530,9 +501,8 @@ describe('buildDocumentModel — STI property documentation inheritance', () => 
         ['HiddenMiddle', new Map([['middleOnly', { description: 'hidden description', atLeastOne: false }]])],
         ['Leaf', new Map([['leafOnly', { description: 'leaf description', atLeastOne: false }]])],
       ]),
-      sourceFileCount: 0,
       classNames: new Set(['Root', 'HiddenMiddle', 'Leaf']),
-    };
+    });
 
     const leafEntity = buildDocumentModel([root, hiddenMiddle, leaf], jsDoc, 'T')
       .groups.flatMap((group) => group.textEntities)
@@ -556,8 +526,7 @@ describe('buildDocumentModel — STI property documentation inheritance', () => 
       extendsEntity: 'Self',
       discriminatorValue: 'self',
     });
-    const jsDoc: JsDocResult = {
-      entities: new Map(),
+    const jsDoc = makeJsDocResult({
       props: new Map([
         [
           'A',
@@ -575,9 +544,8 @@ describe('buildDocumentModel — STI property documentation inheritance', () => 
         ],
         ['Self', new Map([['selfOnly', { description: 'self description', atLeastOne: false }]])],
       ]),
-      sourceFileCount: 0,
       classNames: new Set(['A', 'B', 'Self']),
-    };
+    });
 
     const entities = buildDocumentModel([a, b, self], jsDoc, 'T').groups.flatMap((group) => group.textEntities);
     const aDocs = entities.find((entity) => entity.model.className === 'A')!.propDocs;
@@ -604,14 +572,12 @@ describe('buildDocumentModel — cross-namespace @erd', () => {
         views: { name: 'views', fieldNames: ['views'], type: 'integer', kind: ReferenceKind.SCALAR },
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['DailyStats', { namespaces: [], erdNamespaces: ['Reporting'], describeNamespaces: [], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['DailyStats']),
-    };
+    });
 
     const docModel = buildDocumentModel([statsMeta], jsDoc, 'T');
     const reporting = docModel.groups.find((g) => g.name === 'Reporting')!;
@@ -631,14 +597,12 @@ describe('buildDocumentModel — cross-namespace @erd', () => {
         code: { name: 'code', fieldNames: ['code'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['Widget', { namespaces: ['GroupA'], erdNamespaces: ['GroupB'], describeNamespaces: [], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['Widget']),
-    };
+    });
 
     const docModel = buildDocumentModel([widgetMeta], jsDoc, 'T');
 
@@ -662,14 +626,12 @@ describe('buildDocumentModel — cross-namespace @erd', () => {
         label: { name: 'label', fieldNames: ['label'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['Node', { namespaces: ['Alpha', 'Beta'], erdNamespaces: [], describeNamespaces: [], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['Node']),
-    };
+    });
 
     const docModel = buildDocumentModel([nodeMeta], jsDoc, 'T');
 
@@ -694,14 +656,12 @@ describe('buildDocumentModel — cross-namespace @erd edge cases', () => {
         title: { name: 'title', fieldNames: ['title'], type: 'string', kind: ReferenceKind.SCALAR },
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['Item', { namespaces: [], erdNamespaces: ['GroupB'], describeNamespaces: ['GroupB'], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['Item']),
-    };
+    });
 
     const docModel = buildDocumentModel([itemMeta], jsDoc, 'T');
     const groupB = docModel.groups.find((g) => g.name === 'GroupB')!;
@@ -735,15 +695,13 @@ describe('buildDocumentModel — cross-namespace @erd edge cases', () => {
         },
       },
     });
-    const jsDoc: JsDocResult = {
+    const jsDoc = makeJsDocResult({
       entities: new Map([
         ['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }],
         ['SharedPk', { namespaces: ['Home'], erdNamespaces: ['Guest'], describeNamespaces: [], hidden: false }],
       ]),
-      props: new Map(),
-      sourceFileCount: 0,
       classNames: new Set(['Secret', 'SharedPk']),
-    };
+    });
 
     const docModel = buildDocumentModel([hiddenMeta, sharedPkMeta], jsDoc, 'T');
     const guestGroup = docModel.groups.find((g) => g.name === 'Guest')!;
