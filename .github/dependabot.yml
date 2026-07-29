@@ -12,6 +12,10 @@ updates:
       # supported range is v6 until the migration tracked in #61 lands.
       - dependency-name: '@mikro-orm/*'
         update-types: ['version-update:semver-major']
+      # Node types stay pinned to the package's minimum supported runtime
+      # (Node 18) so src/ cannot compile against newer Node APIs.
+      - dependency-name: '@types/node'
+        update-types: ['version-update:semver-major']
     groups:
       mikro-orm:
         patterns:

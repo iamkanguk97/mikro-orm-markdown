@@ -101,7 +101,7 @@
     "@mikro-orm/postgresql": "^6.6.15",
     "@mikro-orm/reflection": "^6.6.15",
     "@mikro-orm/sqlite": "^6.6.15",
-    "@types/node": "^26.1.2",
+    "@types/node": "^18.19.130",
     "@vitest/coverage-v8": "^2.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^17.2.0",

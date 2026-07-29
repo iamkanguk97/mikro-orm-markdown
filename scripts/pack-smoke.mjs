@@ -87,19 +87,31 @@ generateMarkdown({
   });
 `;
 
+// An optional argument points at a pre-built tarball (CI consumer jobs test an
+// uploaded artifact on a bare Node without the repository dev dependencies);
+// without it the script packs the current build itself.
+const providedTarball = process.argv[2];
+
 try {
-  step('pack the npm tarball');
   const packDir = path.join(workDir, 'pack');
   const consumerDir = path.join(workDir, 'consumer');
   mkdirSync(packDir);
   mkdirSync(consumerDir);
 
-  const packOutput = execFileSync('npm', ['pack', '--json', '--pack-destination', packDir], {
-    cwd: repoRoot,
-    encoding: 'utf-8',
-  });
-  const [packed] = JSON.parse(packOutput);
-  const tarballPath = path.join(packDir, path.basename(packed.filename));
+  let tarballPath;
+  if (providedTarball === undefined) {
+    step('pack the npm tarball');
+    const packOutput = execFileSync('npm', ['pack', '--json', '--pack-destination', packDir], {
+      cwd: repoRoot,
+      encoding: 'utf-8',
+    });
+    const [packed] = JSON.parse(packOutput);
+    tarballPath = path.join(packDir, path.basename(packed.filename));
+  } else {
+    step(`use the pre-built tarball: ${providedTarball}`);
+    tarballPath = path.resolve(providedTarball);
+    readFileSync(tarballPath);
+  }
 
   step('reject MikroORM v7 as an unsupported peer');
   const v7Dir = path.join(workDir, 'v7-consumer');
