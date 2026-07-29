@@ -1,40 +1,30 @@
 import { describe, expect, it } from 'vitest';
-import { loadJsDoc } from '../../src/docs/jsdoc.js';
-import { loadEntityMetadata } from '../../src/metadata/load.js';
 import type { DocumentModel } from '../../src/model/build.js';
-import { buildDocumentModel } from '../../src/model/build.js';
 import { renderMarkdown } from '../../src/render/markdown.js';
-import config from '../fixtures/mikro-orm.config.js';
-
-async function getMarkdown(): Promise<string> {
-  const { metas, sourcePaths } = await loadEntityMetadata(config);
-  const jsDocResult = loadJsDoc(sourcePaths);
-  const docModel = buildDocumentModel(metas, jsDocResult, 'Test DB');
-  return renderMarkdown(docModel);
-}
+import { getFixtureMarkdown } from '../helpers/pipeline.js';
 
 describe('renderMarkdown — structure', () => {
   it('starts with H1 title', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md.startsWith('# Test DB')).toBe(true);
   });
 
   it('contains H2 sections for each namespace group', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('## Blog');
     expect(md).toContain('## Animals');
     expect(md).toContain('## Shop');
   });
 
   it('each section has a mermaid code fence', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     const fenceCount = (md.match(/```mermaid/g) ?? []).length;
     // Blog + Animals + Shop = 3 sections, each with a Mermaid block
     expect(fenceCount).toBeGreaterThanOrEqual(3);
   });
 
   it('each section has H3 entity headings', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('### Author');
     expect(md).toContain('### Post');
     expect(md).toContain('### Tag');
@@ -43,7 +33,7 @@ describe('renderMarkdown — structure', () => {
 
 describe('renderMarkdown — table of contents', () => {
   it('renders a Contents section linking each namespace', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('## Contents');
     expect(md).toContain('- [Animals](#animals)');
     expect(md).toContain('- [Blog](#blog)');
@@ -51,7 +41,7 @@ describe('renderMarkdown — table of contents', () => {
   });
 
   it('places the Contents section before the first namespace section', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md.indexOf('## Contents')).toBeLessThan(md.indexOf('## Blog'));
   });
 
@@ -109,23 +99,23 @@ describe('renderMarkdown — table of contents', () => {
 
 describe('renderMarkdown — entity descriptions', () => {
   it('Author description appears as blockquote', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('> 글 작성자');
   });
 
   it('Post description appears as blockquote', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('> 블로그 게시글');
   });
 
   it('shows the actual DB table name for each entity (M3)', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     // Author maps to the `author` table via the default naming strategy.
     expect(md).toContain('*Table: `author`*');
   });
 
   it('shows the STI child discriminator value on the Extends note (L1)', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('Extends `Animal` (Single Table Inheritance, discriminator value: `dog`)');
   });
 
@@ -144,27 +134,27 @@ describe('renderMarkdown — entity descriptions', () => {
 
 describe('renderMarkdown — column table', () => {
   it('column table header is present under Author', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('| Column | Type | Key | Nullable | Description |');
   });
 
   it('Author id column appears with PK key', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('| id | integer | PK |');
   });
 
   it('Author email column appears with UK key', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('| email | string | UK |');
   });
 
   it('Post author_id column appears with FK key showing TS property name', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('| author_id | integer | FK (author) |');
   });
 
   it('normalizes parameterized SQL types to generic types in the table (H4)', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     // The Author.nickname column is declared as varchar(255); normalizeType maps it to 'string'.
     expect(md).toContain('| nickname | string |');
     const tableRow = md.split('\n').find((line) => line.startsWith('| nickname |'));
@@ -172,12 +162,12 @@ describe('renderMarkdown — column table', () => {
   });
 
   it('property JSDoc description appears in column table', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('| name | string |  |  | 작성자 이름 |');
   });
 
   it('shows an STI parent property description in every child table', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     const animals = extractSection(md, 'Animals');
 
     expect(extractEntitySection(animals, 'Dog')).toContain('| name | string |  |  | Display name. |');
@@ -185,33 +175,33 @@ describe('renderMarkdown — column table', () => {
   });
 
   it('falls back to @Property({ comment }) when a column has no JSDoc', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     // Customer.name has no JSDoc, only a comment
     expect(md).toContain('| name | string |  |  | 고객 이름 |');
   });
 
   it('JSDoc description wins over @Property({ comment }) when both exist', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     // Post.body has both a JSDoc comment and a DDL comment — JSDoc must win
     expect(md).toContain('게시글 본문');
     expect(md).not.toContain('DB 본문 코멘트');
   });
 
   it('nullable column shows Y in Nullable cell', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     // Post.body is nullable
     expect(md).toContain('| body | string |  | Y |');
   });
 
   it('non-nullable column has empty Nullable cell', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('| id | integer | PK |  |');
   });
 });
 
 describe('renderMarkdown — MikroORM specific columns', () => {
   it('formula column is listed in the Computed columns section', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('**Computed columns:**');
     expect(md).toContain('`LENGTH(name)`');
   });
@@ -241,8 +231,6 @@ describe('renderMarkdown — MikroORM specific columns', () => {
                     formula: '',
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [],
               },
               jsDoc: undefined,
@@ -285,8 +273,6 @@ describe('renderMarkdown — MikroORM specific columns', () => {
                     enumItems: ['active', 'banned'],
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [],
               },
               jsDoc: undefined,
@@ -302,34 +288,34 @@ describe('renderMarkdown — MikroORM specific columns', () => {
   });
 
   it('embedded columns show [Address] in Key column', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('[Address]');
   });
 
   it('embedded column falls back to the @Embeddable class JSDoc for its Description', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('| address_street | string | \\[Address\\] |  | 도로명 주소. |');
   });
 
   it('discriminator column shows "discriminator" in Key column', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('| type | string | discriminator |');
   });
 
   it('STI root has discriminator column note', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('STI root — discriminator column: `type`');
   });
 
   it('STI child has extends note', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('Extends `Animal` (Single Table Inheritance');
   });
 });
 
 describe('renderMarkdown — constraints', () => {
   it('Animal index constraint is rendered', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     expect(md).toContain('**Constraints:**');
     expect(md).toContain('Index `animal_name_idx`: (name)');
   });
@@ -348,8 +334,6 @@ describe('renderMarkdown — constraints', () => {
                 className: 'Account',
                 tableName: 'account',
                 columns: [],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [
                   {
                     type: 'index',
@@ -397,8 +381,6 @@ describe('renderMarkdown — constraints', () => {
                 className: 'Account',
                 tableName: 'account',
                 columns: [],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [
                   { type: 'index', name: 'email_idx', properties: ['email_address'] },
                   {
@@ -436,14 +418,14 @@ describe('renderMarkdown — constraints', () => {
 
 describe('renderMarkdown — namespace isolation', () => {
   it('Blog Mermaid block contains Author entity', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     // Blog section's mermaid block should have Author
     const blogSection = extractSection(md, 'Blog');
     expect(blogSection).toContain('Author {');
   });
 
   it('Blog Mermaid block does NOT contain Animal entity', async () => {
-    const md = await getMarkdown();
+    const md = await getFixtureMarkdown();
     const blogSection = extractSection(md, 'Blog');
     // Animal belongs to Animals namespace, not Blog
     expect(blogSection).not.toContain('Animal {');
@@ -487,8 +469,6 @@ describe('renderMarkdown — escaping', () => {
                     formula: 'sum(`score` | 1)',
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 discriminatorColumn: 'kind`type',
                 constraints: [
                   {
@@ -561,8 +541,6 @@ describe('renderMarkdown — composite keys', () => {
                     isNullable: false,
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [],
               },
               jsDoc: undefined,
@@ -609,8 +587,6 @@ describe('renderMarkdown — composite keys', () => {
                     isNullable: false,
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [],
               },
               jsDoc: undefined,

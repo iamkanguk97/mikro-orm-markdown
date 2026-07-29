@@ -24,10 +24,12 @@ export function escapeMarkdownInline(value: string): string {
     .replace(MARKDOWN_EMPHASIS_UNDERSCORE, '\\_');
 }
 
+function escapedLines(value: string): string[] {
+  return splitNormalizedLines(value).map((line) => escapeMarkdownInline(line));
+}
+
 export function escapeMarkdownTableCell(value: string): string {
-  return splitNormalizedLines(value)
-    .map((line) => escapeMarkdownInline(line))
-    .join('<br>');
+  return escapedLines(value).join('<br>');
 }
 
 /**
@@ -37,14 +39,12 @@ export function escapeMarkdownTableCell(value: string): string {
  * accepts as free-form multi-line text.
  */
 export function escapeMarkdownParagraph(value: string): string {
-  return splitNormalizedLines(value)
-    .map((line) => escapeMarkdownInline(line))
-    .join('  \n');
+  return escapedLines(value).join('  \n');
 }
 
 export function renderMarkdownBlockQuote(value: string): string {
-  return splitNormalizedLines(value)
-    .map((line) => `> ${escapeMarkdownInline(line)}`)
+  return escapedLines(value)
+    .map((line) => `> ${line}`)
     .join('\n');
 }
 

@@ -78,8 +78,6 @@ export interface EntityModel {
   className: string;
   tableName: string;
   columns: ColumnModel[];
-  isPivot: boolean;
-  isEmbeddable: boolean;
   /**
    * STI root: the column name used to distinguish subclass rows (e.g. "type").
    * Undefined for non-STI entities and STI children.
@@ -95,7 +93,7 @@ export interface EntityModel {
    * (e.g. "dog"). Stringified so a numeric value like 0 is preserved.
    */
   discriminatorValue?: string;
-  /** Indexes, unique constraints, and check constraints (used in Milestone 5 markdown). */
+  /** Indexes, unique constraints, and check constraints rendered in the markdown tables. */
   constraints: ConstraintModel[];
 }
 

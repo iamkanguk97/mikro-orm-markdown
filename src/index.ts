@@ -1,7 +1,10 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
+import { DEFAULT_TITLE } from './defaults.js';
 import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
+import { causeChain } from './error-chain.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
 import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
+import { isRenderableMeta } from './metadata/renderable.js';
 import { buildDocumentModel, type DocumentModel } from './model/build.js';
 import { MissingTsMorphSourceError, withTsMorphMetadataProvider } from './provider.js';
 import { renderMarkdown } from './render/markdown.js';
@@ -53,8 +56,13 @@ const COMPILED_JS = /\.(c|m)?js$/i;
  * JavaScript, JSDoc (descriptions, `@namespace`, and crucially `@hidden`) is
  * gone, so we warn the user and point them at `src`.
  */
+/** True when the caller provided explicit JSDoc source paths. */
+function hasExplicitSrc(src: string[] | undefined): src is string[] {
+  return src !== undefined && src.length > 0;
+}
+
 export function resolveJsDocSources(sourcePaths: string[], src: string[] | undefined, onWarn?: WarnHandler): string[] {
-  if (src !== undefined && src.length > 0) {
+  if (hasExplicitSrc(src)) {
     return src;
   }
 
@@ -110,27 +118,24 @@ function assertExplicitEntityJsDocSourceCoverage(
   jsDocResult: JsDocResult,
   onWarn?: WarnHandler
 ): void {
-  const isRenderable = (meta: EntityMetadata): boolean => !meta.pivotTable && !meta.embeddable;
-
   const missingConcrete = metas
-    .filter((meta) => isRenderable(meta) && !meta.abstract)
+    .filter((meta) => isRenderableMeta(meta) && !meta.abstract)
     .map((meta) => meta.className)
     .filter((className) => !jsDocResult.classNames.has(className));
 
   if (missingConcrete.length > 0) {
-    throw new StructuredError({
-      title: 'Entities missing from the explicit src paths',
-      detail: `Explicit src paths did not include source declarations for discovered entities: ${missingConcrete.join(', ')}.`,
-      impact: ['JSDoc tags such as @namespace and @hidden for the missing entities cannot be read.'],
-      fix: 'Check that --src (or the `src` option) points at all TypeScript entity files.',
-    });
+    throw missingSrcCoverageError(
+      `Explicit src paths did not include source declarations for discovered entities: ${missingConcrete.join(', ')}.`,
+      ['JSDoc tags such as @namespace and @hidden for the missing entities cannot be read.'],
+      'Check that --src (or the `src` option) points at all TypeScript entity files.'
+    );
   }
 
   // Abstract STI parents appear in the diagram but are often defined in a separate
   // base-class file that --src may not cover. Warn rather than error so the user
   // knows @hidden/@namespace won't apply to them.
   const missingAbstract = metas
-    .filter((meta) => isRenderable(meta) && meta.abstract)
+    .filter((meta) => isRenderableMeta(meta) && meta.abstract)
     .map((meta) => meta.className)
     .filter((className) => !jsDocResult.classNames.has(className));
 
@@ -150,30 +155,31 @@ function assertExplicitEmbeddableJsDocSourceCoverage(jsDocResult: JsDocResult, d
   );
 
   if (missingEmbeddables.length > 0) {
-    throw new StructuredError({
-      title: 'Entities missing from the explicit src paths',
-      detail:
-        'Explicit src paths did not include source declarations for document-contributing embeddables: ' +
+    throw missingSrcCoverageError(
+      'Explicit src paths did not include source declarations for document-contributing embeddables: ' +
         `${missingEmbeddables.join(', ')}.`,
-      impact: ['Property descriptions for the missing embeddables cannot be read.'],
-      fix: 'Check that --src (or the `src` option) points at all required TypeScript source files.',
-    });
+      ['Property descriptions for the missing embeddables cannot be read.'],
+      'Check that --src (or the `src` option) points at all required TypeScript source files.'
+    );
   }
 }
 
+/**
+ * Both explicit-src coverage failures share one title on purpose: each means
+ * "your --src does not cover everything the document needs"; the detail line
+ * names what exactly is missing.
+ */
+function missingSrcCoverageError(detail: string, impact: string[], fix: string): StructuredError {
+  return new StructuredError({
+    title: 'Entities missing from the explicit src paths',
+    detail,
+    impact,
+    fix,
+  });
+}
+
 function hasMissingTsMorphSourceError(err: unknown): boolean {
-  const seen = new Set<unknown>();
-  let current: unknown = err;
-
-  while (current !== null && typeof current === 'object' && !seen.has(current)) {
-    if (current instanceof MissingTsMorphSourceError) {
-      return true;
-    }
-    seen.add(current);
-    current = (current as { cause?: unknown }).cause;
-  }
-
-  return false;
+  return causeChain(err).some((entry) => entry instanceof MissingTsMorphSourceError);
 }
 
 async function loadEntityMetadataWithTsMorphFallback(
@@ -229,7 +235,7 @@ async function loadEntityMetadataWithTsMorphFallback(
  * ```
  */
 export async function generateMarkdown(options: GenerateMarkdownOptions): Promise<string> {
-  const { orm, title = 'Database Schema', description, src, onWarn, mermaid } = options;
+  const { orm, title = DEFAULT_TITLE, description, src, onWarn, mermaid } = options;
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm);
   const { metas, sourcePaths, entitySourcePaths } = await loadEntityMetadataWithTsMorphFallback(
@@ -237,16 +243,17 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
     effectiveOrm,
     onWarn
   );
+  const explicitSrc = hasExplicitSrc(src);
   const loadedJsDoc = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn), onWarn);
   const jsDocResult = bindJsDocToEntitySources(loadedJsDoc, entitySourcePaths, {
-    allowCompiledSourceFallback: src !== undefined && src.length > 0,
+    allowCompiledSourceFallback: explicitSrc,
   });
-  if (src !== undefined && src.length > 0) {
+  if (explicitSrc) {
     assertExplicitJsDocSourcesMatched(jsDocResult, src);
     assertExplicitEntityJsDocSourceCoverage(metas, jsDocResult, onWarn);
   }
   const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn);
-  if (src !== undefined && src.length > 0) {
+  if (explicitSrc) {
     assertExplicitEmbeddableJsDocSourceCoverage(jsDocResult, docModel);
   }
   return renderMarkdown(docModel, mermaid);

@@ -1,5 +1,4 @@
 import * as path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import {
   Entity,
   type EntityClass,
@@ -14,7 +13,7 @@ import { MySqlDriver } from '@mikro-orm/mysql';
 import { PostgreSqlDriver } from '@mikro-orm/postgresql';
 import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { SqliteDriver } from '@mikro-orm/sqlite';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
 import { MetadataLoadError } from '../../src/metadata/load.js';
 import { CoverageAddress, UnusedCoverageAddress } from '../fixtures/embeddable-coverage/Address.js';
@@ -27,20 +26,25 @@ import {
 import config from '../fixtures/mikro-orm.config.js';
 import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
 import { CollisionEntity } from '../fixtures/source-identity/entity/CollisionEntity.js';
+import { inMemorySqliteOptions } from '../helpers/orm.js';
+import { COLLISION_DTO_SOURCE, COLLISION_ENTITY_SOURCE, fixturePath } from '../helpers/paths.js';
 
-const TEST_DIR = path.dirname(fileURLToPath(import.meta.url));
-const COLLISION_ENTITY_SOURCE = path.resolve(TEST_DIR, '../fixtures/source-identity/entity/CollisionEntity.ts');
-const COLLISION_DTO_SOURCE = path.resolve(TEST_DIR, '../fixtures/source-identity/dto/CollisionEntity.ts');
-const COMPILED_IDENTITY_SOURCE = path.resolve(
-  TEST_DIR,
-  '../fixtures/source-identity/compiled/CompiledIdentityEntity.ts'
-);
-const COMPILED_IDENTITY_DUPLICATE = path.resolve(
-  TEST_DIR,
-  '../fixtures/source-identity/compiled-duplicate/CompiledIdentityEntity.ts'
-);
-const EMBEDDABLE_ADDRESS_SOURCE = path.resolve(TEST_DIR, '../fixtures/embeddable-coverage/Address.ts');
-const EMBEDDABLE_OWNERS_SOURCE = path.resolve(TEST_DIR, '../fixtures/embeddable-coverage/Owners.ts');
+const COMPILED_IDENTITY_SOURCE = fixturePath('source-identity', 'compiled', 'CompiledIdentityEntity.ts');
+const COMPILED_IDENTITY_DUPLICATE = fixturePath('source-identity', 'compiled-duplicate', 'CompiledIdentityEntity.ts');
+const EMBEDDABLE_ADDRESS_SOURCE = fixturePath('embeddable-coverage', 'Address.ts');
+const EMBEDDABLE_OWNERS_SOURCE = fixturePath('embeddable-coverage', 'Owners.ts');
+
+/**
+ * A fresh class per call: the decorators register the class in MikroORM's
+ * global MetadataStorage, so sharing one class between tests would leak state.
+ */
+function makeRuntimeJsUser(): EntityClass<object> {
+  class RuntimeJsUser {}
+  Entity()(RuntimeJsUser);
+  PrimaryKey({ type: 'integer' })(RuntimeJsUser.prototype, 'id');
+  Property({ type: 'string' })(RuntimeJsUser.prototype, 'name');
+  return RuntimeJsUser;
+}
 
 function createCompiledIdentityEntity(metadataPath: string): EntityClass<object> {
   class CompiledIdentityEntity {}
@@ -60,10 +64,6 @@ const sqlDriverSmokeCases = [
   ['MySQL', MySqlDriver, 'mikro_orm_markdown_test'],
   ['MariaDB', MariaDbDriver, 'mikro_orm_markdown_test'],
 ] as const;
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 describe('generateMarkdown', () => {
   it('returns a non-empty markdown string', async () => {
@@ -128,18 +128,11 @@ describe('generateMarkdown', () => {
   });
 
   it('falls back to the default provider with a structured warning when TsMorph has no source file', async () => {
-    class RuntimeJsUser {}
-    Entity()(RuntimeJsUser);
-    PrimaryKey({ type: 'integer' })(RuntimeJsUser.prototype, 'id');
-    Property({ type: 'string' })(RuntimeJsUser.prototype, 'name');
+    const RuntimeJsUser = makeRuntimeJsUser();
     const structuredWarnings: StructuredMessage[] = [];
 
     const md = await generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [RuntimeJsUser],
-      },
+      orm: inMemorySqliteOptions([RuntimeJsUser]),
       title: 'Runtime JS',
       onWarn: (_message: string, warning?: StructuredMessage) => {
         if (warning !== undefined) {
@@ -176,10 +169,7 @@ describe('generateMarkdown', () => {
   });
 
   it('keeps the auto-injected provider failure primary when fallback also fails', async () => {
-    class RuntimeJsUser {}
-    Entity()(RuntimeJsUser);
-    PrimaryKey({ type: 'integer' })(RuntimeJsUser.prototype, 'id');
-    Property({ type: 'string' })(RuntimeJsUser.prototype, 'name');
+    const RuntimeJsUser = makeRuntimeJsUser();
     const fallbackFailure = new Error('configured provider failed');
     const fallbackSpy = vi.spyOn(ReflectMetadataProvider.prototype, 'loadEntityMetadata').mockImplementation(() => {
       throw fallbackFailure;
@@ -187,11 +177,7 @@ describe('generateMarkdown', () => {
     const structuredWarnings: StructuredMessage[] = [];
 
     const error = await generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [RuntimeJsUser],
-      },
+      orm: inMemorySqliteOptions([RuntimeJsUser]),
       onWarn: (_message: string, warning?: StructuredMessage) => {
         if (warning !== undefined) {
           structuredWarnings.push(warning);
@@ -275,11 +261,7 @@ describe('generateMarkdown', () => {
     Formula(formula, { type: 'integer' })(MissingFormulaEntity.prototype, 'computed');
 
     const pending = generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [MissingFormulaEntity],
-      },
+      orm: inMemorySqliteOptions([MissingFormulaEntity]),
       src: [COLLISION_DTO_SOURCE],
     });
 
@@ -291,11 +273,7 @@ describe('generateMarkdown', () => {
 
   it('rejects explicit src paths that omit an embeddable contributing descriptions to a text entity', async () => {
     const pending = generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [VisibleEmbeddedOwner, CoverageAddress],
-      },
+      orm: inMemorySqliteOptions([VisibleEmbeddedOwner, CoverageAddress]),
       src: [EMBEDDABLE_OWNERS_SOURCE],
     });
 
@@ -308,11 +286,7 @@ describe('generateMarkdown', () => {
 
   it('preserves flattened property descriptions when the contributing embeddable source is included', async () => {
     const md = await generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [VisibleEmbeddedOwner, CoverageAddress],
-      },
+      orm: inMemorySqliteOptions([VisibleEmbeddedOwner, CoverageAddress]),
       src: [EMBEDDABLE_OWNERS_SOURCE, EMBEDDABLE_ADDRESS_SOURCE],
     });
 
@@ -327,11 +301,7 @@ describe('generateMarkdown', () => {
   ])('does not require an embeddable used only by a %s entity', async (_kind, owner) => {
     await expect(
       generateMarkdown({
-        orm: {
-          driver: SqliteDriver,
-          dbName: ':memory:',
-          entities: [owner, CoverageAddress],
-        },
+        orm: inMemorySqliteOptions([owner, CoverageAddress]),
         src: [EMBEDDABLE_OWNERS_SOURCE],
       })
     ).resolves.toEqual(expect.any(String));
@@ -340,11 +310,7 @@ describe('generateMarkdown', () => {
   it('does not require a configured embeddable that contributes no rendered column', async () => {
     await expect(
       generateMarkdown({
-        orm: {
-          driver: SqliteDriver,
-          dbName: ':memory:',
-          entities: [PlainCoverageEntity, UnusedCoverageAddress],
-        },
+        orm: inMemorySqliteOptions([PlainCoverageEntity, UnusedCoverageAddress]),
         src: [EMBEDDABLE_OWNERS_SOURCE],
       })
     ).resolves.toContain('### PlainCoverageEntity');
@@ -352,11 +318,7 @@ describe('generateMarkdown', () => {
 
   it('does not let a same-named DTO satisfy explicit src coverage for a TypeScript entity', async () => {
     const pending = generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [CollisionEntity],
-      },
+      orm: inMemorySqliteOptions([CollisionEntity]),
       src: [COLLISION_DTO_SOURCE],
     });
 
@@ -371,11 +333,7 @@ describe('generateMarkdown', () => {
     const entitySourceWithParentSegment = `${path.dirname(COLLISION_ENTITY_SOURCE)}${path.sep}..${path.sep}entity${path.sep}CollisionEntity.ts`;
 
     const md = await generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [CollisionEntity],
-      },
+      orm: inMemorySqliteOptions([CollisionEntity]),
       src: [entitySourceWithParentSegment, COLLISION_DTO_SOURCE],
     });
 
@@ -394,11 +352,7 @@ describe('generateMarkdown', () => {
     const CompiledIdentityEntity = createCompiledIdentityEntity('/virtual/dist/CompiledIdentityEntity.js');
 
     const md = await generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [CompiledIdentityEntity],
-      },
+      orm: inMemorySqliteOptions([CompiledIdentityEntity]),
       src: [COMPILED_IDENTITY_SOURCE],
     });
 
@@ -411,11 +365,7 @@ describe('generateMarkdown', () => {
     const CompiledIdentityEntity = createCompiledIdentityEntity('/virtual/bundle/CompiledIdentityEntity');
 
     const md = await generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [CompiledIdentityEntity],
-      },
+      orm: inMemorySqliteOptions([CompiledIdentityEntity]),
       src: [COMPILED_IDENTITY_SOURCE],
     });
 
@@ -428,11 +378,7 @@ describe('generateMarkdown', () => {
     const CompiledIdentityEntity = createCompiledIdentityEntity('/virtual/dist/missing/CompiledIdentityEntity.js');
 
     const pending = generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [CompiledIdentityEntity],
-      },
+      orm: inMemorySqliteOptions([CompiledIdentityEntity]),
       src: [COLLISION_DTO_SOURCE],
     });
 
@@ -447,11 +393,7 @@ describe('generateMarkdown', () => {
     const CompiledIdentityEntity = createCompiledIdentityEntity('/virtual/dist/ambiguous/CompiledIdentityEntity.js');
 
     const pending = generateMarkdown({
-      orm: {
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [CompiledIdentityEntity],
-      },
+      orm: inMemorySqliteOptions([CompiledIdentityEntity]),
       src: [COMPILED_IDENTITY_SOURCE, COMPILED_IDENTITY_DUPLICATE],
     });
 
