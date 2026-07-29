@@ -86,6 +86,53 @@ describe('buildDiagramModel', () => {
     expect(edge!.fromCardinality).toBe('}o');
     expect(edge!.toCardinality).toBe('o{');
   });
+
+  it('does not crash on a scalar with no type or an FK with no fieldNames (L4)', () => {
+    const meta = makeEntityMeta({
+      className: 'Loose',
+      tableName: 'loose',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        // scalar with no `type`
+        mystery: { name: 'mystery', fieldNames: ['mystery'], kind: ReferenceKind.SCALAR },
+        // FK with no `fieldNames`
+        owner: { name: 'owner', type: 'Loose', kind: ReferenceKind.MANY_TO_ONE },
+      },
+    });
+
+    let model: ReturnType<typeof buildDiagramModel>;
+    expect(() => {
+      model = buildDiagramModel([meta]);
+      renderErDiagram(model);
+    }).not.toThrow();
+
+    const cols = model!.entities[0]!.columns;
+    expect(cols.find((c) => c.propName === 'mystery')!.type).toBe('unknown');
+    // FK with no fieldNames falls back to `<prop>_id`.
+    expect(cols.find((c) => c.propName === 'owner')!.fieldName).toBe('owner_id');
+  });
+
+  it('captures @Enum allowed values on the column (M5)', () => {
+    const meta = makeEntityMeta({
+      className: 'Account',
+      tableName: 'account',
+      properties: {
+        status: {
+          name: 'status',
+          fieldNames: ['status'],
+          type: 'string',
+          kind: ReferenceKind.SCALAR,
+          enum: true,
+          items: ['active', 'banned'],
+        },
+      },
+    });
+
+    const model = buildDiagramModel([meta]);
+    const status = model.entities[0]!.columns.find((c) => c.propName === 'status');
+    expect(status!.enumItems).toEqual(['active', 'banned']);
+  });
 });
 
 // ─── buildDiagramModel — M3 MikroORM-specific concepts ───────────────────────
@@ -228,53 +275,6 @@ describe('buildDiagramModel — @Formula', () => {
 
     expect(brokenFormula!.formula).toBe('<unresolved>');
     expect(renderErDiagram(model)).toContain('integer broken_formula "formula: <unresolved>"');
-  });
-
-  it('does not crash on a scalar with no type or an FK with no fieldNames (L4)', () => {
-    const meta = makeEntityMeta({
-      className: 'Loose',
-      tableName: 'loose',
-      primaryKeys: ['id'],
-      properties: {
-        id: pkProperty(),
-        // scalar with no `type`
-        mystery: { name: 'mystery', fieldNames: ['mystery'], kind: ReferenceKind.SCALAR },
-        // FK with no `fieldNames`
-        owner: { name: 'owner', type: 'Loose', kind: ReferenceKind.MANY_TO_ONE },
-      },
-    });
-
-    let model: ReturnType<typeof buildDiagramModel>;
-    expect(() => {
-      model = buildDiagramModel([meta]);
-      renderErDiagram(model);
-    }).not.toThrow();
-
-    const cols = model!.entities[0]!.columns;
-    expect(cols.find((c) => c.propName === 'mystery')!.type).toBe('unknown');
-    // FK with no fieldNames falls back to `<prop>_id`.
-    expect(cols.find((c) => c.propName === 'owner')!.fieldName).toBe('owner_id');
-  });
-
-  it('captures @Enum allowed values on the column (M5)', () => {
-    const meta = makeEntityMeta({
-      className: 'Account',
-      tableName: 'account',
-      properties: {
-        status: {
-          name: 'status',
-          fieldNames: ['status'],
-          type: 'string',
-          kind: ReferenceKind.SCALAR,
-          enum: true,
-          items: ['active', 'banned'],
-        },
-      },
-    });
-
-    const model = buildDiagramModel([meta]);
-    const status = model.entities[0]!.columns.find((c) => c.propName === 'status');
-    expect(status!.enumItems).toEqual(['active', 'banned']);
   });
 
   it('coerces a non-string formula return value to a string (M4)', () => {

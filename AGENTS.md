@@ -17,7 +17,7 @@ Supports a programmatic API (`generateMarkdown`) and a CLI (`mikro-orm-markdown`
 
 ## Source Layout
 
-```
+```text
 src/
   cli.ts            # Commander-based CLI entry point
   index.ts          # Public API: generateMarkdown(), resolveJsDocSources()
@@ -67,7 +67,7 @@ npm run lint && npm run format:check && npm run typecheck && npm run test && npm
 
 ## Test Layout
 
-```
+```text
 test/
   cli.test.ts              # CLI option parsing and validation
   error-chain.test.ts      # causeChain()/errorMessage() unit tests
@@ -96,7 +96,7 @@ When adding a feature, add tests to the matching file. New rendering behaviour b
 
 ## Generation Pipeline
 
-```
+```text
 MikroORM config
   └─ loadEntityMetadata()       → EntityMetadata[]  (metadata/load.ts)
   └─ loadJsDoc()                → JsDocResult        (docs/jsdoc.ts)
@@ -125,7 +125,7 @@ Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`
 - Subject must **not** contain issue/ticket IDs (`#123`, `ECOM-123`).
 - Issue references go in the footer: `Refs: #123`
 
-```
+```text
 feat: add @atLeastOne tag support for collection relations
 
 Refs: #42
