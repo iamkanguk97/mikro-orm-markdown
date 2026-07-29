@@ -1,21 +1,14 @@
 import { type EntityMetadata, type FormulaTable, type IndexCallback, ReferenceKind } from '@mikro-orm/core';
 import { describe, expect, it } from 'vitest';
-import { loadEntityMetadata } from '../../src/metadata/load.js';
 import { buildDiagramModel } from '../../src/model/diagram.js';
-import type { DiagramModel } from '../../src/model/types.js';
 import { renderErDiagram } from '../../src/render/mermaid.js';
-import config from '../fixtures/mikro-orm.config.js';
+import { getFixtureDiagramModel } from '../helpers/pipeline.js';
 
 // ─── buildDiagramModel (integration: uses real MikroORM metadata) ─────────────
 
 describe('buildDiagramModel', () => {
-  async function getModel(): Promise<DiagramModel> {
-    const { metas } = await loadEntityMetadata(config);
-    return buildDiagramModel(metas);
-  }
-
   it('excludes pivot tables from entity boxes', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const classNames = model.entities.map((e) => e.className);
     expect(classNames).not.toContain('post_tags');
     expect(classNames).toContain('Author');
@@ -24,7 +17,7 @@ describe('buildDiagramModel', () => {
   });
 
   it('Author entity has correct columns', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const author = model.entities.find((e) => e.className === 'Author');
     expect(author).toBeDefined();
 
@@ -42,7 +35,7 @@ describe('buildDiagramModel', () => {
   });
 
   it('Post FK column uses DB field name, not property name', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const post = model.entities.find((e) => e.className === 'Post');
     expect(post).toBeDefined();
 
@@ -54,7 +47,7 @@ describe('buildDiagramModel', () => {
   });
 
   it('keeps the original parameterized type on the model, normalizing only at render (H4)', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const author = model.entities.find((e) => e.className === 'Author');
     const nickname = author!.columns.find((c) => c.fieldName === 'nickname');
 
@@ -64,20 +57,20 @@ describe('buildDiagramModel', () => {
   });
 
   it('Post m:n tags property does NOT produce a column', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const post = model.entities.find((e) => e.className === 'Post');
     const tagCol = post!.columns.find((c) => c.propName === 'tags');
     expect(tagCol).toBeUndefined();
   });
 
   it('produces 2 relation edges (Post m:1, Post m:n)', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     // Post.author (m:1), Post.tags (m:n owner)
     expect(model.relations).toHaveLength(2);
   });
 
   it('Post.author edge: many Posts → one Author (not nullable)', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const edge = model.relations.find((r) => r.fromEntity === 'Post' && r.toEntity === 'Author');
     expect(edge).toBeDefined();
     expect(edge!.fromCardinality).toBe('}o');
@@ -86,7 +79,7 @@ describe('buildDiagramModel', () => {
   });
 
   it('Post.tags edge: many Posts ↔ many Tags', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const edge = model.relations.find((r) => r.fromEntity === 'Post' && r.toEntity === 'Tag');
     expect(edge).toBeDefined();
     expect(edge!.fromCardinality).toBe('}o');
@@ -97,20 +90,15 @@ describe('buildDiagramModel', () => {
 // ─── buildDiagramModel — M3 MikroORM-specific concepts ───────────────────────
 
 describe('buildDiagramModel — Embeddable', () => {
-  async function getModel(): Promise<DiagramModel> {
-    const { metas } = await loadEntityMetadata(config);
-    return buildDiagramModel(metas);
-  }
-
   it('excludes @Embeddable classes from entity boxes', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const classNames = model.entities.map((e) => e.className);
     expect(classNames).not.toContain('Address');
     expect(classNames).toContain('Customer');
   });
 
   it('Customer entity contains flattened embedded columns with embeddedIn set', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const customer = model.entities.find((e) => e.className === 'Customer');
     expect(customer).toBeDefined();
 
@@ -122,7 +110,7 @@ describe('buildDiagramModel — Embeddable', () => {
   });
 
   it('Customer embedded columns are NOT marked as PK/FK', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const customer = model.entities.find((e) => e.className === 'Customer');
     const embeddedCols = customer!.columns.filter((c) => c.embeddedIn !== undefined);
     for (const col of embeddedCols) {
@@ -132,7 +120,7 @@ describe('buildDiagramModel — Embeddable', () => {
   });
 
   it('EMBEDDED group reference property is not rendered as a column', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const customer = model.entities.find((e) => e.className === 'Customer');
     // "address" (kind=embedded) should not appear as a direct column
     const addressGroupCol = customer!.columns.find((c) => c.fieldName === 'address');
@@ -141,13 +129,8 @@ describe('buildDiagramModel — Embeddable', () => {
 });
 
 describe('buildDiagramModel — @Formula', () => {
-  async function getModel(): Promise<DiagramModel> {
-    const { metas } = await loadEntityMetadata(config);
-    return buildDiagramModel(metas);
-  }
-
   it('Customer nameLength column has formula set', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const customer = model.entities.find((e) => e.className === 'Customer');
     const nameLengthCol = customer!.columns.find((c) => c.propName === 'nameLength');
     expect(nameLengthCol).toBeDefined();
@@ -155,7 +138,7 @@ describe('buildDiagramModel — @Formula', () => {
   });
 
   it('formula column SQL expression is resolved correctly', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const customer = model.entities.find((e) => e.className === 'Customer');
     const nameLengthCol = customer!.columns.find((c) => c.propName === 'nameLength');
     // @Formula('LENGTH(name)') → should resolve to the SQL expression
@@ -163,7 +146,7 @@ describe('buildDiagramModel — @Formula', () => {
   });
 
   it('formula column fieldName follows NamingStrategy (camelCase → snake_case)', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const customer = model.entities.find((e) => e.className === 'Customer');
     const nameLengthCol = customer!.columns.find((c) => c.propName === 'nameLength');
     // MikroORM applies NamingStrategy to formula properties too: nameLength → name_length
@@ -514,20 +497,15 @@ describe('buildDiagramModel — persist: false (shadow properties)', () => {
 });
 
 describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
-  async function getModel(): Promise<DiagramModel> {
-    const { metas } = await loadEntityMetadata(config);
-    return buildDiagramModel(metas);
-  }
-
   it('STI root (Animal) has discriminatorColumn set', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const animal = model.entities.find((e) => e.className === 'Animal');
     expect(animal).toBeDefined();
     expect(animal!.discriminatorColumn).toBe('type');
   });
 
   it('STI root (Animal) excludes child-only columns (breed, indoor)', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const animal = model.entities.find((e) => e.className === 'Animal');
     const colNames = animal!.columns.map((c) => c.propName);
     expect(colNames).not.toContain('breed');
@@ -539,7 +517,7 @@ describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
   });
 
   it('STI root discriminator column is marked as isDiscriminator', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const animal = model.entities.find((e) => e.className === 'Animal');
     const typeCol = animal!.columns.find((c) => c.propName === 'type');
     expect(typeCol).toBeDefined();
@@ -547,14 +525,14 @@ describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
   });
 
   it('STI child (Dog) has extendsEntity pointing to Animal', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const dog = model.entities.find((e) => e.className === 'Dog');
     expect(dog).toBeDefined();
     expect(dog!.extendsEntity).toBe('Animal');
   });
 
   it('STI child (Dog) includes all columns (own + inherited)', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const dog = model.entities.find((e) => e.className === 'Dog');
     const colNames = dog!.columns.map((c) => c.propName);
     expect(colNames).toContain('id');
@@ -563,18 +541,13 @@ describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
   });
 
   it('STI entities produce no extends edges', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const extendsEdge = model.relations.find((r) => r.label === 'extends');
     expect(extendsEdge).toBeUndefined();
   });
 });
 
 describe('buildDiagramModel — Constraints', () => {
-  async function getModel(): Promise<DiagramModel> {
-    const { metas } = await loadEntityMetadata(config);
-    return buildDiagramModel(metas);
-  }
-
   function makePropertyUniqueMetas(): EntityMetadata[] {
     const account = Object.assign({} as EntityMetadata, {
       className: 'Account',
@@ -663,7 +636,7 @@ describe('buildDiagramModel — Constraints', () => {
   }
 
   it('Animal entity has index constraint collected', async () => {
-    const model = await getModel();
+    const model = await getFixtureDiagramModel();
     const animal = model.entities.find((e) => e.className === 'Animal');
     const indexConstraint = animal!.constraints.find((c) => c.type === 'index');
     expect(indexConstraint).toBeDefined();
