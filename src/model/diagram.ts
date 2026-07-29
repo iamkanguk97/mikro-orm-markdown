@@ -5,6 +5,8 @@ import type { ColumnModel, ConstraintModel, DiagramModel, EntityModel, RelationE
 
 const FORMULA_ALIAS = 'e0';
 const UNRESOLVED_FORMULA = '<unresolved>';
+/** Used when an FK column's type cannot be resolved from the referenced entity. */
+const FALLBACK_COLUMN_TYPE = 'integer';
 
 /**
  * Converts raw MikroORM EntityMetadata array into a DiagramModel.
@@ -60,87 +62,11 @@ function buildColumns(
   owningMeta: EntityMetadata
 ): ColumnModel[] {
   if (prop.kind === ReferenceKind.EMBEDDED) {
-    // An object/array embedded is stored as a single JSON column, so render one
-    // column for it. (`array: true` implies `object: true`.) A plain inline
-    // embedded has no column of its own — its fields surface as flat SCALARs.
-    if (prop.object === true || prop.array === true) {
-      return [
-        {
-          propName: prop.name,
-          fieldName: prop.fieldNames?.[0] ?? prop.name,
-          type: 'json',
-          isPrimary: false,
-          isForeignKey: false,
-          isUnique: isPropertyColumnUnique(prop),
-          isNullable: prop.nullable === true,
-          ...(prop.comment !== undefined && { comment: prop.comment }),
-          embeddedIn: prop.array === true ? `${prop.type}[]` : prop.type,
-        },
-      ];
-    }
-    return [];
+    return buildEmbeddedColumns(prop);
   }
 
   if (prop.kind === ReferenceKind.SCALAR) {
-    // Flat leaf of an object/array embedded: it lives inside the single JSON
-    // column rendered above, so it is not a column of its own — skip it.
-    if (prop.object === true && prop.embedded !== undefined) {
-      return [];
-    }
-
-    // For @Formula columns, formula is set on a SCALAR-kinded property
-    const formulaExpr: string | undefined =
-      prop.formula !== undefined
-        ? resolveFormulaExpr(prop.formula as (table: FormulaTable, cols: Record<string, string>) => string, owningMeta)
-        : undefined;
-
-    // Shadow property (persist: false, e.g. a cached/computed runtime value or a
-    // getter-only property): MikroORM never writes or reads a DB column for it, so
-    // it has no physical column to document. @Formula columns are persist: false
-    // too, but they ARE meaningful to document (a real SELECT-time expression), so
-    // only skip when there is no formula.
-    if (prop.persist === false && formulaExpr === undefined) {
-      return [];
-    }
-
-    // Flat embedded columns carry `embedded: [ownerPropName, embeddedPropName]`
-    let embeddedIn: string | undefined;
-    let embeddedPropName: string | undefined;
-    if (prop.embedded !== undefined) {
-      const parentPropName = prop.embedded[0];
-      embeddedIn = owningMeta.properties[parentPropName]?.type;
-      embeddedPropName = prop.embedded[1];
-    }
-
-    const isDiscriminator =
-      owningMeta.discriminatorColumn !== undefined && prop.name === owningMeta.discriminatorColumn;
-
-    const enumItems =
-      prop.enum === true && Array.isArray(prop.items) && prop.items.length > 0
-        ? prop.items.map((item) => String(item))
-        : undefined;
-
-    return [
-      {
-        propName: prop.name,
-        fieldName: prop.fieldNames?.[0] ?? prop.name,
-        // Store the original type (e.g. `varchar(255)`); the Mermaid renderer
-        // sanitizes it for diagram identifiers, while the markdown table shows
-        // it verbatim. Guard against a missing type so downstream string
-        // handling never sees undefined (matches the FK path's defaulting).
-        type: prop.type ?? 'unknown',
-        isPrimary: prop.primary === true,
-        isForeignKey: false,
-        isUnique: isPropertyColumnUnique(prop),
-        isNullable: prop.nullable === true,
-        ...(prop.comment !== undefined && { comment: prop.comment }),
-        ...(formulaExpr !== undefined && { formula: formulaExpr }),
-        ...(embeddedIn !== undefined && { embeddedIn }),
-        ...(embeddedPropName !== undefined && { embeddedPropName }),
-        ...(isDiscriminator && { isDiscriminator: true }),
-        ...(enumItems !== undefined && { enumItems }),
-      },
-    ];
+    return buildScalarColumns(prop, owningMeta);
   }
 
   // FK columns: m:1 always owns the FK; 1:1 only when owner === true
@@ -157,6 +83,93 @@ function buildColumns(
 }
 
 /**
+ * An object/array embedded is stored as a single JSON column, so render one
+ * column for it. (`array: true` implies `object: true`.) A plain inline
+ * embedded has no column of its own — its fields surface as flat SCALARs.
+ */
+function buildEmbeddedColumns(prop: EntityProperty): ColumnModel[] {
+  if (prop.object !== true && prop.array !== true) {
+    return [];
+  }
+
+  return [
+    {
+      propName: prop.name,
+      fieldName: prop.fieldNames?.[0] ?? prop.name,
+      type: 'json',
+      isPrimary: false,
+      isForeignKey: false,
+      isUnique: isPropertyColumnUnique(prop),
+      isNullable: prop.nullable === true,
+      ...(prop.comment !== undefined && { comment: prop.comment }),
+      embeddedIn: prop.array === true ? `${prop.type}[]` : prop.type,
+    },
+  ];
+}
+
+function buildScalarColumns(prop: EntityProperty, owningMeta: EntityMetadata): ColumnModel[] {
+  // Flat leaf of an object/array embedded: it lives inside the single JSON
+  // column rendered by buildEmbeddedColumns, so it is not a column of its
+  // own — skip it.
+  if (prop.object === true && prop.embedded !== undefined) {
+    return [];
+  }
+
+  // For @Formula columns, formula is set on a SCALAR-kinded property
+  const formulaExpr: string | undefined =
+    prop.formula !== undefined
+      ? resolveFormulaExpr(prop.formula as (table: FormulaTable, cols: Record<string, string>) => string, owningMeta)
+      : undefined;
+
+  // Shadow property (persist: false, e.g. a cached/computed runtime value or a
+  // getter-only property): MikroORM never writes or reads a DB column for it, so
+  // it has no physical column to document. @Formula columns are persist: false
+  // too, but they ARE meaningful to document (a real SELECT-time expression), so
+  // only skip when there is no formula.
+  if (prop.persist === false && formulaExpr === undefined) {
+    return [];
+  }
+
+  // Flat embedded columns carry `embedded: [ownerPropName, embeddedPropName]`
+  let embeddedIn: string | undefined;
+  let embeddedPropName: string | undefined;
+  if (prop.embedded !== undefined) {
+    const parentPropName = prop.embedded[0];
+    embeddedIn = owningMeta.properties[parentPropName]?.type;
+    embeddedPropName = prop.embedded[1];
+  }
+
+  const isDiscriminator = owningMeta.discriminatorColumn !== undefined && prop.name === owningMeta.discriminatorColumn;
+
+  const enumItems =
+    prop.enum === true && Array.isArray(prop.items) && prop.items.length > 0
+      ? prop.items.map((item) => String(item))
+      : undefined;
+
+  return [
+    {
+      propName: prop.name,
+      fieldName: prop.fieldNames?.[0] ?? prop.name,
+      // Store the original type (e.g. `varchar(255)`); the Mermaid renderer
+      // sanitizes it for diagram identifiers, while the markdown table shows
+      // it verbatim. Guard against a missing type so downstream string
+      // handling never sees undefined (matches the FK path's defaulting).
+      type: prop.type ?? 'unknown',
+      isPrimary: prop.primary === true,
+      isForeignKey: false,
+      isUnique: isPropertyColumnUnique(prop),
+      isNullable: prop.nullable === true,
+      ...(prop.comment !== undefined && { comment: prop.comment }),
+      ...(formulaExpr !== undefined && { formula: formulaExpr }),
+      ...(embeddedIn !== undefined && { embeddedIn }),
+      ...(embeddedPropName !== undefined && { embeddedPropName }),
+      ...(isDiscriminator && { isDiscriminator: true }),
+      ...(enumItems !== undefined && { enumItems }),
+    },
+  ];
+}
+
+/**
  * Calls the FormulaCallback with the same physical metadata shape MikroORM provides at query time.
  * String-based formulas (most common) ignore both arguments and return the literal string.
  * Function-based formulas can use the table, schema, stable alias, and physical column names.
@@ -168,12 +181,12 @@ function resolveFormulaExpr(
   owningMeta: EntityMetadata
 ): string {
   try {
-    const schema = owningMeta.schema === '*' ? undefined : owningMeta.schema;
+    const { schema, qualifiedName } = resolveTableSchema(owningMeta);
     const table: FormulaTable = {
       alias: FORMULA_ALIAS,
       name: owningMeta.tableName,
       ...(schema !== undefined && { schema }),
-      qualifiedName: schema ? `${schema}.${owningMeta.tableName}` : owningMeta.tableName,
+      qualifiedName,
       toString: () => FORMULA_ALIAS,
     };
     const result = cb(table, buildPhysicalColumnMapping(owningMeta));
@@ -183,6 +196,19 @@ function resolveFormulaExpr(
   } catch {
     return UNRESOLVED_FORMULA;
   }
+}
+
+/**
+ * Physical table identity handed to formula/index callbacks. A `'*'` schema is
+ * MikroORM's dynamic-schema wildcard, not a real schema — it stays out of the
+ * qualified name.
+ */
+function resolveTableSchema(meta: EntityMetadata): { schema?: string; qualifiedName: string } {
+  const schema = meta.schema === '*' ? undefined : meta.schema;
+  return {
+    ...(schema !== undefined && { schema }),
+    qualifiedName: schema ? `${schema}.${meta.tableName}` : meta.tableName,
+  };
 }
 
 function buildPhysicalColumnMapping(meta: EntityMetadata): Record<string, string> {
@@ -206,12 +232,11 @@ function resolveIndexExpression(
   }
 
   try {
-    const schema = meta.schema === '*' ? undefined : meta.schema;
-    const tableName = meta.tableName;
+    const { schema, qualifiedName } = resolveTableSchema(meta);
     const table = {
-      name: tableName,
+      name: meta.tableName,
       ...(schema !== undefined && { schema }),
-      toString: (): string => (schema ? `${schema}.${tableName}` : tableName),
+      toString: (): string => qualifiedName,
     };
     const result = expression(table, buildPhysicalColumnMapping(meta), indexName ?? '');
     return typeof result === 'string' ? result : undefined;
@@ -265,7 +290,7 @@ function buildForeignKeyColumns(prop: EntityProperty, metaByClass: Map<string, E
   return fieldNames.map((fieldName, index) => ({
     propName: prop.name,
     fieldName,
-    type: fkTypes[index] ?? fkTypes[0] ?? 'integer',
+    type: fkTypes[index] ?? fkTypes[0] ?? FALLBACK_COLUMN_TYPE,
     isPrimary: prop.primary === true,
     isForeignKey: true,
     isUnique: isCompositeOwningOneToOneUnique ? false : isPropertyColumnUnique(prop),
@@ -297,21 +322,28 @@ function resolveFkTypes(
 ): string[] {
   const refMeta = metaByClass.get(prop.type);
   if (!refMeta) {
-    return Array.from({ length: fieldNameCount }, () => 'integer');
+    return Array.from({ length: fieldNameCount }, () => FALLBACK_COLUMN_TYPE);
   }
 
   const primaryFields = getPrimaryPhysicalFields(refMeta);
   const referencedColumnNames = prop.referencedColumnNames ?? [];
   return Array.from({ length: fieldNameCount }, (_value, index) => {
-    const referencedColumnName = referencedColumnNames[index];
-    const referencedField =
-      referencedColumnName !== undefined
-        ? primaryFields.find((candidate) => candidate.fieldName === referencedColumnName)
-        : undefined;
-
-    const resolvedField = referencedField ?? primaryFields[index] ?? primaryFields[0];
-    return resolvedField === undefined ? 'integer' : resolveScalarType(resolvedField, metaByClass);
+    const resolvedField = resolveReferencedPrimaryField(primaryFields, referencedColumnNames[index], index);
+    return resolvedField === undefined ? FALLBACK_COLUMN_TYPE : resolveScalarType(resolvedField, metaByClass);
   });
+}
+
+/** A named referenced-column match wins; otherwise fall back positionally, then to the first PK field. */
+function resolveReferencedPrimaryField(
+  primaryFields: PrimaryPhysicalField[],
+  referencedColumnName: string | undefined,
+  index: number
+): PrimaryPhysicalField | undefined {
+  const referencedField =
+    referencedColumnName !== undefined
+      ? primaryFields.find((candidate) => candidate.fieldName === referencedColumnName)
+      : undefined;
+  return referencedField ?? primaryFields[index] ?? primaryFields[0];
 }
 
 /**
@@ -332,7 +364,7 @@ function resolveScalarType(
   const nextVisitedPath = new Set(visitedPath);
   nextVisitedPath.add(fieldIdentity);
 
-  const type = field.property.type ?? 'integer';
+  const type = field.property.type ?? FALLBACK_COLUMN_TYPE;
   const refMeta = metaByClass.get(type);
   if (!refMeta) {
     return type;
@@ -341,12 +373,11 @@ function resolveScalarType(
   if (primaryFields.length === 0) {
     return type;
   }
-  const referencedColumnName = field.property.referencedColumnNames?.[field.fieldIndex];
-  const referencedField =
-    referencedColumnName !== undefined
-      ? primaryFields.find((candidate) => candidate.fieldName === referencedColumnName)
-      : undefined;
-  const targetField = referencedField ?? primaryFields[field.fieldIndex] ?? primaryFields[0];
+  const targetField = resolveReferencedPrimaryField(
+    primaryFields,
+    field.property.referencedColumnNames?.[field.fieldIndex],
+    field.fieldIndex
+  );
   return targetField === undefined ? type : resolveScalarType(targetField, metaByClass, nextVisitedPath);
 }
 
@@ -375,12 +406,29 @@ function getPrimaryPhysicalFields(meta: EntityMetadata): PrimaryPhysicalField[] 
   });
 }
 
-/** Collects indexes, unique constraints, and check constraints from entity and property metadata. */
+/**
+ * Collects indexes, unique constraints, and check constraints from entity and
+ * property metadata. The collection order (entity indexes, property indexes,
+ * entity uniques, property uniques, checks) is the rendered order and is
+ * pinned by the markdown output — do not reorder. Entity- and property-level
+ * declarations of the same kind share one dedup identity set so an exact
+ * duplicate tuple appears only once.
+ */
 function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
   const result: ConstraintModel[] = [];
   const indexIdentities = new Set<string>();
   const uniqueIdentities = new Set<string>();
 
+  collectEntityIndexes(meta, result, indexIdentities);
+  collectPropertyIndexes(meta, result, indexIdentities);
+  collectEntityUniques(meta, result, uniqueIdentities);
+  collectPropertyUniques(meta, result, uniqueIdentities);
+  collectChecks(meta, result);
+
+  return result;
+}
+
+function collectEntityIndexes(meta: EntityMetadata, result: ConstraintModel[], identities: Set<string>): void {
   for (const idx of meta.indexes ?? []) {
     const props = idx.properties;
     const predicate = resolveIndexPredicate(idx.type);
@@ -403,9 +451,11 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
       result.push(constraint);
       continue;
     }
-    pushDistinctConstraint(result, indexIdentities, constraint);
+    pushDistinctConstraint(result, identities, constraint);
   }
+}
 
+function collectPropertyIndexes(meta: EntityMetadata, result: ConstraintModel[], identities: Set<string>): void {
   for (const prop of Object.values(meta.properties)) {
     const fieldName = prop.fieldNames?.[0];
     if (
@@ -416,24 +466,30 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
     ) {
       continue;
     }
-    pushDistinctConstraint(result, indexIdentities, {
+    pushDistinctConstraint(result, identities, {
       type: 'index',
       properties: [fieldName],
       ...(typeof prop.index === 'string' && { name: prop.index }),
     });
   }
+}
 
+function collectEntityUniques(meta: EntityMetadata, result: ConstraintModel[], identities: Set<string>): void {
   for (const uniq of meta.uniques ?? []) {
     const props = uniq.properties;
-    pushDistinctConstraint(result, uniqueIdentities, {
+    pushDistinctConstraint(result, identities, {
       type: 'unique',
       properties: resolveConstraintProperties(meta, props),
       ...(uniq.name !== undefined && { name: uniq.name }),
     });
   }
+}
 
+function collectPropertyUniques(meta: EntityMetadata, result: ConstraintModel[], identities: Set<string>): void {
   for (const prop of Object.values(meta.properties)) {
     const fieldNames = prop.fieldNames ?? [];
+    // A composite owning 1:1's uniqueness spans all FK columns, so it is one
+    // ordered multi-column constraint rather than a per-column marker.
     if (
       prop.kind === ReferenceKind.ONE_TO_ONE &&
       prop.owner === true &&
@@ -441,7 +497,7 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
       fieldNames.length > 1 &&
       (prop.unique === true || typeof prop.unique === 'string')
     ) {
-      pushDistinctConstraint(result, uniqueIdentities, {
+      pushDistinctConstraint(result, identities, {
         type: 'unique',
         properties: fieldNames,
         ...(typeof prop.unique === 'string' && { name: prop.unique }),
@@ -458,13 +514,15 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
     ) {
       continue;
     }
-    pushDistinctConstraint(result, uniqueIdentities, {
+    pushDistinctConstraint(result, identities, {
       type: 'unique',
       name: prop.unique,
       properties: [fieldName],
     });
   }
+}
 
+function collectChecks(meta: EntityMetadata, result: ConstraintModel[]): void {
   for (const check of meta.checks ?? []) {
     // Skip function-based check expressions (they require column reference objects at runtime)
     if (typeof check.expression !== 'string') {
@@ -477,8 +535,6 @@ function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
       ...(check.name !== undefined && { name: check.name }),
     });
   }
-
-  return result;
 }
 
 function pushDistinctConstraint(result: ConstraintModel[], identities: Set<string>, constraint: ConstraintModel): void {
