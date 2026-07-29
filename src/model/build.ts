@@ -121,7 +121,7 @@ export function buildDocumentModel(
     const isDefault = groupName === DEFAULT_NAMESPACE;
 
     const erdEntities = [...enrichedByClass.values()]
-      .filter(({ jsDoc }) => belongsToGroupForErd(jsDoc, groupName, isDefault))
+      .filter(({ jsDoc }) => belongsToGroup(jsDoc, groupName, isDefault, 'erdNamespaces'))
       .map((entity): EnrichedEntity | null => {
         if (isCrossNamespaceInGroup(entity.jsDoc, groupName)) {
           const pkColumns = entity.model.columns.filter((col) => col.isPrimary);
@@ -137,7 +137,7 @@ export function buildDocumentModel(
       .filter((entity): entity is EnrichedEntity => entity !== null);
 
     const textEntities = [...enrichedByClass.values()].filter(({ jsDoc }) =>
-      belongsToGroupForText(jsDoc, groupName, isDefault)
+      belongsToGroup(jsDoc, groupName, isDefault, 'describeNamespaces')
     );
 
     const erdClassNames = new Set(erdEntities.map((e) => e.model.className));
@@ -316,15 +316,19 @@ function hasNoNamespaceTags(jsDoc: EntityJsDocInfo | undefined): boolean {
   return jsDoc.namespaces.length === 0 && jsDoc.erdNamespaces.length === 0 && jsDoc.describeNamespaces.length === 0;
 }
 
-function belongsToGroupForErd(jsDoc: EntityJsDocInfo | undefined, groupName: string, isDefault: boolean): boolean {
+/**
+ * Membership test shared by the ERD and text-table sections: an entity belongs
+ * to a group when @namespace or the section-specific tag (@erd / @describe)
+ * names it, or — for the default group — when it carries no namespace tags.
+ */
+function belongsToGroup(
+  jsDoc: EntityJsDocInfo | undefined,
+  groupName: string,
+  isDefault: boolean,
+  sectionNamespaces: 'erdNamespaces' | 'describeNamespaces'
+): boolean {
   const isExplicitlyIncluded =
-    jsDoc !== undefined && (jsDoc.namespaces.includes(groupName) || jsDoc.erdNamespaces.includes(groupName));
-  return isExplicitlyIncluded || (isDefault && hasNoNamespaceTags(jsDoc));
-}
-
-function belongsToGroupForText(jsDoc: EntityJsDocInfo | undefined, groupName: string, isDefault: boolean): boolean {
-  const isExplicitlyIncluded =
-    jsDoc !== undefined && (jsDoc.namespaces.includes(groupName) || jsDoc.describeNamespaces.includes(groupName));
+    jsDoc !== undefined && (jsDoc.namespaces.includes(groupName) || jsDoc[sectionNamespaces].includes(groupName));
   return isExplicitlyIncluded || (isDefault && hasNoNamespaceTags(jsDoc));
 }
 
