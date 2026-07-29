@@ -241,8 +241,6 @@ describe('renderMarkdown — MikroORM specific columns', () => {
                     formula: '',
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [],
               },
               jsDoc: undefined,
@@ -285,8 +283,6 @@ describe('renderMarkdown — MikroORM specific columns', () => {
                     enumItems: ['active', 'banned'],
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [],
               },
               jsDoc: undefined,
@@ -348,8 +344,6 @@ describe('renderMarkdown — constraints', () => {
                 className: 'Account',
                 tableName: 'account',
                 columns: [],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [
                   {
                     type: 'index',
@@ -397,8 +391,6 @@ describe('renderMarkdown — constraints', () => {
                 className: 'Account',
                 tableName: 'account',
                 columns: [],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [
                   { type: 'index', name: 'email_idx', properties: ['email_address'] },
                   {
@@ -487,8 +479,6 @@ describe('renderMarkdown — escaping', () => {
                     formula: 'sum(`score` | 1)',
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 discriminatorColumn: 'kind`type',
                 constraints: [
                   {
@@ -561,8 +551,6 @@ describe('renderMarkdown — composite keys', () => {
                     isNullable: false,
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [],
               },
               jsDoc: undefined,
@@ -609,8 +597,6 @@ describe('renderMarkdown — composite keys', () => {
                     isNullable: false,
                   },
                 ],
-                isPivot: false,
-                isEmbeddable: false,
                 constraints: [],
               },
               jsDoc: undefined,

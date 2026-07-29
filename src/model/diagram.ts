@@ -45,8 +45,6 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
     className: meta.className,
     tableName: meta.tableName,
     columns,
-    isPivot: false,
-    isEmbeddable: meta.embeddable === true,
     ...(isStiRoot && { discriminatorColumn: meta.discriminatorColumn as string }),
     ...(isStiChild && { extendsEntity: meta.extends }),
     ...(isStiChild && meta.discriminatorValue !== undefined && { discriminatorValue: String(meta.discriminatorValue) }),

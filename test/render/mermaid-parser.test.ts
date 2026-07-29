@@ -22,8 +22,6 @@ function makeEntity(className: string, fieldNames: string[]): EntityModel {
     className,
     tableName: className,
     columns: fieldNames.map(makeColumn),
-    isPivot: false,
-    isEmbeddable: false,
     constraints: [],
   };
 }
