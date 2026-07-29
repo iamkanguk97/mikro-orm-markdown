@@ -17,22 +17,28 @@ Supports a programmatic API (`generateMarkdown`) and a CLI (`mikro-orm-markdown`
 
 ## Source Layout
 
-```
+```text
 src/
   cli.ts            # Commander-based CLI entry point
   index.ts          # Public API: generateMarkdown(), resolveJsDocSources()
+  defaults.ts       # Defaults shared by the CLI and the programmatic API
+  error-chain.ts    # causeChain() / errorMessage() helpers for unknown errors
   messages.ts       # Structured warning/error payloads (StructuredMessage, StructuredError)
   provider.ts       # Auto-injects TsMorphMetadataProvider when needed
+  source-path.ts    # Canonicalizes entity source paths (symlinks, parent segments)
   docs/
     jsdoc.ts        # Parses JSDoc tags from .ts entity files via ts-morph
   metadata/
     load.ts         # Initialises MikroORM and extracts EntityMetadata[]
+    renderable.ts   # Shared predicate: which entities appear in the document
   model/
     types.ts        # Internal model types (EntityModel, ColumnModel, RelationEdge, …)
-    build.ts        # Converts EntityMetadata[] + JsDocResult → DocumentModel
+    diagram.ts      # Converts EntityMetadata[] → DiagramModel (boxes, columns, edges, constraints)
+    build.ts        # Merges DiagramModel + JsDocResult → DocumentModel (namespace groups)
   render/
     markdown.ts     # Renders DocumentModel → Markdown string
     mermaid.ts      # Renders DiagramModel → erDiagram fences (+ optional frontmatter)
+    column-markers.ts # Column-marker labels shared by both renderers
     escape.ts       # Mermaid / Markdown string escaping helpers
 ```
 
@@ -61,31 +67,43 @@ npm run lint && npm run format:check && npm run typecheck && npm run test && npm
 
 ## Test Layout
 
-```
+```text
 test/
   cli.test.ts              # CLI option parsing and validation
+  error-chain.test.ts      # causeChain()/errorMessage() unit tests
+  messages.test.ts         # StructuredMessage / emitWarning unit tests
+  provider.test.ts         # TsMorphMetadataProvider auto-injection unit tests
+  source-path.test.ts      # Source path canonicalization unit tests
   e2e/cli-smoke.test.ts    # End-to-end: spawns the built CLI binary
   integration/generate.test.ts  # generateMarkdown() integration tests
   docs/jsdoc.test.ts       # JSDoc parsing unit tests
-  metadata/load.test.ts    # Metadata loading unit tests
-  model/build.test.ts      # Model builder unit tests
+  metadata/
+    load.test.ts           # Metadata loading unit tests
+    renderable.test.ts     # Renderable-entity predicate unit tests
+  model/
+    diagram.test.ts        # Diagram model builder unit tests
+    build.test.ts          # Document model builder unit tests
   render/
     markdown.test.ts       # Markdown renderer unit tests
     mermaid.test.ts        # Mermaid renderer unit tests
+    mermaid-parser.ts      # Shared helper: parses fences with the official Mermaid parser
+    mermaid-parser.test.ts # Contract tests for generated fences against that parser
+  helpers/                 # Shared test helpers (temp dirs, fixture pipeline, factories, paths)
   fixtures/                # Fixture entities and MikroORM configs
 ```
 
-When adding a feature, add tests to the matching file. New rendering behaviour belongs in `render/*.test.ts`; new model-building behaviour in `model/build.test.ts`.
+When adding a feature, add tests to the matching file. New rendering behaviour belongs in `render/*.test.ts`; new diagram-model behaviour in `model/diagram.test.ts`; new document-model behaviour in `model/build.test.ts`. Reuse the shared helpers in `test/helpers/` instead of re-declaring temp dirs, fixture pipelines, or metadata factories.
 
 ## Generation Pipeline
 
-```
+```text
 MikroORM config
-  └─ loadEntityMetadata()     → EntityMetadata[]  (metadata/load.ts)
-  └─ loadJsDoc()              → JsDocResult        (docs/jsdoc.ts)
-  └─ buildDocumentModel()     → DocumentModel      (model/build.ts)
-  └─ renderMarkdown()         → string             (render/markdown.ts)
-         └─ renderMermaid()   → erDiagram fence    (render/mermaid.ts)
+  └─ loadEntityMetadata()       → EntityMetadata[]  (metadata/load.ts)
+  └─ loadJsDoc()                → JsDocResult        (docs/jsdoc.ts)
+  └─ buildDocumentModel()       → DocumentModel      (model/build.ts)
+         └─ buildDiagramModel() → DiagramModel       (model/diagram.ts)
+  └─ renderMarkdown()           → string             (render/markdown.ts)
+         └─ renderErDiagram()   → erDiagram fence    (render/mermaid.ts)
 ```
 
 ## Supported JSDoc Tags
@@ -107,7 +125,7 @@ Allowed types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `ci`
 - Subject must **not** contain issue/ticket IDs (`#123`, `ECOM-123`).
 - Issue references go in the footer: `Refs: #123`
 
-```
+```text
 feat: add @atLeastOne tag support for collection relations
 
 Refs: #42
@@ -121,3 +139,4 @@ Refs: #42
 - **Peer dependencies.** `@mikro-orm/core` ≥6 and `tsx` (optional) are peers, not bundled. Do not add them to `dependencies`.
 - **Node ≥18.19.0** is the minimum runtime target.
 - **`src/` is pure ESM.** Use `.js` extensions on relative imports (TypeScript resolves them to `.ts` at compile time).
+- **Use `node:` specifiers for Node builtins** (`node:path`, `node:fs`, …) in both `src/` and `test/`.

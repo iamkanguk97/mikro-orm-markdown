@@ -1,4 +1,5 @@
 import type { ColumnModel, DiagramModel } from '../model/types.js';
+import { DISCRIMINATOR_LABEL, embeddedLabel } from './column-markers.js';
 import { escapeMermaidQuotedText, toMermaidIdentifier } from './escape.js';
 
 export const MERMAID_LAYOUTS = ['dagre', 'elk', 'elk.stress'] as const;
@@ -103,30 +104,31 @@ export function renderErDiagram(model: DiagramModel, mermaid?: MermaidRenderOpti
   lines.push('erDiagram');
 
   for (const entity of model.entities) {
-    const entityIdentifier = entityIdentifiers.get(entity.className) ?? toMermaidIdentifier(entity.className);
+    const entityIdentifier = entityIdentifiers(entity.className);
     const entityAlias = entityIdentifier === entity.className ? '' : `["${escapeMermaidQuotedText(entity.className)}"]`;
     const attributeIdentifiers = createMermaidIdentifierRegistry(entity.columns.map((column) => column.fieldName));
 
     lines.push(`  ${entityIdentifier}${entityAlias} {`);
     for (const col of entity.columns) {
-      const fieldIdentifier = attributeIdentifiers.get(col.fieldName) ?? toMermaidIdentifier(col.fieldName);
-      lines.push(`    ${renderColumnLine(col, fieldIdentifier)}`);
+      lines.push(`    ${renderColumnLine(col, attributeIdentifiers(col.fieldName))}`);
     }
     lines.push('  }');
   }
 
   for (const rel of model.relations) {
-    const fromIdentifier = entityIdentifiers.get(rel.fromEntity) ?? toMermaidIdentifier(rel.fromEntity);
-    const toIdentifier = entityIdentifiers.get(rel.toEntity) ?? toMermaidIdentifier(rel.toEntity);
     lines.push(
-      `  ${fromIdentifier} ${rel.fromCardinality}--${rel.toCardinality} ${toIdentifier} : "${escapeMermaidQuotedText(rel.label)}"`
+      `  ${entityIdentifiers(rel.fromEntity)} ${rel.fromCardinality}--${rel.toCardinality} ${entityIdentifiers(rel.toEntity)} : "${escapeMermaidQuotedText(rel.label)}"`
     );
   }
 
   return lines.join('\n');
 }
 
-function createMermaidIdentifierRegistry(values: Iterable<string>): Map<string, string> {
+/**
+ * Returns a collision-free identifier lookup for the given names. Lookups of
+ * names outside the registered set fall back to plain sanitization.
+ */
+function createMermaidIdentifierRegistry(values: Iterable<string>): (value: string) => string {
   const originals = [...new Set(values)];
   const identifiers = new Map<string, string>();
   const allocated = new Set<string>();
@@ -158,7 +160,7 @@ function createMermaidIdentifierRegistry(values: Iterable<string>): Map<string, 
     identifiers.set(original, identifier);
   }
 
-  return identifiers;
+  return (value: string): string => identifiers.get(value) ?? toMermaidIdentifier(value);
 }
 
 function renderColumnLine(col: ColumnModel, fieldIdentifier: string): string {
@@ -180,9 +182,9 @@ function renderColumnLine(col: ColumnModel, fieldIdentifier: string): string {
   if (col.formula !== undefined) {
     comment = col.formula ? `formula: ${col.formula}` : 'formula';
   } else if (col.isDiscriminator) {
-    comment = 'discriminator';
+    comment = DISCRIMINATOR_LABEL;
   } else if (col.embeddedIn !== undefined) {
-    comment = `[${col.embeddedIn}]`;
+    comment = embeddedLabel(col.embeddedIn);
   } else if (col.isSelfReference) {
     comment = 'self-ref';
   }

@@ -1,15 +1,12 @@
+import * as path from 'node:path';
 import { EntitySchema, MikroORM } from '@mikro-orm/core';
 import { SqliteDriver } from '@mikro-orm/sqlite';
-import * as path from 'path';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
+import { inMemorySqliteOptions } from '../helpers/orm.js';
 
 describe('loadEntityMetadata', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it('returns EntityMetadata for all fixture entities', async () => {
     const { metas } = await loadEntityMetadata(config);
     const classNames = metas.map((m) => m.className);
@@ -63,13 +60,9 @@ describe('loadEntityMetadata', () => {
       },
     });
 
-    await expect(
-      loadEntityMetadata({
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [schema],
-      })
-    ).rejects.toThrow('EntitySchema-defined entities are not currently supported: SchemaUser.');
+    await expect(loadEntityMetadata(inMemorySqliteOptions([schema]))).rejects.toThrow(
+      'EntitySchema-defined entities are not currently supported: SchemaUser.'
+    );
   });
 
   it('throws a clear error for EntitySchema class groups', async () => {
@@ -82,33 +75,21 @@ describe('loadEntityMetadata', () => {
       },
     });
 
-    await expect(
-      loadEntityMetadata({
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: [{ entity: GroupedSchemaUser, schema }],
-      })
-    ).rejects.toThrow('EntitySchema-defined entities are not currently supported: GroupedSchemaUser.');
+    await expect(loadEntityMetadata(inMemorySqliteOptions([{ entity: GroupedSchemaUser, schema }]))).rejects.toThrow(
+      'EntitySchema-defined entities are not currently supported: GroupedSchemaUser.'
+    );
   });
 
   it('throws a clear error for a class-linked EntitySchema discovered via a glob pattern (not listed directly)', async () => {
-    await expect(
-      loadEntityMetadata({
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: ['./test/fixtures/entity-schema/*.js'],
-      })
-    ).rejects.toThrow('EntitySchema-defined entities are not currently supported: Book.');
+    await expect(loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']))).rejects.toThrow(
+      'EntitySchema-defined entities are not currently supported: Book.'
+    );
   });
 
   it('throws a softer error for a name-only EntitySchema discovered via a glob pattern', async () => {
-    await expect(
-      loadEntityMetadata({
-        driver: SqliteDriver,
-        dbName: ':memory:',
-        entities: ['./test/fixtures/entity-schema/*.js'],
-      })
-    ).rejects.toThrow(/Could not confirm these entities are decorator-based @Entity\(\) classes: Publisher\./);
+    await expect(loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']))).rejects.toThrow(
+      /Could not confirm these entities are decorator-based @Entity\(\) classes: Publisher\./
+    );
   });
 
   it('discovers metadata without connecting to the database', async () => {

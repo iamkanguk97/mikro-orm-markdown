@@ -1,7 +1,6 @@
 import * as fs from 'node:fs/promises';
-import * as os from 'node:os';
 import * as path from 'node:path';
-import { afterEach, describe, expect, it, type Mock, vi } from 'vitest';
+import { describe, expect, it, type Mock, vi } from 'vitest';
 import {
   type AtomicWriteFileOperations,
   findNearestTsconfig,
@@ -14,6 +13,7 @@ import {
   writeMarkdownFile,
 } from '../src/cli.js';
 import { StructuredError } from '../src/index.js';
+import { makeTempDir } from './helpers/temp-dir.js';
 
 interface MockAtomicWriteFileOperations {
   mkdir: Mock<AtomicWriteFileOperations['mkdir']>;
@@ -23,8 +23,6 @@ interface MockAtomicWriteFileOperations {
 }
 
 describe('CLI helpers', () => {
-  let tempDir: string | undefined;
-
   function createAtomicWriteFileOperations(): MockAtomicWriteFileOperations {
     return {
       mkdir: vi.fn<AtomicWriteFileOperations['mkdir']>().mockResolvedValue(undefined),
@@ -34,18 +32,8 @@ describe('CLI helpers', () => {
     } satisfies AtomicWriteFileOperations;
   }
 
-  afterEach(async () => {
-    if (tempDir === undefined) {
-      return;
-    }
-
-    await fs.rm(tempDir, { recursive: true, force: true });
-    tempDir = undefined;
-  });
-
-  async function createTempDir(): Promise<string> {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'mikro-orm-markdown-cli-'));
-    return tempDir;
+  function createTempDir(): string {
+    return makeTempDir('mikro-orm-markdown-cli-');
   }
 
   it('converts config paths to file URL import specifiers', () => {
@@ -56,7 +44,7 @@ describe('CLI helpers', () => {
   });
 
   it('loads config files through a file URL import specifier', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const configPath = path.join(dir, 'config.js');
     await fs.writeFile(configPath, "export default { dbName: ':memory:', entities: [] };\n", 'utf-8');
 
@@ -66,7 +54,7 @@ describe('CLI helpers', () => {
   });
 
   it('defaults .ts config loading to TypeScript entity discovery', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const configPath = path.join(dir, 'config.ts');
     await fs.writeFile(
       configPath,
@@ -80,7 +68,7 @@ describe('CLI helpers', () => {
   });
 
   it('does not override an explicit preferTs value in .ts config files', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const configPath = path.join(dir, 'config.ts');
     await fs.writeFile(
       configPath,
@@ -101,7 +89,7 @@ describe('CLI helpers', () => {
 
     try {
       const { loadOrmOptions: loadOrmOptionsWithMockedTsx } = await import('../src/cli.js');
-      const dir = await createTempDir();
+      const dir = createTempDir();
       const configPath = path.join(dir, 'config.ts');
       await fs.writeFile(configPath, "export default { dbName: ':memory:', entities: [] };\n", 'utf-8');
 
@@ -116,7 +104,7 @@ describe('CLI helpers', () => {
   });
 
   it('leaves metadataProvider unset so generation can apply provider fallback safely', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const configPath = path.join(dir, 'config.ts');
     await fs.writeFile(configPath, "export default { dbName: ':memory:', entities: [] };\n", 'utf-8');
 
@@ -127,7 +115,7 @@ describe('CLI helpers', () => {
 
   it('does not override a metadataProvider chosen by the config', async () => {
     const { TsMorphMetadataProvider } = await import('@mikro-orm/reflection');
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const configPath = path.join(dir, 'config.ts');
     await fs.writeFile(
       configPath,
@@ -142,7 +130,7 @@ describe('CLI helpers', () => {
   });
 
   it('finds the tsconfig.json nearest to the config file, not the cwd', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const nested = path.join(dir, 'pkg', 'config');
     await fs.mkdir(nested, { recursive: true });
     const tsconfigPath = path.join(dir, 'pkg', 'tsconfig.json');
@@ -153,7 +141,7 @@ describe('CLI helpers', () => {
   });
 
   it('returns undefined when no tsconfig.json exists above the config file', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const configPath = path.join(dir, 'mikro-orm.config.ts');
 
     // A tsconfig may legitimately not exist near temp dirs; the walk should
@@ -163,7 +151,7 @@ describe('CLI helpers', () => {
   });
 
   it('rejects an explicit --tsconfig path that does not exist', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const configPath = path.join(dir, 'config.ts');
     await fs.writeFile(configPath, "export default { dbName: ':memory:', entities: [] };\n", 'utf-8');
     const missing = path.join(dir, 'nope.tsconfig.json');
@@ -221,7 +209,7 @@ describe('CLI helpers', () => {
   });
 
   it('creates missing output parent directories before writing markdown', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const outPath = path.join(dir, 'nested', 'docs', 'ERD.md');
 
     await writeMarkdownFile(outPath, '# ERD\n');
@@ -230,7 +218,7 @@ describe('CLI helpers', () => {
   });
 
   it('atomically replaces an existing output without leaving temporary files', async () => {
-    const dir = await createTempDir();
+    const dir = createTempDir();
     const outPath = path.join(dir, 'ERD.md');
     await fs.writeFile(outPath, '# Old ERD\n', 'utf-8');
 
