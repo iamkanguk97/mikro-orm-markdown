@@ -68,6 +68,17 @@ function collectEntitySchemaNames(options: Options): string[] {
   return names;
 }
 
+/**
+ * Closing hint shared by every "unsupported definition style" error.
+ *
+ * `defineEntity()` is named explicitly because it returns an EntitySchema: a
+ * MikroORM 7 user who followed the official guide never typed "EntitySchema"
+ * anywhere and would not otherwise recognize their own entities in this error.
+ */
+const DECORATOR_ONLY_HINT =
+  'Use decorator-based @Entity() classes instead. ' +
+  "MikroORM 7's defineEntity() is built on EntitySchema, so entities declared with it are reported here too.";
+
 function assertNoEntitySchemaEntities(options: Options): void {
   const schemaNames = collectEntitySchemaNames(options);
   if (schemaNames.length === 0) {
@@ -75,8 +86,7 @@ function assertNoEntitySchemaEntities(options: Options): void {
   }
 
   throw new MetadataLoadError(
-    `EntitySchema-defined entities are not currently supported: ${schemaNames.join(', ')}.\n` +
-      'Use decorator-based @Entity() classes instead.'
+    `EntitySchema-defined entities are not currently supported: ${schemaNames.join(', ')}.\n` + DECORATOR_ONLY_HINT
   );
 }
 
@@ -156,7 +166,7 @@ function assertDiscoveredEntitiesAreSupported(metas: EntityMetadata[]): void {
         'mikro-orm-markdown — please open an issue: https://github.com/iamkanguk97/mikro-orm-markdown/issues'
     );
   }
-  lines.push('Use decorator-based @Entity() classes instead.');
+  lines.push(DECORATOR_ONLY_HINT);
 
   throw new MetadataLoadError(lines.join('\n'));
 }

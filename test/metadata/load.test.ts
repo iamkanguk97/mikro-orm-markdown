@@ -70,6 +70,26 @@ describe('loadEntityMetadata', () => {
     );
   });
 
+  // A MikroORM 7 user who followed the official guide reaches this error through
+  // defineEntity() (which returns an EntitySchema) and never typed
+  // "EntitySchema" themselves, so the hint has to name defineEntity.
+  it('names defineEntity() in the unsupported-definition hint', async () => {
+    const schema = new EntitySchema({
+      name: 'DefinedUser',
+      properties: {
+        id: { type: 'number', primary: true },
+      },
+    });
+
+    await expect(loadEntityMetadata(inMemorySqliteOptions([schema]))).rejects.toThrow(/defineEntity\(\)/);
+  });
+
+  it('names defineEntity() in the hint for entities discovered via a glob pattern', async () => {
+    await expect(loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']))).rejects.toThrow(
+      /defineEntity\(\)/
+    );
+  });
+
   it('throws a clear error for EntitySchema class groups', async () => {
     class GroupedSchemaUser {}
 
