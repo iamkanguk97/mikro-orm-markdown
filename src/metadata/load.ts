@@ -195,7 +195,13 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
   let discoveryError: unknown;
 
   try {
-    const all = Object.values(orm.getMetadata().getAll());
+    // Iterate the storage rather than reading `getAll()`: v6 returns a plain
+    // object from it, v7 a Map, so `Object.values()` silently yields nothing on
+    // v7 and every entity disappears. `MetadataStorage[Symbol.iterator]` is
+    // declared in both majors' typings and yields exactly the same set as
+    // `getAll()` in each (v6: `Object.values(this.metadata)`, v7:
+    // `this.#metadataMap.values()`), so this is version-agnostic.
+    const all = [...orm.getMetadata()];
 
     if (all.length === 0) {
       throw new MetadataLoadError(

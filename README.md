@@ -42,10 +42,11 @@ Beyond what Prisma-based tools can express, `mikro-orm-markdown` also visualizes
 ## Requirements
 
 - **Node.js >= 18**
-- **MikroORM 6** — `@mikro-orm/core` is a peer dependency with the range `>=6.0.0 <7`. MikroORM 7 is not yet supported: it requires Node.js >= 22.17, which conflicts with this package's Node 18 runtime support, and it has not been verified against this tool. v7 support is a separate migration target.
+- **MikroORM 6 or 7** — `@mikro-orm/core` is a peer dependency with the range `>=6.0.0 <8`. Both majors are exercised end-to-end (installed package, ESM/CJS API, CLI binary) in CI. MikroORM 7 itself requires Node.js >= 22.17, so on Node 18 or 20 only v6 is installable.
 - **A MikroORM config file** — the CLI expects a default export of a plain MikroORM options object.
 - **The matching MikroORM driver package** — for example `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`. A live database connection is not required, but MikroORM still needs the driver to discover metadata.
-- **Decorator-based entities** — entities must be `@Entity()` classes. `EntitySchema`-defined entities are not currently supported.
+- **Decorator-based entities** — entities must be `@Entity()` classes. `EntitySchema`-defined entities are not currently supported, and neither is MikroORM 7's `defineEntity()`, which builds on `EntitySchema`.
+- **On MikroORM 7, import decorators from `@mikro-orm/decorators`** — v7 moved them out of `@mikro-orm/core` into `@mikro-orm/decorators/legacy` (TypeScript `experimentalDecorators`) and `@mikro-orm/decorators/es` (ES-standard decorators). Both work with this tool; on v6 they stay in `@mikro-orm/core`.
 - **Resolvable property types** — each entity property's type must be known during MikroORM discovery. Use explicit decorator options such as `type:` / `entity:`, or install `@mikro-orm/reflection` so the CLI can auto-use `TsMorphMetadataProvider` for TypeScript sources.
 - **`tsx` for TypeScript config files** — required only when loading a `.ts` MikroORM config through the CLI. `.js` config files do not need it.
 

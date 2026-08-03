@@ -31,6 +31,7 @@ src/
   metadata/
     load.ts         # Initialises MikroORM and extracts EntityMetadata[]
     renderable.ts   # Shared predicate: which entities appear in the document
+    extends.ts      # Normalizes meta.extends across MikroORM majors (v6 name / v7 class)
   model/
     types.ts        # Internal model types (EntityModel, ColumnModel, RelationEdge, …)
     diagram.ts      # Converts EntityMetadata[] → DiagramModel (boxes, columns, edges, constraints)
@@ -80,6 +81,7 @@ test/
   metadata/
     load.test.ts           # Metadata loading unit tests
     renderable.test.ts     # Renderable-entity predicate unit tests
+    extends.test.ts        # meta.extends normalization unit tests
   model/
     diagram.test.ts        # Diagram model builder unit tests
     build.test.ts          # Document model builder unit tests
@@ -136,7 +138,8 @@ Refs: #42
 - **No `src/` changes without tests.** Every behaviour change needs a corresponding test.
 - **Biome enforces formatting.** Run `npm run lint:fix` before committing; the pre-commit hook runs lint-staged automatically.
 - **Dual build output.** `dist/index.js` (ESM) + `dist/index.cjs` (CJS) + `dist/cli.js`. Always verify with `npm run test:pack` after build changes.
-- **Peer dependencies.** `@mikro-orm/core` ≥6 <7 and `tsx` (optional) are peers, not bundled. Do not add them to `dependencies`. MikroORM v7 is unsupported (needs Node ≥22.17); widening the range is a deliberate migration, not a version bump.
+- **Peer dependencies.** `@mikro-orm/core` ≥6 <8 and `tsx` (optional) are peers, not bundled. Do not add them to `dependencies`. Both MikroORM majors are supported for decorator-based entities; `npm run test:pack` installs each one against the packed tarball (v7 is skipped below Node 22.17, which v7's own `engines` requires).
+- **v6/v7 metadata differences.** MikroORM changed three metadata shapes in v7, each normalized in exactly one place — do not reintroduce direct reads: `MetadataStorage.getAll()` returns an object on v6 and a `Map` on v7 (iterate the storage instead, `src/metadata/load.ts`); `meta.extends` holds a class name on v6 and the ancestor class on v7 (`resolveExtendsName`, `src/metadata/extends.ts`); `meta.path` is a filesystem path on v6 and a `file://` URL on v7 (`normalizeSourcePath`, `src/source-path.ts`). Only decorator entities are supported — `EntitySchema` and v7's `defineEntity()` are rejected by design.
 - **Node ≥18.19.0** is the minimum runtime target.
 - **`src/` is pure ESM.** Use `.js` extensions on relative imports (TypeScript resolves them to `.ts` at compile time).
 - **Use `node:` specifiers for Node builtins** (`node:path`, `node:fs`, …) in both `src/` and `test/`.

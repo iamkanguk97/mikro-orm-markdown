@@ -42,10 +42,11 @@ Prisma 기반 도구로는 표현할 수 없는 MikroORM 고유 개념도 함께
 ## 요구사항
 
 - **Node.js >= 18**
-- **MikroORM >= 6** — `@mikro-orm/core`는 peer dependency입니다.
+- **MikroORM 6 또는 7** — `@mikro-orm/core`는 peer dependency이며 범위는 `>=6.0.0 <8`입니다. 두 메이저 모두 CI에서 설치된 패키지·ESM/CJS API·CLI 바이너리까지 end-to-end로 검증합니다. 다만 MikroORM 7 자체가 Node.js >= 22.17을 요구하므로, Node 18이나 20에서는 v6만 설치할 수 있습니다.
 - **MikroORM config 파일** — CLI는 plain MikroORM options object를 default export로 내보내는 파일을 기대합니다.
 - **사용할 DB에 맞는 MikroORM 드라이버 패키지** — 예를 들어 `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, `@mikro-orm/sqlite`가 있습니다. 실행 중인 DB 연결은 필요 없지만, MikroORM이 메타데이터를 discovery하려면 드라이버는 필요합니다.
-- **데코레이터 기반 엔티티** — 엔티티는 `@Entity()` 클래스여야 합니다. `EntitySchema`로 정의한 엔티티는 현재 지원하지 않습니다.
+- **데코레이터 기반 엔티티** — 엔티티는 `@Entity()` 클래스여야 합니다. `EntitySchema`로 정의한 엔티티는 현재 지원하지 않으며, `EntitySchema` 위에 만들어진 MikroORM 7의 `defineEntity()`도 지원하지 않습니다.
+- **MikroORM 7에서는 데코레이터를 `@mikro-orm/decorators`에서 임포트** — v7은 데코레이터를 `@mikro-orm/core`에서 분리해 `@mikro-orm/decorators/legacy`(TypeScript `experimentalDecorators`)와 `@mikro-orm/decorators/es`(ES 표준 데코레이터)로 옮겼습니다. 둘 다 이 도구와 함께 동작합니다. v6에서는 그대로 `@mikro-orm/core`에 있습니다.
 - **해석 가능한 프로퍼티 타입** — 각 엔티티 프로퍼티의 타입은 MikroORM discovery 시점에 알려져야 합니다. `type:` / `entity:` 같은 명시적인 데코레이터 옵션을 사용하거나, `@mikro-orm/reflection`을 설치해 CLI가 TypeScript 소스에 대해 `TsMorphMetadataProvider`를 자동으로 사용하게 하세요.
 - **TypeScript config 파일을 위한 `tsx`** — CLI에서 `.ts` MikroORM config를 로드할 때만 필요합니다. `.js` config 파일에는 필요하지 않습니다.
 

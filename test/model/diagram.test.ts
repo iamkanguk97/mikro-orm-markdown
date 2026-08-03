@@ -546,6 +546,34 @@ describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
     const extendsEdge = model.relations.find((r) => r.label === 'extends');
     expect(extendsEdge).toBeUndefined();
   });
+
+  // MikroORM v6 stores the ancestor's class name in `meta.extends`, v7 the
+  // ancestor class itself. An unnormalized class leaks into extendsEntity and
+  // crashes the markdown renderer on `value.replace`.
+  it('resolves extendsEntity to a class name when metadata carries the ancestor class', () => {
+    class Animal {}
+    const model = buildDiagramModel([
+      makeEntityMeta({
+        className: 'Animal',
+        tableName: 'animals',
+        discriminatorColumn: 'type',
+        primaryKeys: ['id'],
+        properties: { id: pkProperty() },
+      }),
+      makeEntityMeta({
+        className: 'Dog',
+        tableName: 'animals',
+        extends: Animal,
+        discriminatorValue: 'dog',
+        primaryKeys: ['id'],
+        properties: { id: pkProperty() },
+      }),
+    ]);
+
+    expect(model.entities.find((e) => e.className === 'Dog')?.extendsEntity).toBe('Animal');
+    // The root must still read as a root, not as its own child.
+    expect(model.entities.find((e) => e.className === 'Animal')?.discriminatorColumn).toBe('type');
+  });
 });
 
 describe('buildDiagramModel — Constraints', () => {
