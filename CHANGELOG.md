@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-08-04
+
+Adds MikroORM 7 support alongside MikroORM 6. Two things to know when moving a project to v7: MikroORM 7 moved the decorators out of `@mikro-orm/core` into `@mikro-orm/decorators/legacy` and `@mikro-orm/decorators/es`, so entities must import them from there; and MikroORM 7 requires Node.js >= 22.17, so on Node 18 and 20 only MikroORM 6 is installable. This package's own minimum stays at Node 18.19.0.
+
+### Added
+
+- MikroORM 7 support — the `@mikro-orm/core` and `@mikro-orm/reflection` peer ranges widen from `>=6.0.0 <7` to `>=6.0.0 <8`. Both majors are verified end-to-end against the packed tarball in CI, through the installed ESM API, CJS API, and CLI binary
+- Generation adapts to the three metadata shapes MikroORM 7 changed: `MetadataStorage.getAll()` returns a `Map` rather than a plain object, `EntityMetadata.extends` holds the ancestor class rather than its class name, and `EntityMetadata.path` is a `file://` URL rather than a filesystem path. On MikroORM 6 the output is byte-for-byte unchanged
+
+### Changed
+
+- The unsupported-definition error now names `defineEntity()` explicitly. MikroORM 7 recommends `defineEntity()`, which returns an `EntitySchema` and is therefore rejected like any other `EntitySchema` entity — but such a project never mentions `EntitySchema` itself, so the previous message named a concept absent from the user's code. `EntitySchema` and `defineEntity()` remain unsupported; only decorator-based `@Entity()` classes are
+
 ## [1.0.0] - 2026-07-30
 
 First major release. Identical in behavior to 0.2.0 — this release promotes the current, extensively hardened feature set to a stable 1.0 API.

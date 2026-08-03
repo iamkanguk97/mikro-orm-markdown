@@ -42,7 +42,13 @@ function createAtLeastOneJsDoc(className: string, propName: string): JsDocResult
 function createStiEntityMeta(
   className: string,
   propertyNames: string[],
-  options: { extendsEntity?: string; discriminatorColumn?: string; discriminatorValue?: string } = {}
+  // `extendsEntity` accepts a class as well as a name: MikroORM v6 stores the
+  // ancestor's class name in `meta.extends`, v7 the ancestor class itself.
+  options: {
+    extendsEntity?: string | (new () => unknown);
+    discriminatorColumn?: string;
+    discriminatorValue?: string;
+  } = {}
 ): EntityMetadata {
   const properties = Object.fromEntries(
     propertyNames.map((name) => [
@@ -480,6 +486,32 @@ describe('buildDocumentModel — STI property documentation inheritance', () => 
       middleOnly: 'middle description',
       leafOnly: 'leaf description',
     });
+  });
+
+  // On v7 an unnormalized class never matches the metadata map keyed by class
+  // name, so the ancestor walk stops immediately and inherited docs vanish with
+  // no error.
+  it('inherits ancestor docs when metadata carries the ancestor class instead of its name', () => {
+    class Root {}
+    const root = createStiEntityMeta('Root', ['id', 'rootOnly'], { discriminatorColumn: 'kind' });
+    const leaf = createStiEntityMeta('Leaf', ['id', 'rootOnly', 'leafOnly'], {
+      extendsEntity: Root,
+      discriminatorValue: 'leaf',
+    });
+    const jsDoc = makeJsDocResult({
+      props: new Map([
+        ['Root', new Map([['rootOnly', { description: 'root description', atLeastOne: false }]])],
+        ['Leaf', new Map([['leafOnly', { description: 'leaf description', atLeastOne: false }]])],
+      ]),
+      classNames: new Set(['Root', 'Leaf']),
+    });
+
+    const leafEntity = buildDocumentModel([root, leaf], jsDoc, 'T')
+      .groups.flatMap((group) => group.textEntities)
+      .find((entity) => entity.model.className === 'Leaf')!;
+
+    expect(leafEntity.propDocs.get('rootOnly')?.description).toBe('root description');
+    expect(leafEntity.propDocs.get('leafOnly')?.description).toBe('leaf description');
   });
 
   it('stops inheritance at a hidden ancestor without losing child docs', () => {

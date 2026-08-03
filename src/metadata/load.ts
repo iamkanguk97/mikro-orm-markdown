@@ -68,6 +68,17 @@ function collectEntitySchemaNames(options: Options): string[] {
   return names;
 }
 
+/**
+ * Closing hint shared by every "unsupported definition style" error.
+ *
+ * `defineEntity()` is named explicitly because it returns an EntitySchema: a
+ * MikroORM 7 user who followed the official guide never typed "EntitySchema"
+ * anywhere and would not otherwise recognize their own entities in this error.
+ */
+const DECORATOR_ONLY_HINT =
+  'Use decorator-based @Entity() classes instead. ' +
+  "MikroORM 7's defineEntity() is built on EntitySchema, so entities declared with it are reported here too.";
+
 function assertNoEntitySchemaEntities(options: Options): void {
   const schemaNames = collectEntitySchemaNames(options);
   if (schemaNames.length === 0) {
@@ -75,8 +86,7 @@ function assertNoEntitySchemaEntities(options: Options): void {
   }
 
   throw new MetadataLoadError(
-    `EntitySchema-defined entities are not currently supported: ${schemaNames.join(', ')}.\n` +
-      'Use decorator-based @Entity() classes instead.'
+    `EntitySchema-defined entities are not currently supported: ${schemaNames.join(', ')}.\n` + DECORATOR_ONLY_HINT
   );
 }
 
@@ -156,7 +166,7 @@ function assertDiscoveredEntitiesAreSupported(metas: EntityMetadata[]): void {
         'mikro-orm-markdown — please open an issue: https://github.com/iamkanguk97/mikro-orm-markdown/issues'
     );
   }
-  lines.push('Use decorator-based @Entity() classes instead.');
+  lines.push(DECORATOR_ONLY_HINT);
 
   throw new MetadataLoadError(lines.join('\n'));
 }
@@ -195,7 +205,13 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
   let discoveryError: unknown;
 
   try {
-    const all = Object.values(orm.getMetadata().getAll());
+    // Iterate the storage rather than reading `getAll()`: v6 returns a plain
+    // object from it, v7 a Map, so `Object.values()` silently yields nothing on
+    // v7 and every entity disappears. `MetadataStorage[Symbol.iterator]` is
+    // declared in both majors' typings and yields exactly the same set as
+    // `getAll()` in each (v6: `Object.values(this.metadata)`, v7:
+    // `this.#metadataMap.values()`), so this is version-agnostic.
+    const all = [...orm.getMetadata()];
 
     if (all.length === 0) {
       throw new MetadataLoadError(

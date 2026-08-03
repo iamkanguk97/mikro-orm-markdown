@@ -1,6 +1,7 @@
 import { type EntityMetadata, type EntityProperty, ReferenceKind } from '@mikro-orm/core';
 import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo, PropJsDocMap } from '../docs/jsdoc.js';
 import { emitWarning, type WarnHandler } from '../messages.js';
+import { resolveExtendsName } from '../metadata/extends.js';
 import { buildDiagramModel } from './diagram.js';
 import type { ColumnModel, EntityModel, RelationEdge } from './types.js';
 
@@ -219,7 +220,8 @@ function withInheritedStiPropDocs(
 ): Map<string, PropJsDocInfo> {
   const ancestorClassNames: string[] = [];
   const visited = new Set<string>([model.className]);
-  let ancestorName = metadataByClass.get(model.className)?.extends;
+  const ownMeta = metadataByClass.get(model.className);
+  let ancestorName = ownMeta === undefined ? undefined : resolveExtendsName(ownMeta);
 
   while (ancestorName !== undefined && !visited.has(ancestorName) && !hiddenClasses.has(ancestorName)) {
     const ancestor = metadataByClass.get(ancestorName);
@@ -228,7 +230,7 @@ function withInheritedStiPropDocs(
     }
     visited.add(ancestorName);
     ancestorClassNames.push(ancestorName);
-    ancestorName = ancestor.extends;
+    ancestorName = resolveExtendsName(ancestor);
   }
 
   const merged = new Map<string, PropJsDocInfo>();

@@ -4,7 +4,12 @@ import { SqliteDriver } from '@mikro-orm/sqlite';
 import { describe, expect, it, vi } from 'vitest';
 import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
-import { inMemorySqliteOptions } from '../helpers/orm.js';
+import {
+  inMemorySqliteOptions,
+  type MetadataStorageShape,
+  makeFailingMetadataStorage,
+  makeMetadataStorage,
+} from '../helpers/orm.js';
 
 describe('loadEntityMetadata', () => {
   it('returns EntityMetadata for all fixture entities', async () => {
@@ -62,6 +67,26 @@ describe('loadEntityMetadata', () => {
 
     await expect(loadEntityMetadata(inMemorySqliteOptions([schema]))).rejects.toThrow(
       'EntitySchema-defined entities are not currently supported: SchemaUser.'
+    );
+  });
+
+  // A MikroORM 7 user who followed the official guide reaches this error through
+  // defineEntity() (which returns an EntitySchema) and never typed
+  // "EntitySchema" themselves, so the hint has to name defineEntity.
+  it('names defineEntity() in the unsupported-definition hint', async () => {
+    const schema = new EntitySchema({
+      name: 'DefinedUser',
+      properties: {
+        id: { type: 'number', primary: true },
+      },
+    });
+
+    await expect(loadEntityMetadata(inMemorySqliteOptions([schema]))).rejects.toThrow(/defineEntity\(\)/);
+  });
+
+  it('names defineEntity() in the hint for entities discovered via a glob pattern', async () => {
+    await expect(loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']))).rejects.toThrow(
+      /defineEntity\(\)/
     );
   });
 
@@ -141,11 +166,7 @@ describe('loadEntityMetadata', () => {
     const closeResultCache = vi.fn().mockRejectedValue(resultCleanupError);
 
     vi.spyOn(MikroORM, 'init').mockResolvedValue({
-      getMetadata: () => ({
-        getAll: () => {
-          throw discoveryError;
-        },
-      }),
+      getMetadata: () => makeFailingMetadataStorage(discoveryError),
       config: {
         getMetadataCacheAdapter: () => ({ close: closeMetadataCache }),
         getResultCacheAdapter: () => ({ close: closeResultCache }),
@@ -169,11 +190,7 @@ describe('loadEntityMetadata', () => {
     const closeResultCache = vi.fn().mockRejectedValue(resultCleanupError);
 
     vi.spyOn(MikroORM, 'init').mockResolvedValue({
-      getMetadata: () => ({
-        getAll: () => {
-          throw discoveryError;
-        },
-      }),
+      getMetadata: () => makeFailingMetadataStorage(discoveryError),
       config: {
         getMetadataCacheAdapter: () => ({ close: closeMetadataCache }),
         getResultCacheAdapter: () => ({ close: closeResultCache }),
@@ -196,15 +213,8 @@ describe('loadEntityMetadata', () => {
     const closeResultCache = vi.fn().mockRejectedValue(resultCleanupError);
 
     vi.spyOn(MikroORM, 'init').mockResolvedValue({
-      getMetadata: () => ({
-        getAll: () => ({
-          DecoratedEntity: {
-            class: DecoratedEntity,
-            className: 'DecoratedEntity',
-            properties: {},
-          },
-        }),
-      }),
+      getMetadata: () =>
+        makeMetadataStorage([{ class: DecoratedEntity, className: 'DecoratedEntity', properties: {} }]),
       config: {
         get: () => process.cwd(),
         getMetadataCacheAdapter: () => ({ close: closeMetadataCache }),
@@ -218,5 +228,27 @@ describe('loadEntityMetadata', () => {
     expect((failure as AggregateError).errors).toEqual([metadataCleanupError, resultCleanupError]);
     expect(closeMetadataCache).toHaveBeenCalledOnce();
     expect(closeResultCache).toHaveBeenCalledOnce();
+  });
+
+  // MikroORM v7 returns a Map from `MetadataStorage.getAll()` where v6 returned
+  // a plain object, so `Object.values(getAll())` yields nothing and every entity
+  // silently disappears. Loading must read the storage's iterator instead.
+  it.each<MetadataStorageShape>(['v6', 'v7'])('discovers entities from a %s-shaped MetadataStorage', async (shape) => {
+    class DecoratedEntity {}
+    Object.defineProperty(DecoratedEntity, '__path', { value: import.meta.url });
+
+    vi.spyOn(MikroORM, 'init').mockResolvedValue({
+      getMetadata: () =>
+        makeMetadataStorage([{ class: DecoratedEntity, className: 'DecoratedEntity', properties: {} }], shape),
+      config: {
+        get: () => process.cwd(),
+        getMetadataCacheAdapter: () => undefined,
+        getResultCacheAdapter: () => undefined,
+      },
+    } as never);
+
+    const { metas } = await loadEntityMetadata(config);
+
+    expect(metas.map((meta) => meta.className)).toEqual(['DecoratedEntity']);
   });
 });

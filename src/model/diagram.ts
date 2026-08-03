@@ -1,5 +1,6 @@
 import type { EntityMetadata, EntityProperty, FormulaTable, IndexCallback } from '@mikro-orm/core';
 import { ReferenceKind } from '@mikro-orm/core';
+import { resolveExtendsName } from '../metadata/extends.js';
 import { isRenderableMeta } from '../metadata/renderable.js';
 import type { ColumnModel, ConstraintModel, DiagramModel, EntityModel, RelationEdge } from './types.js';
 
@@ -33,8 +34,9 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
   // so we must not key off the absence of discriminatorValue here — that would
   // misclassify non-abstract roots and leak every subclass column into them.
   // The root's properties list includes all child-only columns (inherited=true) — filter them out.
-  const isStiRoot = meta.discriminatorColumn !== undefined && !meta.extends;
-  const isStiChild = Boolean(meta.extends) && meta.discriminatorValue !== undefined;
+  const extendsEntity = resolveExtendsName(meta);
+  const isStiRoot = meta.discriminatorColumn !== undefined && extendsEntity === undefined;
+  const isStiChild = extendsEntity !== undefined && meta.discriminatorValue !== undefined;
 
   const columns: ColumnModel[] = [];
   for (const prop of Object.values(meta.properties)) {
@@ -49,7 +51,7 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
     tableName: meta.tableName,
     columns,
     ...(isStiRoot && { discriminatorColumn: meta.discriminatorColumn as string }),
-    ...(isStiChild && { extendsEntity: meta.extends }),
+    ...(isStiChild && { extendsEntity }),
     ...(isStiChild && meta.discriminatorValue !== undefined && { discriminatorValue: String(meta.discriminatorValue) }),
     constraints: buildConstraints(meta),
   };
