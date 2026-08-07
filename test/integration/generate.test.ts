@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import {
   Entity,
   type EntityClass,
+  EntitySchema,
   Formula,
   MetadataStorage,
   PrimaryKey,
@@ -15,7 +16,7 @@ import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
-import { MetadataLoadError, UnsupportedEntityDefinitionError } from '../../src/metadata/load.js';
+import { MetadataLoadError } from '../../src/metadata/load.js';
 import { CoverageAddress, UnusedCoverageAddress } from '../fixtures/embeddable-coverage/Address.js';
 import {
   ErdOnlyEmbeddedOwner,
@@ -198,38 +199,123 @@ describe('generateMarkdown', () => {
   });
 
   // The auto-injected TsMorph provider crashes on schema entities in .ts
-  // sources with MikroORM's MetadataError before the unsupported-definition
-  // rejection can run. The fallback must retry and surface the rejection —
-  // not the provider error, whose tsconfig advice misattributes the problem.
-  it('surfaces the EntitySchema rejection for glob-discovered schema entities in .ts sources', async () => {
-    const error = await generateMarkdown({
-      orm: inMemorySqliteOptions(['./test/fixtures/entity-schema-ts/*.ts']),
-    }).then(
-      () => undefined,
-      (cause: unknown) => cause
-    );
+  // sources with MikroORM's MetadataError (there is no class declaration to
+  // analyse), so generation only proceeds through the fallback retry. The
+  // schema entity renders from metadata; the fixture's @hidden tag cannot be
+  // read yet, so the entity must appear AND the gap must be warned about —
+  // a silent @hidden leak is never acceptable (#107).
+  it('renders glob-discovered schema entities from .ts sources and warns about their unread JSDoc', async () => {
+    const structuredWarnings: StructuredMessage[] = [];
 
-    expect(error).toBeInstanceOf(UnsupportedEntityDefinitionError);
-    expect((error as Error).message).toContain('Catalog');
-    expect((error as Error).message).toContain('not currently supported');
-    expect((error as Error).message).not.toContain('compilerOptions.declaration');
+    const md = await generateMarkdown({
+      orm: inMemorySqliteOptions(['./test/fixtures/entity-schema-ts/*.ts']),
+      onWarn: (_message: string, warning?: StructuredMessage) => {
+        if (warning !== undefined) {
+          structuredWarnings.push(warning);
+        }
+      },
+    });
+
+    expect(md).toContain('### Catalog');
+    expect(md).toContain('| title | string |');
+    expect(structuredWarnings).toContainEqual(
+      expect.objectContaining({
+        title: 'JSDoc unavailable for schema-defined entities',
+        detail: expect.stringContaining('Catalog'),
+        impact: expect.arrayContaining([expect.stringContaining('@hidden')]),
+        fix: expect.stringContaining('issues/106'),
+      })
+    );
   });
 
-  // Same rejection, other provider failure flavor: for a compiled .js glob the
-  // provider throws MissingTsMorphSourceError, and the fallback retry used to
-  // swallow the rejection raised during the retry and rethrow the original
-  // missing-source error instead.
-  it('surfaces the EntitySchema rejection for glob-discovered schema entities in compiled .js sources', async () => {
-    const error = await generateMarkdown({
-      orm: inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']),
-    }).then(
-      () => undefined,
-      (cause: unknown) => cause
-    );
+  // Same pipeline, other provider failure flavor: for a compiled .js glob the
+  // provider throws MissingTsMorphSourceError instead of MetadataError. Both
+  // the class-linked (Book) and name-only (Publisher) schema styles must
+  // render and be named in the warning — a linked class binding its own JSDoc
+  // does not read JSDoc written on the schema declaration itself.
+  it('renders glob-discovered schema entities from compiled .js sources and warns about their unread JSDoc', async () => {
+    const structuredWarnings: StructuredMessage[] = [];
 
-    expect(error).toBeInstanceOf(UnsupportedEntityDefinitionError);
-    expect((error as Error).message).toContain('EntitySchema-defined entities are not currently supported: Book.');
-    expect((error as Error).message).not.toContain('No TypeScript metadata source');
+    const md = await generateMarkdown({
+      orm: inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']),
+      onWarn: (_message: string, warning?: StructuredMessage) => {
+        if (warning !== undefined) {
+          structuredWarnings.push(warning);
+        }
+      },
+    });
+
+    expect(md).toContain('### Book');
+    expect(md).toContain('### Publisher');
+    expect(structuredWarnings).toContainEqual(
+      expect.objectContaining({
+        title: 'JSDoc unavailable for schema-defined entities',
+        detail: expect.stringMatching(/Book.*Publisher|Publisher.*Book/),
+      })
+    );
+  });
+
+  // Instance-listed schemas have no meta.path at all, so no JSDoc source
+  // exists to read — the warning is the only thing standing between a @hidden
+  // tag and a silent leak (#107's second discovery flavor).
+  it('renders instance-listed schema entities and warns about their unread JSDoc', async () => {
+    const schema = new EntitySchema({
+      name: 'InstanceListedSchemaUser',
+      properties: {
+        id: { primary: true, type: 'number' },
+        name: { type: 'string' },
+      },
+    });
+    const structuredWarnings: StructuredMessage[] = [];
+
+    const md = await generateMarkdown({
+      orm: inMemorySqliteOptions([schema]),
+      onWarn: (_message: string, warning?: StructuredMessage) => {
+        if (warning !== undefined) {
+          structuredWarnings.push(warning);
+        }
+      },
+    });
+
+    expect(md).toContain('### InstanceListedSchemaUser');
+    expect(md).toContain('| name | string |');
+    expect(structuredWarnings).toContainEqual(
+      expect.objectContaining({
+        title: 'JSDoc unavailable for schema-defined entities',
+        detail: expect.stringContaining('InstanceListedSchemaUser'),
+      })
+    );
+  });
+
+  // Schema entities have no class declaration for --src to cover, so the
+  // explicit-src coverage assertion must not fail generation over them — the
+  // schema-JSDoc warning already reports the gap.
+  it('does not fail explicit src coverage over schema-defined entities', async () => {
+    const schema = new EntitySchema({
+      name: 'SrcExemptSchemaUser',
+      properties: {
+        id: { primary: true, type: 'number' },
+      },
+    });
+    const structuredWarnings: StructuredMessage[] = [];
+
+    const md = await generateMarkdown({
+      orm: inMemorySqliteOptions([schema]),
+      src: ['./test/fixtures/entities/Author.ts'],
+      onWarn: (_message: string, warning?: StructuredMessage) => {
+        if (warning !== undefined) {
+          structuredWarnings.push(warning);
+        }
+      },
+    });
+
+    expect(md).toContain('### SrcExemptSchemaUser');
+    expect(structuredWarnings).toContainEqual(
+      expect.objectContaining({
+        title: 'JSDoc unavailable for schema-defined entities',
+        detail: expect.stringContaining('SrcExemptSchemaUser'),
+      })
+    );
   });
 
   it.each(sqlDriverSmokeCases)(
