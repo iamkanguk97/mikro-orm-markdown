@@ -15,7 +15,7 @@ import { TsMorphMetadataProvider } from '@mikro-orm/reflection';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { describe, expect, it, vi } from 'vitest';
 import { generateMarkdown, resolveJsDocSources, StructuredError, type StructuredMessage } from '../../src/index.js';
-import { MetadataLoadError } from '../../src/metadata/load.js';
+import { MetadataLoadError, UnsupportedEntityDefinitionError } from '../../src/metadata/load.js';
 import { CoverageAddress, UnusedCoverageAddress } from '../fixtures/embeddable-coverage/Address.js';
 import {
   ErdOnlyEmbeddedOwner,
@@ -195,6 +195,41 @@ describe('generateMarkdown', () => {
     expect(structuredWarnings).not.toContainEqual(
       expect.objectContaining({ title: 'TypeScript metadata source unavailable' })
     );
+  });
+
+  // The auto-injected TsMorph provider crashes on schema entities in .ts
+  // sources with MikroORM's MetadataError before the unsupported-definition
+  // rejection can run. The fallback must retry and surface the rejection —
+  // not the provider error, whose tsconfig advice misattributes the problem.
+  it('surfaces the EntitySchema rejection for glob-discovered schema entities in .ts sources', async () => {
+    const error = await generateMarkdown({
+      orm: inMemorySqliteOptions(['./test/fixtures/entity-schema-ts/*.ts']),
+    }).then(
+      () => undefined,
+      (cause: unknown) => cause
+    );
+
+    expect(error).toBeInstanceOf(UnsupportedEntityDefinitionError);
+    expect((error as Error).message).toContain('Catalog');
+    expect((error as Error).message).toContain('not currently supported');
+    expect((error as Error).message).not.toContain('compilerOptions.declaration');
+  });
+
+  // Same rejection, other provider failure flavor: for a compiled .js glob the
+  // provider throws MissingTsMorphSourceError, and the fallback retry used to
+  // swallow the rejection raised during the retry and rethrow the original
+  // missing-source error instead.
+  it('surfaces the EntitySchema rejection for glob-discovered schema entities in compiled .js sources', async () => {
+    const error = await generateMarkdown({
+      orm: inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']),
+    }).then(
+      () => undefined,
+      (cause: unknown) => cause
+    );
+
+    expect(error).toBeInstanceOf(UnsupportedEntityDefinitionError);
+    expect((error as Error).message).toContain('EntitySchema-defined entities are not currently supported: Book.');
+    expect((error as Error).message).not.toContain('No TypeScript metadata source');
   });
 
   it.each(sqlDriverSmokeCases)(

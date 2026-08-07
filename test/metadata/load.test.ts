@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { EntitySchema, MikroORM } from '@mikro-orm/core';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { describe, expect, it, vi } from 'vitest';
-import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
+import { loadEntityMetadata, MetadataLoadError, UnsupportedEntityDefinitionError } from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
 import {
   inMemorySqliteOptions,
@@ -115,6 +115,36 @@ describe('loadEntityMetadata', () => {
     await expect(loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']))).rejects.toThrow(
       /Could not confirm these entities are decorator-based @Entity\(\) classes: Publisher\./
     );
+  });
+
+  // Both rejection styles must be recognizable as the deliberate policy
+  // decision (not a generic loading failure): the TsMorph fallback in index.ts
+  // uses the class to surface the rejection over the provider crash.
+  it('marks the config-listed rejection with UnsupportedEntityDefinitionError', async () => {
+    const schema = new EntitySchema({
+      name: 'ListedSchemaUser',
+      properties: {
+        id: { type: 'number', primary: true },
+      },
+    });
+
+    const error = await loadEntityMetadata(inMemorySqliteOptions([schema])).then(
+      () => undefined,
+      (cause: unknown) => cause
+    );
+
+    expect(error).toBeInstanceOf(UnsupportedEntityDefinitionError);
+    expect(error).toBeInstanceOf(MetadataLoadError);
+  });
+
+  it('marks the glob-discovered rejection with UnsupportedEntityDefinitionError', async () => {
+    const error = await loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js'])).then(
+      () => undefined,
+      (cause: unknown) => cause
+    );
+
+    expect(error).toBeInstanceOf(UnsupportedEntityDefinitionError);
+    expect(error).toBeInstanceOf(MetadataLoadError);
   });
 
   it('discovers metadata without connecting to the database', async () => {
