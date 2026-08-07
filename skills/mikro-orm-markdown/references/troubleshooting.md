@@ -67,7 +67,7 @@ Resolve asynchronous config yourself and call the programmatic API instead.
 
 ## EntitySchema entities
 
-`EntitySchema`-defined entities are not currently supported. Use decorator-based `@Entity()` classes for projects that need `mikro-orm-markdown` output.
+Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`) render in the ERD and column tables from their metadata. JSDoc on the schema declaration is not read yet — a "JSDoc unavailable for schema-defined entities" warning names the affected entities, and descriptions, `@namespace`, and `@hidden` on those declarations are not applied until [#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106) lands. JSDoc on decorator-based `@Entity()` classes keeps working unchanged.
 
 ## Empty or incomplete Mermaid output
 

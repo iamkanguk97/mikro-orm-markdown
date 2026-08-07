@@ -45,7 +45,7 @@ Beyond what Prisma-based tools can express, `mikro-orm-markdown` also visualizes
 - **MikroORM 6 or 7** — `@mikro-orm/core` is a peer dependency with the range `>=6.0.0 <8`. Both majors are exercised end-to-end (installed package, ESM/CJS API, CLI binary) in CI. MikroORM 7 itself requires Node.js >= 22.17, so on Node 18 or 20 only v6 is installable.
 - **A MikroORM config file** — the CLI expects a default export of a plain MikroORM options object.
 - **The matching MikroORM driver package** — for example `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`. A live database connection is not required, but MikroORM still needs the driver to discover metadata.
-- **Decorator-based entities** — entities must be `@Entity()` classes. `EntitySchema`-defined entities are not currently supported, and neither is MikroORM 7's `defineEntity()`, which builds on `EntitySchema`.
+- **Decorator-based entities render fully; schema-defined entities render from metadata only** — `@Entity()` classes get full JSDoc support (descriptions, `@namespace`, `@hidden`, …). Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`, which builds on it) appear in the ERD and column tables, but JSDoc on the schema declaration is not read yet — generation emits a warning naming those entities ([#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106)).
 - **On MikroORM 7, import decorators from `@mikro-orm/decorators`** — v7 moved them out of `@mikro-orm/core` into `@mikro-orm/decorators/legacy` (TypeScript `experimentalDecorators`) and `@mikro-orm/decorators/es` (ES-standard decorators). Both work with this tool; on v6 they stay in `@mikro-orm/core`.
 - **Resolvable property types** — each entity property's type must be known during MikroORM discovery. Use explicit decorator options such as `type:` / `entity:`, or install `@mikro-orm/reflection` so the CLI can auto-use `TsMorphMetadataProvider` for TypeScript sources.
 - **`tsx` for TypeScript config files** — required only when loading a `.ts` MikroORM config through the CLI. `.js` config files do not need it.
@@ -491,10 +491,10 @@ Useful during active development when you want the ERD to stay current without r
 mikro-orm-markdown --config ./mikro-orm.config.ts --watch
 ```
 
-### `EntitySchema` support
+### JSDoc for `EntitySchema` entities
 
-Currently only decorator-based entities (`@Entity()` classes) are supported.
-A future release will add support for [`EntitySchema`](https://mikro-orm.io/docs/entity-schema)-defined entities, which describe the schema as a plain object without TypeScript decorators.
+[`EntitySchema`](https://mikro-orm.io/docs/entity-schema)-defined entities (including MikroORM 7's `defineEntity()`) already render in the ERD and column tables from their metadata.
+Reading JSDoc from the schema declarations — descriptions, `@namespace`, `@hidden` — is planned next, tracked in [#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106). Until it lands, generation emits a warning naming the schema-defined entities whose JSDoc was not read.
 
 ```typescript
 const PostSchema = new EntitySchema({

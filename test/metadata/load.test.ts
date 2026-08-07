@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { EntitySchema, MikroORM } from '@mikro-orm/core';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { describe, expect, it, vi } from 'vitest';
-import { loadEntityMetadata, MetadataLoadError, UnsupportedEntityDefinitionError } from '../../src/metadata/load.js';
+import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
 import {
   inMemorySqliteOptions,
@@ -57,40 +57,31 @@ describe('loadEntityMetadata', () => {
     await expect(loadEntityMetadata({ ...config, entities: [] })).rejects.toBeInstanceOf(MetadataLoadError);
   });
 
-  it('throws a clear error for EntitySchema-defined entities', async () => {
+  // Schema-defined entities (EntitySchema, and MikroORM 7's defineEntity()
+  // which is built on it) are identified instead of rejected: their metadata
+  // renders fine, only JSDoc on the schema declaration is not read yet (#106).
+  // generateMarkdown uses these sets to warn so tags such as @hidden are never
+  // dropped silently (#107).
+  it('identifies a config-listed EntitySchema instead of rejecting it', async () => {
     const schema = new EntitySchema({
-      name: 'SchemaUser',
+      name: 'ListedSchemaUser',
       properties: {
         id: { type: 'number', primary: true },
       },
     });
 
-    await expect(loadEntityMetadata(inMemorySqliteOptions([schema]))).rejects.toThrow(
-      'EntitySchema-defined entities are not currently supported: SchemaUser.'
+    const { metas, schemaEntityClassNames, unconfirmedEntityClassNames } = await loadEntityMetadata(
+      inMemorySqliteOptions([schema])
     );
+
+    expect(metas.map((meta) => meta.className)).toContain('ListedSchemaUser');
+    expect(schemaEntityClassNames.has('ListedSchemaUser')).toBe(true);
+    // Config-listed instances are confirmed directly; they must not be
+    // double-reported through the weaker no-decorator-marker inference.
+    expect(unconfirmedEntityClassNames.has('ListedSchemaUser')).toBe(false);
   });
 
-  // A MikroORM 7 user who followed the official guide reaches this error through
-  // defineEntity() (which returns an EntitySchema) and never typed
-  // "EntitySchema" themselves, so the hint has to name defineEntity.
-  it('names defineEntity() in the unsupported-definition hint', async () => {
-    const schema = new EntitySchema({
-      name: 'DefinedUser',
-      properties: {
-        id: { type: 'number', primary: true },
-      },
-    });
-
-    await expect(loadEntityMetadata(inMemorySqliteOptions([schema]))).rejects.toThrow(/defineEntity\(\)/);
-  });
-
-  it('names defineEntity() in the hint for entities discovered via a glob pattern', async () => {
-    await expect(loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']))).rejects.toThrow(
-      /defineEntity\(\)/
-    );
-  });
-
-  it('throws a clear error for EntitySchema class groups', async () => {
+  it('identifies a config-listed EntitySchema class group', async () => {
     class GroupedSchemaUser {}
 
     const schema = new EntitySchema({
@@ -100,51 +91,34 @@ describe('loadEntityMetadata', () => {
       },
     });
 
-    await expect(loadEntityMetadata(inMemorySqliteOptions([{ entity: GroupedSchemaUser, schema }]))).rejects.toThrow(
-      'EntitySchema-defined entities are not currently supported: GroupedSchemaUser.'
+    const { metas, schemaEntityClassNames } = await loadEntityMetadata(
+      inMemorySqliteOptions([{ entity: GroupedSchemaUser, schema }])
     );
+
+    expect(metas.map((meta) => meta.className)).toContain('GroupedSchemaUser');
+    expect(schemaEntityClassNames.has('GroupedSchemaUser')).toBe(true);
   });
 
-  it('throws a clear error for a class-linked EntitySchema discovered via a glob pattern (not listed directly)', async () => {
-    await expect(loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']))).rejects.toThrow(
-      'EntitySchema-defined entities are not currently supported: Book.'
+  it('identifies glob-discovered EntitySchema entities and keeps their metadata', async () => {
+    const { metas, schemaEntityClassNames, unconfirmedEntityClassNames } = await loadEntityMetadata(
+      inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js'])
     );
+
+    const classNames = metas.map((meta) => meta.className);
+    expect(classNames).toContain('Book');
+    expect(classNames).toContain('Publisher');
+    // Class-linked schemas register in EntitySchema.REGISTRY — definitive.
+    expect(schemaEntityClassNames.has('Book')).toBe(true);
+    // Name-only schemas leave no definitive trace: only the absence of a
+    // decorator marker flags them, so they surface as unconfirmed.
+    expect(unconfirmedEntityClassNames.has('Publisher')).toBe(true);
   });
 
-  it('throws a softer error for a name-only EntitySchema discovered via a glob pattern', async () => {
-    await expect(loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js']))).rejects.toThrow(
-      /Could not confirm these entities are decorator-based @Entity\(\) classes: Publisher\./
-    );
-  });
+  it('identifies no schema entities among decorator-based fixtures', async () => {
+    const { schemaEntityClassNames, unconfirmedEntityClassNames } = await loadEntityMetadata(config);
 
-  // Both rejection styles must be recognizable as the deliberate policy
-  // decision (not a generic loading failure): the TsMorph fallback in index.ts
-  // uses the class to surface the rejection over the provider crash.
-  it('marks the config-listed rejection with UnsupportedEntityDefinitionError', async () => {
-    const schema = new EntitySchema({
-      name: 'ListedSchemaUser',
-      properties: {
-        id: { type: 'number', primary: true },
-      },
-    });
-
-    const error = await loadEntityMetadata(inMemorySqliteOptions([schema])).then(
-      () => undefined,
-      (cause: unknown) => cause
-    );
-
-    expect(error).toBeInstanceOf(UnsupportedEntityDefinitionError);
-    expect(error).toBeInstanceOf(MetadataLoadError);
-  });
-
-  it('marks the glob-discovered rejection with UnsupportedEntityDefinitionError', async () => {
-    const error = await loadEntityMetadata(inMemorySqliteOptions(['./test/fixtures/entity-schema/*.js'])).then(
-      () => undefined,
-      (cause: unknown) => cause
-    );
-
-    expect(error).toBeInstanceOf(UnsupportedEntityDefinitionError);
-    expect(error).toBeInstanceOf(MetadataLoadError);
+    expect(schemaEntityClassNames.size).toBe(0);
+    expect(unconfirmedEntityClassNames.size).toBe(0);
   });
 
   it('discovers metadata without connecting to the database', async () => {

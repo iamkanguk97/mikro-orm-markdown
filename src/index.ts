@@ -4,7 +4,7 @@ import { DEFAULT_TITLE } from './defaults.js';
 import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
 import { causeChain } from './error-chain.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
-import { type LoadedEntityMetadata, loadEntityMetadata, UnsupportedEntityDefinitionError } from './metadata/load.js';
+import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
 import { isRenderableMeta } from './metadata/renderable.js';
 import { buildDocumentModel, type DocumentModel } from './model/build.js';
 import { MissingTsMorphSourceError, withTsMorphMetadataProvider } from './provider.js';
@@ -13,7 +13,7 @@ import type { MermaidRenderOptions } from './render/mermaid.js';
 
 export type { StructuredMessage, WarnHandler } from './messages.js';
 export { StructuredError } from './messages.js';
-export { MetadataLoadError, UnsupportedEntityDefinitionError } from './metadata/load.js';
+export { MetadataLoadError } from './metadata/load.js';
 export type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
 
 /** Options for the programmatic API. */
@@ -117,10 +117,16 @@ function collectRequiredEmbeddableClassNames(docModel: DocumentModel): Set<strin
 function assertExplicitEntityJsDocSourceCoverage(
   metas: EntityMetadata[],
   jsDocResult: JsDocResult,
+  schemaEntityClassNames: ReadonlySet<string>,
   onWarn?: WarnHandler
 ): void {
-  const missingConcrete = metas
-    .filter((meta) => isRenderableMeta(meta) && !meta.abstract)
+  // Schema-defined entities have no class declaration for --src to cover, so
+  // demanding one would fail every valid config that mixes in a schema entity.
+  // Their JSDoc gap is already reported by warnSchemaEntityJsDocUnavailable.
+  const coverable = metas.filter((meta) => isRenderableMeta(meta) && !schemaEntityClassNames.has(meta.className));
+
+  const missingConcrete = coverable
+    .filter((meta) => !meta.abstract)
     .map((meta) => meta.className)
     .filter((className) => !jsDocResult.classNames.has(className));
 
@@ -135,8 +141,8 @@ function assertExplicitEntityJsDocSourceCoverage(
   // Abstract STI parents appear in the diagram but are often defined in a separate
   // base-class file that --src may not cover. Warn rather than error so the user
   // knows @hidden/@namespace won't apply to them.
-  const missingAbstract = metas
-    .filter((meta) => isRenderableMeta(meta) && meta.abstract)
+  const missingAbstract = coverable
+    .filter((meta) => meta.abstract)
     .map((meta) => meta.className)
     .filter((className) => !jsDocResult.classNames.has(className));
 
@@ -179,6 +185,33 @@ function missingSrcCoverageError(detail: string, impact: string[], fix: string):
   });
 }
 
+/**
+ * Schema-defined entities (EntitySchema, and MikroORM 7's defineEntity() which
+ * is built on it) render from metadata, but JSDoc written on the schema
+ * declaration itself is not read yet (#106). Warned unconditionally — even
+ * when a class-linked schema's class bound its own JSDoc — so a @hidden tag
+ * on the declaration can never be dropped silently (#107).
+ */
+function warnSchemaEntityJsDocUnavailable(loaded: LoadedEntityMetadata, onWarn?: WarnHandler): void {
+  const names = [...new Set([...loaded.schemaEntityClassNames, ...loaded.unconfirmedEntityClassNames])].sort();
+  if (names.length === 0) {
+    return;
+  }
+
+  emitWarning(onWarn, {
+    title: 'JSDoc unavailable for schema-defined entities',
+    detail:
+      `JSDoc on EntitySchema declarations cannot be read yet: ${names.join(', ')}. ` +
+      "MikroORM 7's defineEntity() creates EntitySchema instances, so entities declared with it are affected too.",
+    impact: [
+      'Descriptions written on these declarations will be missing.',
+      '@namespace and @hidden tags on these declarations are not applied.',
+      'Entities marked @hidden may appear in the generated document.',
+    ],
+    fix: 'JSDoc support for schema-defined entities is tracked at https://github.com/iamkanguk97/mikro-orm-markdown/issues/106.',
+  });
+}
+
 function hasMissingTsMorphSourceError(err: unknown): boolean {
   return causeChain(err).some((entry) => entry instanceof MissingTsMorphSourceError);
 }
@@ -195,10 +228,6 @@ function hasMikroOrmMetadataError(err: unknown): boolean {
   return causeChain(err).some(
     (entry) => entry instanceof MetadataError || (entry instanceof Error && entry.name === 'MetadataError')
   );
-}
-
-function hasUnsupportedEntityDefinitionError(err: unknown): boolean {
-  return causeChain(err).some((entry) => entry instanceof UnsupportedEntityDefinitionError);
 }
 
 async function loadEntityMetadataWithTsMorphFallback(
@@ -221,22 +250,16 @@ async function loadEntityMetadataWithTsMorphFallback(
     let loaded: LoadedEntityMetadata;
     try {
       loaded = await loadEntityMetadata(originalOrm);
-    } catch (retryError) {
-      // The retry runs discovery without TsMorph, so it gets far enough to
-      // diagnose *why* the provider crashed. When that diagnosis is "these
-      // entities are EntitySchema-defined", surface it — the provider's own
-      // "source class not found" error misattributes the problem to the
-      // user's tsconfig. Any other retry failure keeps the original error.
-      if (hasUnsupportedEntityDefinitionError(retryError)) {
-        throw retryError;
-      }
+    } catch {
+      // The retry exists only to recover from provider-inflicted failures;
+      // when it fails too, the original error is the more accurate diagnosis.
       throw err;
     }
 
     emitWarning(onWarn, {
       title: 'TypeScript metadata source unavailable',
       detail:
-        'The automatically selected TypeScript metadata provider could not find a source file, ' +
+        'The automatically selected TypeScript metadata provider could not analyse the sources for every entity, ' +
         'so generation succeeded by retrying with the original metadata provider.',
       impact: ['Type information will come from runtime decorator metadata instead of TypeScript source analysis.'],
       fix: 'Configure `entitiesTs` to point at the original TypeScript entity sources when source analysis is required.',
@@ -269,11 +292,10 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
   const { orm, title = DEFAULT_TITLE, description, src, onWarn, mermaid } = options;
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm);
-  const { metas, sourcePaths, entitySourcePaths } = await loadEntityMetadataWithTsMorphFallback(
-    orm,
-    effectiveOrm,
-    onWarn
-  );
+  const loaded = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm, onWarn);
+  const { metas, sourcePaths, entitySourcePaths } = loaded;
+  warnSchemaEntityJsDocUnavailable(loaded, onWarn);
+  const schemaEntityClassNames = new Set([...loaded.schemaEntityClassNames, ...loaded.unconfirmedEntityClassNames]);
   const explicitSrc = hasExplicitSrc(src);
   const loadedJsDoc = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn), onWarn);
   const jsDocResult = bindJsDocToEntitySources(loadedJsDoc, entitySourcePaths, {
@@ -281,7 +303,7 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
   });
   if (explicitSrc) {
     assertExplicitJsDocSourcesMatched(jsDocResult, src);
-    assertExplicitEntityJsDocSourceCoverage(metas, jsDocResult, onWarn);
+    assertExplicitEntityJsDocSourceCoverage(metas, jsDocResult, schemaEntityClassNames, onWarn);
   }
   const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn);
   if (explicitSrc) {
