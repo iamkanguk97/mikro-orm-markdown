@@ -1,9 +1,10 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
+import { MetadataError } from '@mikro-orm/core';
 import { DEFAULT_TITLE } from './defaults.js';
 import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
 import { causeChain } from './error-chain.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
-import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
+import { type LoadedEntityMetadata, loadEntityMetadata, UnsupportedEntityDefinitionError } from './metadata/load.js';
 import { isRenderableMeta } from './metadata/renderable.js';
 import { buildDocumentModel, type DocumentModel } from './model/build.js';
 import { MissingTsMorphSourceError, withTsMorphMetadataProvider } from './provider.js';
@@ -12,7 +13,7 @@ import type { MermaidRenderOptions } from './render/mermaid.js';
 
 export type { StructuredMessage, WarnHandler } from './messages.js';
 export { StructuredError } from './messages.js';
-export { MetadataLoadError } from './metadata/load.js';
+export { MetadataLoadError, UnsupportedEntityDefinitionError } from './metadata/load.js';
 export type { MermaidLayout, MermaidRenderOptions, MermaidTheme } from './render/mermaid.js';
 
 /** Options for the programmatic API. */
@@ -182,6 +183,24 @@ function hasMissingTsMorphSourceError(err: unknown): boolean {
   return causeChain(err).some((entry) => entry instanceof MissingTsMorphSourceError);
 }
 
+/**
+ * True when MikroORM's own metadata analysis failed. The TsMorph provider
+ * raises `MetadataError` ("Source class for entity X not found") for every
+ * EntitySchema-defined entity in a `.ts` source, because there is no class
+ * declaration to analyse. Matched by class and by `name` so the check holds
+ * across both supported MikroORM majors and across duplicated
+ * `@mikro-orm/core` module instances.
+ */
+function hasMikroOrmMetadataError(err: unknown): boolean {
+  return causeChain(err).some(
+    (entry) => entry instanceof MetadataError || (entry instanceof Error && entry.name === 'MetadataError')
+  );
+}
+
+function hasUnsupportedEntityDefinitionError(err: unknown): boolean {
+  return causeChain(err).some((entry) => entry instanceof UnsupportedEntityDefinitionError);
+}
+
 async function loadEntityMetadataWithTsMorphFallback(
   originalOrm: Options,
   effectiveOrm: Options,
@@ -191,14 +210,26 @@ async function loadEntityMetadataWithTsMorphFallback(
     return await loadEntityMetadata(effectiveOrm);
   } catch (err) {
     const wasAutoInjected = originalOrm.metadataProvider === undefined && effectiveOrm.metadataProvider !== undefined;
-    if (!wasAutoInjected || !hasMissingTsMorphSourceError(err)) {
+    // Retry without the auto-injected provider only when the failure came from
+    // TsMorph source analysis: this package's own missing-source sentinel, or
+    // MikroORM's MetadataError (see hasMikroOrmMetadataError). Arbitrary
+    // errors keep propagating untouched.
+    if (!wasAutoInjected || !(hasMissingTsMorphSourceError(err) || hasMikroOrmMetadataError(err))) {
       throw err;
     }
 
     let loaded: LoadedEntityMetadata;
     try {
       loaded = await loadEntityMetadata(originalOrm);
-    } catch {
+    } catch (retryError) {
+      // The retry runs discovery without TsMorph, so it gets far enough to
+      // diagnose *why* the provider crashed. When that diagnosis is "these
+      // entities are EntitySchema-defined", surface it — the provider's own
+      // "source class not found" error misattributes the problem to the
+      // user's tsconfig. Any other retry failure keeps the original error.
+      if (hasUnsupportedEntityDefinitionError(retryError)) {
+        throw retryError;
+      }
       throw err;
     }
 

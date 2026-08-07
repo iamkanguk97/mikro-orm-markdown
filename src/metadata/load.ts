@@ -14,6 +14,21 @@ export class MetadataLoadError extends Error {
   }
 }
 
+/**
+ * The deliberate rejection of EntitySchema-defined entities (including
+ * MikroORM 7's defineEntity(), which is built on EntitySchema).
+ *
+ * A dedicated class so callers can tell this policy decision apart from
+ * genuine loading failures — the TsMorph fallback in index.ts relies on it to
+ * surface this rejection instead of the provider crash that precedes it.
+ */
+export class UnsupportedEntityDefinitionError extends MetadataLoadError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'UnsupportedEntityDefinitionError';
+  }
+}
+
 export interface LoadedEntityMetadata {
   metas: EntityMetadata[];
   /** Absolute paths to the source files each entity class was declared in, deduped. */
@@ -85,7 +100,7 @@ function assertNoEntitySchemaEntities(options: Options): void {
     return;
   }
 
-  throw new MetadataLoadError(
+  throw new UnsupportedEntityDefinitionError(
     `EntitySchema-defined entities are not currently supported: ${schemaNames.join(', ')}.\n` + DECORATOR_ONLY_HINT
   );
 }
@@ -168,7 +183,7 @@ function assertDiscoveredEntitiesAreSupported(metas: EntityMetadata[]): void {
   }
   lines.push(DECORATOR_ONLY_HINT);
 
-  throw new MetadataLoadError(lines.join('\n'));
+  throw new UnsupportedEntityDefinitionError(lines.join('\n'));
 }
 
 /**
