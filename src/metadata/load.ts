@@ -14,27 +14,28 @@ export class MetadataLoadError extends Error {
   }
 }
 
-/**
- * The deliberate rejection of EntitySchema-defined entities (including
- * MikroORM 7's defineEntity(), which is built on EntitySchema).
- *
- * A dedicated class so callers can tell this policy decision apart from
- * genuine loading failures — the TsMorph fallback in index.ts relies on it to
- * surface this rejection instead of the provider crash that precedes it.
- */
-export class UnsupportedEntityDefinitionError extends MetadataLoadError {
-  constructor(message: string) {
-    super(message);
-    this.name = 'UnsupportedEntityDefinitionError';
-  }
-}
-
 export interface LoadedEntityMetadata {
   metas: EntityMetadata[];
   /** Absolute paths to the source files each entity class was declared in, deduped. */
   sourcePaths: string[];
   /** Absolute source path for each discovered entity class. */
   entitySourcePaths: Map<string, string>;
+  /**
+   * Renderable entities confirmed to be schema-defined (EntitySchema, or
+   * MikroORM 7's defineEntity() which is built on it): config-listed instances
+   * and EntitySchema.REGISTRY hits. Their metadata renders normally, but JSDoc
+   * on the schema declaration is not read yet, so generateMarkdown warns for
+   * them instead of silently dropping tags such as @hidden.
+   */
+  schemaEntityClassNames: Set<string>;
+  /**
+   * Renderable entities that could not be confirmed as decorator-based
+   * @Entity() classes — usually name-only EntitySchema entities, which leave
+   * no definitive trace (see identifyDiscoveredSchemaEntities). Treated like
+   * schemaEntityClassNames downstream; kept separate because the signal is an
+   * inference, not proof.
+   */
+  unconfirmedEntityClassNames: Set<string>;
 }
 
 async function closeDiscoveryResources(orm: MikroORM): Promise<unknown[]> {
@@ -65,6 +66,12 @@ function attachCleanupErrors(discoveryError: unknown, cleanupErrors: unknown[]):
   }
 }
 
+/**
+ * Identifies schema entities listed directly in the config, before discovery
+ * runs. Needed because a name-only EntitySchema instance leaves no trace that
+ * discovery can later confirm (it never appears in EntitySchema.REGISTRY), so
+ * the instance in the config array is the only definitive signal for it.
+ */
 function collectEntitySchemaNames(options: Options): string[] {
   const configuredEntities = [...(options.entities ?? []), ...(options.entitiesTs ?? [])];
   const names: string[] = [];
@@ -84,33 +91,11 @@ function collectEntitySchemaNames(options: Options): string[] {
 }
 
 /**
- * Closing hint shared by every "unsupported definition style" error.
- *
- * `defineEntity()` is named explicitly because it returns an EntitySchema: a
- * MikroORM 7 user who followed the official guide never typed "EntitySchema"
- * anywhere and would not otherwise recognize their own entities in this error.
- */
-const DECORATOR_ONLY_HINT =
-  'Use decorator-based @Entity() classes instead. ' +
-  "MikroORM 7's defineEntity() is built on EntitySchema, so entities declared with it are reported here too.";
-
-function assertNoEntitySchemaEntities(options: Options): void {
-  const schemaNames = collectEntitySchemaNames(options);
-  if (schemaNames.length === 0) {
-    return;
-  }
-
-  throw new UnsupportedEntityDefinitionError(
-    `EntitySchema-defined entities are not currently supported: ${schemaNames.join(', ')}.\n` + DECORATOR_ONLY_HINT
-  );
-}
-
-/**
  * True when `target` was ever passed through a MikroORM property/class decorator
  * (@Entity, @Property, @PrimaryKey, ...). Every such decorator calls
  * `MetadataStorage.getMetadataFromDecorator`, which stamps a marker onto the
  * class the first time it runs — used here to catch EntitySchema entities that
- * were never decorated at all (see assertDiscoveredEntitiesAreSupported).
+ * were never decorated at all (see identifyDiscoveredSchemaEntities).
  *
  * The marker's name changed between MikroORM versions (verified by diffing
  * @mikro-orm/core release tarballs from npm): `__path` up to 6.2.8, then a
@@ -126,12 +111,12 @@ function hasDecoratorMarker(target: EntityClass<unknown>): boolean {
 }
 
 /**
- * Catches EntitySchema entities that assertNoEntitySchemaEntities cannot see:
+ * Identifies EntitySchema entities that collectEntitySchemaNames cannot see:
  * ones discovered via a glob/folder pattern (`entities: ['./src/**\/*.ts']`)
  * rather than listed directly in the config array. MikroORM only reveals the
  * actual EntitySchema instance by dynamically importing the matched files
- * during discovery — after the pre-discovery guard has already run — so this
- * must run on the discovered EntityMetadata[] instead.
+ * during discovery — after the pre-discovery collection has already run — so
+ * this must run on the discovered EntityMetadata[] instead.
  *
  * Two signals, in order of confidence:
  *
@@ -146,11 +131,12 @@ function hasDecoratorMarker(target: EntityClass<unknown>): boolean {
  *    register against. The only signal left is that it never went through a
  *    decorator. If some future MikroORM release changes the marker mechanism
  *    again (it has happened once before, at 6.2.9), a validly decorated entity
- *    could look "markerless" too — so this case still throws (the project's
- *    policy is to reject EntitySchema outright, not just warn), but with a
- *    softer message that invites a bug report instead of asserting certainty.
+ *    could look "markerless" too — the reason these names stay in a separate
+ *    `unconfirmed` bucket instead of being asserted as schema entities. A
+ *    false positive costs only a spurious JSDoc warning downstream, never a
+ *    failed generation.
  */
-function assertDiscoveredEntitiesAreSupported(metas: EntityMetadata[]): void {
+function identifyDiscoveredSchemaEntities(metas: EntityMetadata[]): { confirmed: string[]; unconfirmed: string[] } {
   const confirmed: string[] = [];
   const unconfirmed: string[] = [];
 
@@ -165,25 +151,7 @@ function assertDiscoveredEntitiesAreSupported(metas: EntityMetadata[]): void {
     }
   }
 
-  if (confirmed.length === 0 && unconfirmed.length === 0) {
-    return;
-  }
-
-  const lines: string[] = [];
-  if (confirmed.length > 0) {
-    lines.push(`EntitySchema-defined entities are not currently supported: ${confirmed.join(', ')}.`);
-  }
-  if (unconfirmed.length > 0) {
-    lines.push(
-      `Could not confirm these entities are decorator-based @Entity() classes: ${unconfirmed.join(', ')}. ` +
-        'This usually means they are EntitySchema-defined entities (also not currently supported). ' +
-        "If you're certain these are valid @Entity() classes, this may be a detection false positive in " +
-        'mikro-orm-markdown — please open an issue: https://github.com/iamkanguk97/mikro-orm-markdown/issues'
-    );
-  }
-  lines.push(DECORATOR_ONLY_HINT);
-
-  throw new UnsupportedEntityDefinitionError(lines.join('\n'));
+  return { confirmed, unconfirmed };
 }
 
 /**
@@ -195,7 +163,7 @@ function assertDiscoveredEntitiesAreSupported(metas: EntityMetadata[]): void {
  * embeddable, or pivot entities) based on rendering needs.
  */
 export async function loadEntityMetadata(options: Options): Promise<LoadedEntityMetadata> {
-  assertNoEntitySchemaEntities(options);
+  const configListedSchemaNames = collectEntitySchemaNames(options);
 
   let orm: MikroORM;
   try {
@@ -234,7 +202,9 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
       );
     }
 
-    assertDiscoveredEntitiesAreSupported(all);
+    const { confirmed, unconfirmed } = identifyDiscoveredSchemaEntities(all);
+    const schemaEntityClassNames = new Set([...configListedSchemaNames, ...confirmed]);
+    const unconfirmedEntityClassNames = new Set(unconfirmed.filter((name) => !schemaEntityClassNames.has(name)));
 
     const baseDir = orm.config.get('baseDir');
     const entitySourcePaths = new Map(
@@ -242,7 +212,7 @@ export async function loadEntityMetadata(options: Options): Promise<LoadedEntity
     );
     const sourcePaths = [...new Set(entitySourcePaths.values())];
 
-    return { metas: all, sourcePaths, entitySourcePaths };
+    return { metas: all, sourcePaths, entitySourcePaths, schemaEntityClassNames, unconfirmedEntityClassNames };
   } catch (error) {
     discoveryFailed = true;
     discoveryError = error;

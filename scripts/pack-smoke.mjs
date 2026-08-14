@@ -36,7 +36,8 @@ const V6_DECORATORS = '@mikro-orm/core';
 const V7_DECORATORS = '@mikro-orm/decorators/legacy';
 
 // Shared by every installed entry path: a decorator-based entity declared from
-// plain JavaScript (EntitySchema is unsupported) and a JavaScript ORM config.
+// plain JavaScript and a JavaScript ORM config. Schema-defined consumers
+// (v6 EntitySchema, v7 defineEntity()) land with #106's pack-smoke step.
 // Types are given explicitly, so no metadata provider inference is needed.
 const entityModule = (decorators) => `import { Entity, PrimaryKey, Property } from '${decorators}';
 
