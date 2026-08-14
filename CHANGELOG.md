@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-08-14
+
+Schema-defined entities — `EntitySchema`, and MikroORM 7's `defineEntity()` which builds on it — are now rendered instead of rejected. One thing to know: JSDoc written on schema declarations (descriptions, `@namespace`, `@hidden`, …) is not read yet, so generation emits a warning naming those entities; JSDoc binding for them is tracked in [#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106). Decorator-based projects are unaffected — their output is byte-for-byte unchanged.
+
+### Added
+
+- Schema-defined entities render their metadata-driven output (ERD and column tables) exactly like decorator entities, whether listed as instances in the config or discovered through `.ts`/`.js` globs
+- A structured warning ("JSDoc unavailable for schema-defined entities") names every schema-defined entity in the project. It is emitted unconditionally — even when a class-linked schema's class contributed its own JSDoc — so a `@hidden` tag on a schema declaration can never be dropped silently ([#107](https://github.com/iamkanguk97/mikro-orm-markdown/issues/107))
+
+### Changed
+
+- The explicit `--src` coverage check no longer fails over schema-defined entities: they have no class declaration for `--src` to cover, and the warning above already reports the gap
+
 ## [1.1.0] - 2026-08-04
 
 Adds MikroORM 7 support alongside MikroORM 6. Two things to know when moving a project to v7: MikroORM 7 moved the decorators out of `@mikro-orm/core` into `@mikro-orm/decorators/legacy` and `@mikro-orm/decorators/es`, so entities must import them from there; and MikroORM 7 requires Node.js >= 22.17, so on Node 18 and 20 only MikroORM 6 is installable. This package's own minimum stays at Node 18.19.0.
