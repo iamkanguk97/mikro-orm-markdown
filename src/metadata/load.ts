@@ -91,6 +91,22 @@ function collectEntitySchemaNames(options: Options): string[] {
 }
 
 /**
+ * String entries (globs or file paths) of `entitiesTs`/`entities`. Schema
+ * entities often carry no meta.path (v7 never sets it; v6 only under
+ * folder/glob discovery), so these config strings are the only route to the
+ * files declaring them when their JSDoc must be read. `entitiesTs` wins when
+ * it has any strings — it points at original TypeScript sources, where
+ * comments survive.
+ */
+export function collectConfiguredEntitySourceStrings(options: Options): string[] {
+  const fromTs = (options.entitiesTs ?? []).filter((entry): entry is string => typeof entry === 'string');
+  if (fromTs.length > 0) {
+    return fromTs;
+  }
+  return (options.entities ?? []).filter((entry): entry is string => typeof entry === 'string');
+}
+
+/**
  * True when `target` was ever passed through a MikroORM property/class decorator
  * (@Entity, @Property, @PrimaryKey, ...). Every such decorator calls
  * `MetadataStorage.getMetadataFromDecorator`, which stamps a marker onto the

@@ -1,8 +1,16 @@
 import { EntitySchema } from '@mikro-orm/core';
 
+/**
+ * Class-side description for Book.
+ *
+ * @namespace Catalog
+ */
 export class Book {}
 
-/** Class-linked EntitySchema: registers in EntitySchema.REGISTRY, detected with certainty. */
+/**
+ * Schema-side description for Book — the class wins this conflict.
+ * (Class-linked EntitySchema: registers in EntitySchema.REGISTRY, detected with certainty.)
+ */
 export const BookSchema = new EntitySchema({
   class: Book,
   properties: {
@@ -11,7 +19,12 @@ export const BookSchema = new EntitySchema({
   },
 });
 
-/** Name-only EntitySchema: no class link, so it never registers in EntitySchema.REGISTRY. */
+/**
+ * Name-only Publisher declared as EntitySchema.
+ * (No class link, so it never registers in EntitySchema.REGISTRY.)
+ *
+ * @namespace Catalog
+ */
 export const PublisherSchema = new EntitySchema({
   name: 'Publisher',
   properties: {

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
-import { bindJsDocToEntitySources, loadJsDoc } from '../../src/docs/jsdoc.js';
+import { bindJsDocToEntitySources, bindSchemaJsDoc, type JsDocResult, loadJsDoc } from '../../src/docs/jsdoc.js';
 import { COLLISION_DTO_SOURCE, COLLISION_ENTITY_SOURCE, ENTITY_FIXTURES_GLOB, fixturePath } from '../helpers/paths.js';
 import { makeTempDir } from '../helpers/temp-dir.js';
 
@@ -300,5 +300,322 @@ describe('loadJsDoc — @hidden and @erd/@describe', () => {
       hidden: true,
     });
     expect(links).toEqual({ description: 'Required links.', atLeastOne: true });
+  });
+});
+
+describe('loadJsDoc — schema declarations', () => {
+  const SCHEMA_JS_FIXTURE = fixturePath('entity-schema', 'BookSchema.js');
+
+  /** Writes a class-linked pair: the class in one file, the schema importing it. */
+  function writeLinkedPair(dir: string): string {
+    fs.writeFileSync(
+      path.join(dir, 'Author.ts'),
+      [
+        '/**',
+        ' * Class desc.',
+        ' *',
+        ' * @namespace Core',
+        ' */',
+        'export class Author {',
+        '  /** Primary key. */',
+        '  id!: number;',
+        '}',
+        '',
+      ].join('\n')
+    );
+    const schemaPath = path.join(dir, 'AuthorSchema.ts');
+    fs.writeFileSync(
+      schemaPath,
+      [
+        "import { EntitySchema } from '@mikro-orm/core';",
+        "import { Author } from './Author';",
+        '',
+        '/**',
+        ' * Schema desc.',
+        ' *',
+        ' * @namespace SchemaSide',
+        ' * @erd Storefront',
+        ' * @hidden',
+        ' */',
+        'export const AuthorSchema = new EntitySchema({',
+        '  class: Author,',
+        '  properties: {},',
+        '});',
+        '',
+      ].join('\n')
+    );
+    return schemaPath;
+  }
+
+  it('does not scan schema declarations unless asked', () => {
+    const result = loadJsDoc([SCHEMA_JS_FIXTURE]);
+
+    expect(result.schemaDeclarations).toHaveLength(0);
+  });
+
+  it('scans exported EntitySchema variables, resolving the entity name from name:', () => {
+    const dir = makeTempDir('jsdoc-schema-scan-');
+    const filePath = path.join(dir, 'CatalogSchema.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        "import { EntitySchema } from '@mikro-orm/core';",
+        '',
+        '/**',
+        ' * Catalog description.',
+        ' *',
+        ' * @namespace Storefront',
+        ' * @hidden',
+        ' */',
+        'export const CatalogSchema = new EntitySchema({',
+        "  name: 'Catalog',",
+        '  properties: {},',
+        '});',
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations).toHaveLength(1);
+    const declaration = result.schemaDeclarations[0]!;
+    expect(declaration.entityName).toBe('Catalog');
+    expect(declaration.sourcePath.endsWith('CatalogSchema.ts')).toBe(true);
+    expect(declaration.entity?.description).toBe('Catalog description.');
+    expect(declaration.entity?.namespaces).toEqual(['Storefront']);
+    expect(declaration.entity?.hidden).toBe(true);
+    expect(declaration.linkedClass).toBeUndefined();
+  });
+
+  it('resolves class-linked schemas through the class: symbol, imports included', () => {
+    const dir = makeTempDir('jsdoc-schema-linked-');
+    const schemaPath = writeLinkedPair(dir);
+
+    // Only the schema file is passed: the class is reached via its import.
+    const result = loadJsDoc([schemaPath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations).toHaveLength(1);
+    const declaration = result.schemaDeclarations[0]!;
+    expect(declaration.entityName).toBe('Author');
+    expect(declaration.entity?.description).toBe('Schema desc.');
+    expect(declaration.linkedClass?.className).toBe('Author');
+    expect(declaration.linkedClass?.sourcePath.endsWith('Author.ts')).toBe(true);
+    expect(declaration.linkedClass?.entity?.description).toBe('Class desc.');
+    expect(declaration.linkedClass?.props.get('id')?.description).toBe('Primary key.');
+  });
+
+  it('recognizes defineEntity() declarations', () => {
+    const dir = makeTempDir('jsdoc-schema-define-');
+    const filePath = path.join(dir, 'setting.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        "import { defineEntity } from '@mikro-orm/core';",
+        '',
+        '/** Setting entity. */',
+        "export const settingEntity = defineEntity({ name: 'Setting', properties: {} });",
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations).toHaveLength(1);
+    expect(result.schemaDeclarations[0]?.entityName).toBe('Setting');
+    expect(result.schemaDeclarations[0]?.entity?.description).toBe('Setting entity.');
+  });
+
+  it('recognizes namespace-qualified schema constructors', () => {
+    const dir = makeTempDir('jsdoc-schema-qualified-');
+    const filePath = path.join(dir, 'qualified.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        "import * as orm from '@mikro-orm/core';",
+        '',
+        "export const QualifiedSchema = new orm.EntitySchema({ name: 'Qualified', properties: {} });",
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations.map((declaration) => declaration.entityName)).toEqual(['Qualified']);
+  });
+
+  it('ignores exports that are not schema declarations', () => {
+    const dir = makeTempDir('jsdoc-schema-ignore-');
+    const filePath = path.join(dir, 'not-schemas.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        '/** A DTO, not an entity. */',
+        'export class NotASchema {}',
+        "export const plainObject = { name: 'NotASchema' };",
+        'export const arrow = () => null;',
+        "export const otherCall = makeThing({ name: 'NotASchema' });",
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations).toHaveLength(0);
+  });
+
+  it('skips schema declarations whose entity name cannot be resolved', () => {
+    const dir = makeTempDir('jsdoc-schema-noname-');
+    const filePath = path.join(dir, 'unresolvable.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        "const cfg = { name: 'Mystery', properties: {} };",
+        'export const MysterySchema = new EntitySchema(cfg);',
+        'export const TemplateSchema = new EntitySchema({ name: `Templated`, properties: {} });',
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations).toHaveLength(0);
+  });
+});
+
+describe('bindSchemaJsDoc', () => {
+  function emptyJsDocResult(): JsDocResult {
+    return { entities: new Map(), props: new Map(), sourceFileCount: 0, classNames: new Set() };
+  }
+
+  function writeNamedSchema(filePath: string, entityName: string, description?: string): void {
+    fs.writeFileSync(
+      filePath,
+      [
+        ...(description !== undefined ? [`/** ${description} */`] : []),
+        `export const ${entityName}Schema = new EntitySchema({ name: '${entityName}', properties: {} });`,
+        '',
+      ].join('\n')
+    );
+  }
+
+  it('merges class-linked JSDoc field by field: class wins, @hidden is OR-d, props come from the class', () => {
+    const dir = makeTempDir('jsdoc-bind-linked-');
+    fs.writeFileSync(
+      path.join(dir, 'Author.ts'),
+      [
+        '/**',
+        ' * Class desc.',
+        ' *',
+        ' * @namespace Core',
+        ' */',
+        'export class Author {',
+        '  /** Primary key. */',
+        '  id!: number;',
+        '}',
+        '',
+      ].join('\n')
+    );
+    const schemaPath = path.join(dir, 'AuthorSchema.ts');
+    fs.writeFileSync(
+      schemaPath,
+      [
+        "import { Author } from './Author';",
+        '',
+        '/**',
+        ' * Schema desc.',
+        ' *',
+        ' * @namespace SchemaSide',
+        ' * @erd Storefront',
+        ' * @hidden',
+        ' */',
+        'export const AuthorSchema = new EntitySchema({ class: Author, properties: {} });',
+        '',
+      ].join('\n')
+    );
+    const loaded = loadJsDoc([schemaPath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['Author', undefined]]));
+
+    const author = binding.jsDocResult.entities.get('Author');
+    expect(author?.description).toBe('Class desc.');
+    expect(author?.namespaces).toEqual(['Core']);
+    expect(author?.erdNamespaces).toEqual(['Storefront']);
+    expect(author?.hidden).toBe(true);
+    expect(binding.jsDocResult.props.get('Author')?.get('id')?.description).toBe('Primary key.');
+    expect(binding.jsDocReadEntityNames.has('Author')).toBe(true);
+  });
+
+  it('prefers the exact source-path match over other same-named declarations', () => {
+    const dir = makeTempDir('jsdoc-bind-path-');
+    const firstPath = path.join(dir, 'A.ts');
+    const secondPath = path.join(dir, 'B.ts');
+    writeNamedSchema(firstPath, 'PathMatch', 'From A.');
+    writeNamedSchema(secondPath, 'PathMatch', 'From B.');
+    const loaded = loadJsDoc([firstPath, secondPath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['PathMatch', secondPath]]));
+
+    expect(binding.jsDocResult.entities.get('PathMatch')?.description).toBe('From B.');
+    expect(binding.jsDocReadEntityNames.has('PathMatch')).toBe(true);
+  });
+
+  it('binds by unique name when the entity has no source path', () => {
+    const dir = makeTempDir('jsdoc-bind-name-');
+    const filePath = path.join(dir, 'Solo.ts');
+    writeNamedSchema(filePath, 'Solo', 'Solo description.');
+    const loaded = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['Solo', undefined]]));
+
+    expect(binding.jsDocResult.entities.get('Solo')?.description).toBe('Solo description.');
+    expect(binding.jsDocReadEntityNames.has('Solo')).toBe(true);
+  });
+
+  it('binds nothing when same-named declarations are ambiguous', () => {
+    const dir = makeTempDir('jsdoc-bind-ambiguous-');
+    const firstPath = path.join(dir, 'A.ts');
+    const secondPath = path.join(dir, 'B.ts');
+    writeNamedSchema(firstPath, 'Ambiguous', 'From A.');
+    writeNamedSchema(secondPath, 'Ambiguous', 'From B.');
+    const loaded = loadJsDoc([firstPath, secondPath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['Ambiguous', undefined]]));
+
+    expect(binding.jsDocResult.entities.has('Ambiguous')).toBe(false);
+    expect(binding.jsDocReadEntityNames.has('Ambiguous')).toBe(false);
+  });
+
+  it('treats a compiled-JS declaration without JSDoc as unread — its comments may be stripped', () => {
+    const dir = makeTempDir('jsdoc-bind-bare-js-');
+    const filePath = path.join(dir, 'bare.js');
+    writeNamedSchema(filePath, 'Bare');
+    const loaded = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['Bare', undefined]]));
+
+    expect(binding.jsDocReadEntityNames.has('Bare')).toBe(false);
+  });
+
+  it('treats a compiled-JS declaration with surviving JSDoc as read', () => {
+    const dir = makeTempDir('jsdoc-bind-doc-js-');
+    const filePath = path.join(dir, 'documented.js');
+    writeNamedSchema(filePath, 'Documented', 'Survived the build.');
+    const loaded = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['Documented', undefined]]));
+
+    expect(binding.jsDocResult.entities.get('Documented')?.description).toBe('Survived the build.');
+    expect(binding.jsDocReadEntityNames.has('Documented')).toBe(true);
+  });
+
+  it('treats a TypeScript declaration without JSDoc as read — nothing was written to lose', () => {
+    const dir = makeTempDir('jsdoc-bind-bare-ts-');
+    const filePath = path.join(dir, 'bare.ts');
+    writeNamedSchema(filePath, 'BareTs');
+    const loaded = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['BareTs', undefined]]));
+
+    expect(binding.jsDocReadEntityNames.has('BareTs')).toBe(true);
   });
 });
