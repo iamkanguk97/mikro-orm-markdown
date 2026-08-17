@@ -27,7 +27,7 @@ src/
   provider.ts       # Auto-injects TsMorphMetadataProvider when needed
   source-path.ts    # Canonicalizes entity source paths (symlinks, parent segments)
   docs/
-    jsdoc.ts        # Parses JSDoc tags from .ts entity files via ts-morph
+    jsdoc.ts        # Parses JSDoc from entity classes and schema declarations via ts-morph
   metadata/
     load.ts         # Initialises MikroORM and extracts EntityMetadata[]
     renderable.ts   # Shared predicate: which entities appear in the document
@@ -112,11 +112,13 @@ MikroORM config
 
 | Tag | Scope | Effect |
 |---|---|---|
-| `@namespace <name>` | Entity class | Groups entity in both ERD and text table |
-| `@erd <name>` | Entity class | Groups entity in ERD only |
-| `@describe <name>` | Entity class | Groups entity in text table only |
-| `@hidden` | Entity class | Excludes entity from all output |
+| `@namespace <name>` | Entity class or schema declaration | Groups entity in both ERD and text table |
+| `@erd <name>` | Entity class or schema declaration | Groups entity in ERD only |
+| `@describe <name>` | Entity class or schema declaration | Groups entity in text table only |
+| `@hidden` | Entity class or schema declaration | Excludes entity from all output |
 | `@atLeastOne` | Collection property | Marks relation as requiring ≥1 elements |
+
+"Schema declaration" means the exported `new EntitySchema({...})` / `defineEntity({...})` variable. For a class-linked schema (`class:`), property JSDoc comes from the class unconditionally; entity-level JSDoc merges field by field with the class winning conflicts, except `@hidden`, which applies when either location has it. Property JSDoc inside the schema object literal is not read (tracked as future work in #106).
 
 ## Commit Conventions
 
@@ -139,7 +141,7 @@ Refs: #42
 - **Biome enforces formatting.** Run `npm run lint:fix` before committing; the pre-commit hook runs lint-staged automatically.
 - **Dual build output.** `dist/index.js` (ESM) + `dist/index.cjs` (CJS) + `dist/cli.js`. Always verify with `npm run test:pack` after build changes.
 - **Peer dependencies.** `@mikro-orm/core` ≥6 <8 and `tsx` (optional) are peers, not bundled. Do not add them to `dependencies`. Both MikroORM majors are supported for decorator-based entities; `npm run test:pack` installs each one against the packed tarball (v7 is skipped below Node 22.17, which v7's own `engines` requires).
-- **v6/v7 metadata differences.** MikroORM changed three metadata shapes in v7, each normalized in exactly one place — do not reintroduce direct reads: `MetadataStorage.getAll()` returns an object on v6 and a `Map` on v7 (iterate the storage instead, `src/metadata/load.ts`); `meta.extends` holds a class name on v6 and the ancestor class on v7 (`resolveExtendsName`, `src/metadata/extends.ts`); `meta.path` is a filesystem path on v6 and a `file://` URL on v7 (`normalizeSourcePath`, `src/source-path.ts`). Schema-defined entities (`EntitySchema`, and v7's `defineEntity()` which builds on it) render from metadata like decorator entities; JSDoc written on schema declarations is not read yet, so generation emits an unconditional structured warning naming them (JSDoc binding is tracked in #106).
+- **v6/v7 metadata differences.** MikroORM changed three metadata shapes in v7, each normalized in exactly one place — do not reintroduce direct reads: `MetadataStorage.getAll()` returns an object on v6 and a `Map` on v7 (iterate the storage instead, `src/metadata/load.ts`); `meta.extends` holds a class name on v6 and the ancestor class on v7 (`resolveExtendsName`, `src/metadata/extends.ts`); `meta.path` is a filesystem path on v6 and a `file://` URL on v7 (`normalizeSourcePath`, `src/source-path.ts`). Schema-defined entities (`EntitySchema`, and v7's `defineEntity()` which builds on it) render from metadata like decorator entities, and JSDoc on their exported schema declarations binds too (`src/docs/jsdoc.ts`, entity name resolved from the initializer's `class:`/`name:`). The "JSDoc unavailable" warning now fires only for schema entities whose declaration could not be read — not found, ambiguous, or comment-stripped compiled JS (#107 must never regress to a silent `@hidden` drop). Remaining #106 work: pack-smoke `defineEntity()` coverage and property JSDoc inside schema object literals.
 - **Node ≥18.19.0** is the minimum runtime target.
 - **`src/` is pure ESM.** Use `.js` extensions on relative imports (TypeScript resolves them to `.ts` at compile time).
 - **Use `node:` specifiers for Node builtins** (`node:path`, `node:fs`, …) in both `src/` and `test/`.
