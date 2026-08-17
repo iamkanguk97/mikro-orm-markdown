@@ -1,0 +1,196 @@
+:root {
+  --border: #d0d7de;
+  --ink: #1f2328;
+  --muted: #59636e;
+  --accent: #0969da;
+  --surface: #f6f8fa;
+  font-size: 16px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0 auto;
+  padding: 0 1.25rem 2rem;
+  max-width: 90rem;
+  color: var(--ink);
+  font-family: -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  line-height: 1.55;
+  background: #ffffff;
+}
+
+.site-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding: 1.5rem 0 0.75rem;
+}
+
+.site-header h1 {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.tagline {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+
+.site-links a {
+  margin-left: 1rem;
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.site-links a:hover {
+  text-decoration: underline;
+}
+
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+}
+
+.tabs button {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0.4rem 1rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.tabs button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.blurb {
+  color: var(--muted);
+  margin: 0.75rem 0 1rem;
+  min-height: 1.5rem;
+}
+
+.panes {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+}
+
+@media (max-width: 60rem) {
+  .panes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.pane {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.pane-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.6rem 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.pane-head h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+#file-picker {
+  max-width: 55%;
+  font-size: 0.9rem;
+  padding: 0.2rem 0.4rem;
+}
+
+.code-pane {
+  margin: 0;
+  padding: 1rem;
+  overflow: auto;
+  max-height: 75vh;
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
+.output-pane {
+  padding: 1rem 1.25rem;
+  overflow: auto;
+  max-height: 75vh;
+}
+
+.output-pane h1 {
+  font-size: 1.4rem;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.4rem;
+}
+
+.output-pane h2 {
+  font-size: 1.2rem;
+  margin-top: 1.75rem;
+}
+
+.output-pane h3 {
+  font-size: 1.05rem;
+  margin-top: 1.5rem;
+}
+
+.output-pane blockquote {
+  margin: 0.5rem 0;
+  padding: 0.1rem 1rem;
+  color: var(--muted);
+  border-left: 4px solid var(--border);
+}
+
+.output-pane table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+  display: block;
+  overflow-x: auto;
+}
+
+.output-pane th,
+.output-pane td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.output-pane th {
+  background: var(--surface);
+}
+
+.output-pane pre.mermaid {
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  background: var(--surface);
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.site-footer {
+  margin-top: 1.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
