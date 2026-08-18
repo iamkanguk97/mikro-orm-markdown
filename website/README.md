@@ -14,8 +14,9 @@ with the ERD rendered live by Mermaid in the browser.
 - `public/` is the static shell (`index.html`, `app.js`, `style.css`). Markdown rendering
   (marked), syntax highlighting (highlight.js), and diagrams (mermaid) load from CDN in the
   visitor's browser, so the site needs no npm dependencies of its own.
-- `.github/workflows/pages.yml` builds and deploys the site to GitHub Pages on every push
-  to `main`.
+- `.github/workflows/pages.yml` builds and deploys the site to GitHub Pages when run
+  manually (Actions → Pages → Run workflow), so merging site changes and publishing them
+  stay separate decisions.
 
 ## Local development
 

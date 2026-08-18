@@ -1,8 +1,8 @@
 name: Pages
 
+# Deployed manually (Actions -> Pages -> Run workflow) on purpose: merging
+# site changes into main and publishing them are separate decisions.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
