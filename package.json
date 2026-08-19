@@ -102,7 +102,7 @@
     "@mikro-orm/reflection": "^6.6.16",
     "@mikro-orm/sqlite": "^6.6.16",
     "@types/node": "^18.19.130",
-    "@vitest/coverage-v8": "^2.0.0",
+    "@vitest/coverage-v8": "^4.1.10",
     "husky": "^9.1.7",
     "lint-staged": "^17.2.0",
     "mermaid": "11.16.0",
