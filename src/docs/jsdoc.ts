@@ -1,5 +1,12 @@
-import type { ClassDeclaration, JSDoc as MorphJsDoc, ParameterDeclaration } from 'ts-morph';
-import { Project, ts } from 'ts-morph';
+import type {
+  ClassDeclaration,
+  ExportedDeclarations,
+  JSDoc as MorphJsDoc,
+  ObjectLiteralExpression,
+  ParameterDeclaration,
+  SourceFile,
+} from 'ts-morph';
+import { Node, Project, ts } from 'ts-morph';
 import { errorMessage } from '../error-chain.js';
 import { StructuredError, type WarnHandler } from '../messages.js';
 import { normalizeSourcePath } from '../source-path.js';
@@ -49,9 +56,31 @@ export interface JsDocResult {
   classNames: Set<string>;
 }
 
+/** JSDoc parsed from one exported schema declaration (`new EntitySchema({...})` or `defineEntity({...})`). */
+export interface SchemaJsDocDeclaration {
+  /** Entity name the declaration defines: the `class:` link's class name, or the `name:` string. */
+  entityName: string;
+  /** Normalized path of the file the declaration lives in (its home file, not a re-exporting barrel). */
+  sourcePath: string;
+  /** JSDoc written on the schema variable statement itself. */
+  entity?: EntityJsDocInfo;
+  /** JSDoc of the `class:`-linked class declaration, resolved through its symbol (imports included). */
+  linkedClass?: JsDocDeclaration;
+}
+
 export interface LoadedJsDocResult extends JsDocResult {
   /** Source-aware declarations retained so same-named classes are not conflated. */
   declarations: JsDocDeclaration[];
+  /** Exported schema declarations; empty unless scanSchemaDeclarations was set. */
+  schemaDeclarations: SchemaJsDocDeclaration[];
+}
+
+export interface LoadJsDocOptions {
+  /**
+   * Also scan exported schema declarations. Off by default so decorator-only
+   * projects do exactly the same parsing work as before.
+   */
+  scanSchemaDeclarations?: boolean;
 }
 
 export interface BindJsDocOptions {
@@ -69,15 +98,21 @@ const TYPESCRIPT_SOURCE = /\.(c|m)?tsx?$/i;
  * Returns empty maps if no source files are given or no JSDoc is found.
  * Never throws — errors are reported through onWarn so missing docs don't block generation.
  */
-export function loadJsDoc(filePaths: string[], onWarn?: WarnHandler): LoadedJsDocResult {
+export function loadJsDoc(
+  filePaths: string[],
+  onWarn?: WarnHandler,
+  options: LoadJsDocOptions = {}
+): LoadedJsDocResult {
   const entities: EntityJsDocMap = new Map();
   const props: PropJsDocMap = new Map();
   const classNames = new Set<string>();
   const declarations: JsDocDeclaration[] = [];
   const declarationKeys = new Set<string>();
+  const schemaDeclarations: SchemaJsDocDeclaration[] = [];
+  const schemaDeclarationKeys = new Set<string>();
 
   if (filePaths.length === 0) {
-    return { entities, props, sourceFileCount: 0, classNames, declarations };
+    return { entities, props, sourceFileCount: 0, classNames, declarations, schemaDeclarations };
   }
 
   const project = new Project({
@@ -86,6 +121,9 @@ export function loadJsDoc(filePaths: string[], onWarn?: WarnHandler): LoadedJsDo
     compilerOptions: {
       experimentalDecorators: true,
       skipLibCheck: true,
+      // Without allowJs, .js sources still surface class declarations but
+      // report zero exported declarations — schema scanning needs the exports.
+      allowJs: true,
     },
   });
 
@@ -137,12 +175,23 @@ export function loadJsDoc(filePaths: string[], onWarn?: WarnHandler): LoadedJsDo
           props: propMap,
         });
       }
+
+      if (options.scanSchemaDeclarations === true) {
+        for (const schemaDeclaration of collectSchemaDeclarations(sourceFile)) {
+          const schemaKey = declarationIdentity(schemaDeclaration.sourcePath, schemaDeclaration.entityName);
+          if (schemaDeclarationKeys.has(schemaKey)) {
+            continue;
+          }
+          schemaDeclarationKeys.add(schemaKey);
+          schemaDeclarations.push(schemaDeclaration);
+        }
+      }
     } catch (err) {
       onWarn?.(`Could not parse JSDoc source file "${sourceFile.getFilePath()}": ${errorMessage(err)}`);
     }
   }
 
-  return { entities, props, sourceFileCount: sourceFiles.length, classNames, declarations };
+  return { entities, props, sourceFileCount: sourceFiles.length, classNames, declarations, schemaDeclarations };
 }
 
 /** Binds declarations by exact normalized path, with an optional unique fallback for compiled or bundled code. */
@@ -213,6 +262,246 @@ export function bindJsDocToEntitySources(
   }
 
   return { entities, props, sourceFileCount: jsDocResult.sourceFileCount, classNames };
+}
+
+/** Result of layering schema-declaration JSDoc over the class-bound result. */
+export interface SchemaJsDocBinding {
+  jsDocResult: JsDocResult;
+  /**
+   * Schema entities whose declaration JSDoc was read with confidence: found in
+   * a TypeScript source, or carrying JSDoc even in JavaScript. A compiled-JS
+   * declaration without JSDoc stays out — its comments may simply have been
+   * stripped by the build, and treating that as "read" could silently drop a
+   * @hidden written in the original source (#107).
+   */
+  jsDocReadEntityNames: Set<string>;
+}
+
+/**
+ * Binds JSDoc from exported schema declarations to schema-defined entities.
+ *
+ * Matching: the entity's own source path wins; otherwise a unique name match
+ * among the scanned schema declarations. Ambiguity (several same-named schema
+ * declarations) binds nothing, so the caller keeps warning for those entities
+ * instead of guessing.
+ *
+ * Merge for class-linked schemas: property JSDoc comes from the class
+ * unconditionally; entity-level JSDoc merges field by field with the class
+ * winning conflicts; @hidden is OR'd across both locations (#106).
+ */
+export function bindSchemaJsDoc(
+  loadedJsDoc: LoadedJsDocResult,
+  baseResult: JsDocResult,
+  schemaEntitySourcePaths: ReadonlyMap<string, string | undefined>
+): SchemaJsDocBinding {
+  const entities = new Map(baseResult.entities);
+  const props = new Map(baseResult.props);
+  const jsDocReadEntityNames = new Set<string>();
+
+  const byIdentity = new Map<string, SchemaJsDocDeclaration>();
+  const byName = new Map<string, SchemaJsDocDeclaration[]>();
+  for (const declaration of loadedJsDoc.schemaDeclarations) {
+    byIdentity.set(declarationIdentity(declaration.sourcePath, declaration.entityName), declaration);
+    const candidates = byName.get(declaration.entityName);
+    if (candidates === undefined) {
+      byName.set(declaration.entityName, [declaration]);
+    } else {
+      candidates.push(declaration);
+    }
+  }
+
+  for (const [entityName, sourcePath] of schemaEntitySourcePaths) {
+    const declaration = matchSchemaDeclaration(entityName, sourcePath, byIdentity, byName);
+    if (declaration === undefined) {
+      continue;
+    }
+
+    // The symbol-resolved linked class is definitive when present; otherwise
+    // whatever the class-side binding already produced for this name stands in.
+    const classEntity =
+      declaration.linkedClass !== undefined ? declaration.linkedClass.entity : entities.get(entityName);
+    const merged = mergeEntityJsDoc(classEntity, declaration.entity);
+    if (merged !== undefined) {
+      entities.set(entityName, merged);
+    }
+    if (declaration.linkedClass !== undefined && declaration.linkedClass.props.size > 0) {
+      props.set(entityName, declaration.linkedClass.props);
+    }
+    if (TYPESCRIPT_SOURCE.test(declaration.sourcePath) || declaration.entity !== undefined) {
+      jsDocReadEntityNames.add(entityName);
+    }
+  }
+
+  return {
+    jsDocResult: { entities, props, sourceFileCount: baseResult.sourceFileCount, classNames: baseResult.classNames },
+    jsDocReadEntityNames,
+  };
+}
+
+function matchSchemaDeclaration(
+  entityName: string,
+  sourcePath: string | undefined,
+  byIdentity: ReadonlyMap<string, SchemaJsDocDeclaration>,
+  byName: ReadonlyMap<string, SchemaJsDocDeclaration[]>
+): SchemaJsDocDeclaration | undefined {
+  if (sourcePath !== undefined) {
+    const exact = byIdentity.get(declarationIdentity(normalizeSourcePath(sourcePath), entityName));
+    if (exact !== undefined) {
+      return exact;
+    }
+  }
+  const candidates = byName.get(entityName) ?? [];
+  return candidates.length === 1 ? candidates[0] : undefined;
+}
+
+/**
+ * Field-by-field merge with the class winning conflicts (the class is the
+ * primary documentation site) — except @hidden, which is OR'd: accidentally
+ * exposing an entity someone tried to hide is the worse failure mode.
+ */
+function mergeEntityJsDoc(
+  fromClass: EntityJsDocInfo | undefined,
+  fromSchema: EntityJsDocInfo | undefined
+): EntityJsDocInfo | undefined {
+  if (fromClass === undefined || fromSchema === undefined) {
+    return fromClass ?? fromSchema;
+  }
+
+  const description = fromClass.description ?? fromSchema.description;
+  return {
+    ...(description !== undefined && { description }),
+    namespaces: fromClass.namespaces.length > 0 ? fromClass.namespaces : fromSchema.namespaces,
+    erdNamespaces: fromClass.erdNamespaces.length > 0 ? fromClass.erdNamespaces : fromSchema.erdNamespaces,
+    describeNamespaces:
+      fromClass.describeNamespaces.length > 0 ? fromClass.describeNamespaces : fromSchema.describeNamespaces,
+    hidden: fromClass.hidden || fromSchema.hidden,
+  };
+}
+
+/** Collects exported schema declarations; re-exports resolve to their home file. */
+function collectSchemaDeclarations(sourceFile: SourceFile): SchemaJsDocDeclaration[] {
+  const found: SchemaJsDocDeclaration[] = [];
+  for (const declarationsForExport of sourceFile.getExportedDeclarations().values()) {
+    for (const exported of declarationsForExport) {
+      const schemaDeclaration = inspectSchemaExport(exported);
+      if (schemaDeclaration !== undefined) {
+        found.push(schemaDeclaration);
+      }
+    }
+  }
+  return found;
+}
+
+function inspectSchemaExport(exported: ExportedDeclarations): SchemaJsDocDeclaration | undefined {
+  if (!Node.isVariableDeclaration(exported)) {
+    return undefined;
+  }
+  const configArg = getSchemaConfigArgument(exported.getInitializer());
+  if (configArg === undefined) {
+    return undefined;
+  }
+
+  const linked = resolveLinkedClass(configArg);
+  const entityName = linked?.className ?? getStringProperty(configArg, 'name');
+  if (entityName === undefined) {
+    return undefined;
+  }
+
+  // JSDoc sits on the VariableStatement, one level above the declaration
+  // getExportedDeclarations() hands out.
+  const statementDocs = exported.getVariableStatement()?.getJsDocs() ?? [];
+  const entity = statementDocs.length > 0 ? parseEntityJsDoc(statementDocs) : undefined;
+
+  return {
+    entityName,
+    sourcePath: normalizeSourcePath(exported.getSourceFile().getFilePath()),
+    ...(entity !== undefined && { entity }),
+    ...(linked?.declaration !== undefined && { linkedClass: linked.declaration }),
+  };
+}
+
+/**
+ * Matches `new EntitySchema({...})` and `defineEntity({...})` initializers.
+ * MikroORM 7's defineEntity() builds on EntitySchema, so both spell "schema
+ * declaration". Restricting candidates to these initializers is what keeps a
+ * same-named DTO class or unrelated variable from ever binding.
+ */
+function getSchemaConfigArgument(initializer: Node | undefined): ObjectLiteralExpression | undefined {
+  if (initializer === undefined) {
+    return undefined;
+  }
+  if (Node.isNewExpression(initializer)) {
+    return matchesCallee(initializer.getExpression().getText(), 'EntitySchema')
+      ? asObjectLiteral(initializer.getArguments()[0])
+      : undefined;
+  }
+  if (Node.isCallExpression(initializer)) {
+    return matchesCallee(initializer.getExpression().getText(), 'defineEntity')
+      ? asObjectLiteral(initializer.getArguments()[0])
+      : undefined;
+  }
+  return undefined;
+}
+
+/** Accepts bare and namespace-qualified callees (`EntitySchema`, `orm.EntitySchema`). */
+function matchesCallee(calleeText: string, name: string): boolean {
+  return calleeText === name || calleeText.endsWith(`.${name}`);
+}
+
+function asObjectLiteral(node: Node | undefined): ObjectLiteralExpression | undefined {
+  return node !== undefined && Node.isObjectLiteralExpression(node) ? node : undefined;
+}
+
+function getStringProperty(configArg: ObjectLiteralExpression, propertyName: string): string | undefined {
+  const property = configArg.getProperty(propertyName);
+  if (property === undefined || !Node.isPropertyAssignment(property)) {
+    return undefined;
+  }
+  const value = property.getInitializer();
+  return value !== undefined && Node.isStringLiteral(value) ? value.getLiteralValue() : undefined;
+}
+
+interface LinkedClassResolution {
+  className: string;
+  /** Present only when the identifier's symbol resolved to a class declaration. */
+  declaration?: JsDocDeclaration;
+}
+
+/**
+ * Follows the `class:` identifier through its symbol (import aliases included)
+ * to the actual class declaration — pinning the class without name guessing.
+ * Falls back to the identifier text when the symbol cannot be resolved, so the
+ * entity name still comes out right even if the class JSDoc cannot be read.
+ */
+function resolveLinkedClass(configArg: ObjectLiteralExpression): LinkedClassResolution | undefined {
+  const property = configArg.getProperty('class');
+  if (property === undefined || !Node.isPropertyAssignment(property)) {
+    return undefined;
+  }
+  const value = property.getInitializer();
+  if (value === undefined || !Node.isIdentifier(value)) {
+    return undefined;
+  }
+
+  const symbol = value.getSymbol();
+  const resolved = symbol?.getAliasedSymbol() ?? symbol;
+  const classDeclaration = resolved?.getDeclarations().find(Node.isClassDeclaration);
+  if (classDeclaration === undefined) {
+    return { className: value.getText() };
+  }
+
+  const className = classDeclaration.getName() ?? value.getText();
+  const classDocs = classDeclaration.getJsDocs();
+  const entity = classDocs.length > 0 ? parseEntityJsDoc(classDocs) : undefined;
+  return {
+    className,
+    declaration: {
+      className,
+      sourcePath: normalizeSourcePath(classDeclaration.getSourceFile().getFilePath()),
+      ...(entity !== undefined && { entity }),
+      props: collectPropJsDocs(classDeclaration),
+    },
+  };
 }
 
 function declarationIdentity(sourcePath: string, className: string): string {

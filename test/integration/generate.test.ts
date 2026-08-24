@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   Entity,
@@ -29,6 +30,7 @@ import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
 import { CollisionEntity } from '../fixtures/source-identity/entity/CollisionEntity.js';
 import { inMemorySqliteOptions } from '../helpers/orm.js';
 import { COLLISION_DTO_SOURCE, COLLISION_ENTITY_SOURCE, fixturePath } from '../helpers/paths.js';
+import { makeTempDir } from '../helpers/temp-dir.js';
 
 const COMPILED_IDENTITY_SOURCE = fixturePath('source-identity', 'compiled', 'CompiledIdentityEntity.ts');
 const COMPILED_IDENTITY_DUPLICATE = fixturePath('source-identity', 'compiled-duplicate', 'CompiledIdentityEntity.ts');
@@ -200,11 +202,11 @@ describe('generateMarkdown', () => {
 
   // The auto-injected TsMorph provider crashes on schema entities in .ts
   // sources with MikroORM's MetadataError (there is no class declaration to
-  // analyse), so generation only proceeds through the fallback retry. The
-  // schema entity renders from metadata; the fixture's @hidden tag cannot be
-  // read yet, so the entity must appear AND the gap must be warned about —
-  // a silent @hidden leak is never acceptable (#107).
-  it('renders glob-discovered schema entities from .ts sources and warns about their unread JSDoc', async () => {
+  // analyse), so generation only proceeds through the fallback retry. Schema
+  // declarations then bind their own JSDoc (#106 step 4): the Catalog
+  // fixture's @hidden — the #107 regression pin — must actually hide it, and
+  // the Showcase fixture's description and @namespace must land.
+  it('binds schema-declaration JSDoc for glob-discovered .ts schema entities', async () => {
     const structuredWarnings: StructuredMessage[] = [];
 
     const md = await generateMarkdown({
@@ -216,24 +218,23 @@ describe('generateMarkdown', () => {
       },
     });
 
-    expect(md).toContain('### Catalog');
-    expect(md).toContain('| title | string |');
-    expect(structuredWarnings).toContainEqual(
-      expect.objectContaining({
-        title: 'JSDoc unavailable for schema-defined entities',
-        detail: expect.stringContaining('Catalog'),
-        impact: expect.arrayContaining([expect.stringContaining('@hidden')]),
-        fix: expect.stringContaining('issues/106'),
-      })
+    expect(md).not.toContain('### Catalog');
+    expect(md).toContain('## Storefront');
+    expect(md).toContain('### Showcase');
+    expect(md).toContain('> Featured storefront showcase.');
+    expect(structuredWarnings).not.toContainEqual(
+      expect.objectContaining({ title: 'JSDoc unavailable for schema-defined entities' })
     );
   });
 
   // Same pipeline, other provider failure flavor: for a compiled .js glob the
-  // provider throws MissingTsMorphSourceError instead of MetadataError. Both
-  // the class-linked (Book) and name-only (Publisher) schema styles must
-  // render and be named in the warning — a linked class binding its own JSDoc
-  // does not read JSDoc written on the schema declaration itself.
-  it('renders glob-discovered schema entities from compiled .js sources and warns about their unread JSDoc', async () => {
+  // provider throws MissingTsMorphSourceError instead of MetadataError. The
+  // fixture's comments survive (they are handwritten, not build output), so
+  // both schema styles bind: the class-linked Book merges with the class
+  // winning the description conflict, and name-only Publisher binds the
+  // schema-side JSDoc directly. The compiled-JS warning still fires — a real
+  // build would have stripped the comments.
+  it('binds schema-declaration JSDoc from .js sources when comments survive', async () => {
     const structuredWarnings: StructuredMessage[] = [];
 
     const md = await generateMarkdown({
@@ -245,14 +246,16 @@ describe('generateMarkdown', () => {
       },
     });
 
+    expect(md).toContain('## Catalog');
     expect(md).toContain('### Book');
     expect(md).toContain('### Publisher');
-    expect(structuredWarnings).toContainEqual(
-      expect.objectContaining({
-        title: 'JSDoc unavailable for schema-defined entities',
-        detail: expect.stringMatching(/Book.*Publisher|Publisher.*Book/),
-      })
+    expect(md).toContain('> Class-side description for Book.');
+    expect(md).not.toContain('Schema-side description for Book');
+    expect(md).toContain('> Name-only Publisher declared as EntitySchema.');
+    expect(structuredWarnings).not.toContainEqual(
+      expect.objectContaining({ title: 'JSDoc unavailable for schema-defined entities' })
     );
+    expect(structuredWarnings).toContainEqual(expect.objectContaining({ title: 'JSDoc source unavailable' }));
   });
 
   // Instance-listed schemas have no meta.path at all, so no JSDoc source
@@ -314,6 +317,100 @@ describe('generateMarkdown', () => {
       expect.objectContaining({
         title: 'JSDoc unavailable for schema-defined entities',
         detail: expect.stringContaining('SrcExemptSchemaUser'),
+      })
+    );
+  });
+
+  // Instance-listed schemas have no path signal at all; explicit --src is the
+  // route to their declaration. It matches by unique entity name among schema
+  // declarations, and the declaration's @hidden applies (#106 step 4).
+  it('binds instance-listed schema declarations through explicit src by name match', async () => {
+    const dir = makeTempDir('schema-src-bind-');
+    const declarationPath = path.join(dir, 'SrcBoundSchemaUser.ts');
+    fs.writeFileSync(
+      declarationPath,
+      [
+        "import { EntitySchema } from '@mikro-orm/core';",
+        '',
+        '/**',
+        ' * Declared hidden at the schema declaration.',
+        ' *',
+        ' * @hidden',
+        ' */',
+        'export const SrcBoundSchemaUserSchema = new EntitySchema({',
+        "  name: 'SrcBoundSchemaUser',",
+        "  properties: { id: { primary: true, type: 'number' } },",
+        '});',
+        '',
+      ].join('\n')
+    );
+    const schema = new EntitySchema({
+      name: 'SrcBoundSchemaUser',
+      properties: {
+        id: { primary: true, type: 'number' },
+      },
+    });
+    const structuredWarnings: StructuredMessage[] = [];
+
+    const md = await generateMarkdown({
+      orm: inMemorySqliteOptions([schema]),
+      src: [declarationPath],
+      onWarn: (_message: string, warning?: StructuredMessage) => {
+        if (warning !== undefined) {
+          structuredWarnings.push(warning);
+        }
+      },
+    });
+
+    expect(md).not.toContain('### SrcBoundSchemaUser');
+    expect(structuredWarnings).not.toContainEqual(
+      expect.objectContaining({ title: 'JSDoc unavailable for schema-defined entities' })
+    );
+  });
+
+  // Two schema declarations with the same entity name make a name match
+  // ambiguous. Binding must refuse to guess — applying the wrong file's tags
+  // is worse than not binding — so the entity stays visible and warned about.
+  it('keeps warning when same-named schema declarations are ambiguous', async () => {
+    const dir = makeTempDir('schema-src-ambiguous-');
+    const declarationSource = (description: string): string =>
+      [
+        "import { EntitySchema } from '@mikro-orm/core';",
+        '',
+        `/** ${description} @hidden */`,
+        'export const AmbiguousSchemaUserSchema = new EntitySchema({',
+        "  name: 'AmbiguousSchemaUser',",
+        "  properties: { id: { primary: true, type: 'number' } },",
+        '});',
+        '',
+      ].join('\n');
+    const firstPath = path.join(dir, 'First.ts');
+    const secondPath = path.join(dir, 'Second.ts');
+    fs.writeFileSync(firstPath, declarationSource('First candidate.'));
+    fs.writeFileSync(secondPath, declarationSource('Second candidate.'));
+    const schema = new EntitySchema({
+      name: 'AmbiguousSchemaUser',
+      properties: {
+        id: { primary: true, type: 'number' },
+      },
+    });
+    const structuredWarnings: StructuredMessage[] = [];
+
+    const md = await generateMarkdown({
+      orm: inMemorySqliteOptions([schema]),
+      src: [firstPath, secondPath],
+      onWarn: (_message: string, warning?: StructuredMessage) => {
+        if (warning !== undefined) {
+          structuredWarnings.push(warning);
+        }
+      },
+    });
+
+    expect(md).toContain('### AmbiguousSchemaUser');
+    expect(structuredWarnings).toContainEqual(
+      expect.objectContaining({
+        title: 'JSDoc unavailable for schema-defined entities',
+        detail: expect.stringContaining('AmbiguousSchemaUser'),
       })
     );
   });

@@ -2,7 +2,11 @@ import * as path from 'node:path';
 import { EntitySchema, MikroORM } from '@mikro-orm/core';
 import { SqliteDriver } from '@mikro-orm/sqlite';
 import { describe, expect, it, vi } from 'vitest';
-import { loadEntityMetadata, MetadataLoadError } from '../../src/metadata/load.js';
+import {
+  collectConfiguredEntitySourceStrings,
+  loadEntityMetadata,
+  MetadataLoadError,
+} from '../../src/metadata/load.js';
 import config from '../fixtures/mikro-orm.config.js';
 import {
   inMemorySqliteOptions,
@@ -254,5 +258,36 @@ describe('loadEntityMetadata', () => {
     const { metas } = await loadEntityMetadata(config);
 
     expect(metas.map((meta) => meta.className)).toEqual(['DecoratedEntity']);
+  });
+});
+
+describe('collectConfiguredEntitySourceStrings', () => {
+  const schemaInstance = new EntitySchema({
+    name: 'ConfigStringSchemaUser',
+    properties: {
+      id: { primary: true, type: 'number' },
+    },
+  });
+
+  it('returns only the string entries of entities, skipping instances and classes', () => {
+    const strings = collectConfiguredEntitySourceStrings({
+      entities: [schemaInstance, './src/entities/*.ts'],
+    });
+
+    expect(strings).toEqual(['./src/entities/*.ts']);
+  });
+
+  it('prefers entitiesTs strings when present — they point at sources where comments survive', () => {
+    const strings = collectConfiguredEntitySourceStrings({
+      entities: ['./dist/entities/*.js'],
+      entitiesTs: ['./src/entities/*.ts'],
+    });
+
+    expect(strings).toEqual(['./src/entities/*.ts']);
+  });
+
+  it('returns an empty list when neither option holds strings', () => {
+    expect(collectConfiguredEntitySourceStrings({ entities: [schemaInstance] })).toEqual([]);
+    expect(collectConfiguredEntitySourceStrings({})).toEqual([]);
   });
 });

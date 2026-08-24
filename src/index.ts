@@ -1,10 +1,20 @@
 import type { EntityMetadata, Options } from '@mikro-orm/core';
 import { MetadataError } from '@mikro-orm/core';
 import { DEFAULT_TITLE } from './defaults.js';
-import { bindJsDocToEntitySources, type JsDocResult, loadJsDoc } from './docs/jsdoc.js';
+import {
+  bindJsDocToEntitySources,
+  bindSchemaJsDoc,
+  type JsDocResult,
+  type LoadedJsDocResult,
+  loadJsDoc,
+} from './docs/jsdoc.js';
 import { causeChain } from './error-chain.js';
 import { emitWarning, StructuredError, type WarnHandler } from './messages.js';
-import { type LoadedEntityMetadata, loadEntityMetadata } from './metadata/load.js';
+import {
+  collectConfiguredEntitySourceStrings,
+  type LoadedEntityMetadata,
+  loadEntityMetadata,
+} from './metadata/load.js';
 import { isRenderableMeta } from './metadata/renderable.js';
 import { buildDocumentModel, type DocumentModel } from './model/build.js';
 import { MissingTsMorphSourceError, withTsMorphMetadataProvider } from './provider.js';
@@ -186,29 +196,55 @@ function missingSrcCoverageError(detail: string, impact: string[], fix: string):
 }
 
 /**
- * Schema-defined entities (EntitySchema, and MikroORM 7's defineEntity() which
- * is built on it) render from metadata, but JSDoc written on the schema
- * declaration itself is not read yet (#106). Warned unconditionally — even
- * when a class-linked schema's class bound its own JSDoc — so a @hidden tag
- * on the declaration can never be dropped silently (#107).
+ * Layers schema-declaration JSDoc over the class-bound result, then warns for
+ * the schema entities whose declaration could not be read with confidence —
+ * so a @hidden written on an unread declaration is never dropped silently
+ * (#107). Class-linked declarations merge per the #106 precedence rules
+ * (class wins field by field, @hidden OR'd) inside bindSchemaJsDoc.
  */
-function warnSchemaEntityJsDocUnavailable(loaded: LoadedEntityMetadata, onWarn?: WarnHandler): void {
-  const names = [...new Set([...loaded.schemaEntityClassNames, ...loaded.unconfirmedEntityClassNames])].sort();
-  if (names.length === 0) {
+function bindSchemaJsDocWithWarning(
+  loadedJsDoc: LoadedJsDocResult,
+  classBoundJsDoc: JsDocResult,
+  schemaEntityClassNames: ReadonlySet<string>,
+  entitySourcePaths: ReadonlyMap<string, string>,
+  onWarn?: WarnHandler
+): JsDocResult {
+  const schemaEntitySourcePaths = new Map(
+    [...schemaEntityClassNames].map((name) => [name, entitySourcePaths.get(name)])
+  );
+  const { jsDocResult, jsDocReadEntityNames } = bindSchemaJsDoc(loadedJsDoc, classBoundJsDoc, schemaEntitySourcePaths);
+  warnSchemaEntityJsDocUnavailable(
+    [...schemaEntityClassNames].filter((name) => !jsDocReadEntityNames.has(name)),
+    onWarn
+  );
+  return jsDocResult;
+}
+
+/**
+ * Schema-defined entities (EntitySchema, and MikroORM 7's defineEntity() which
+ * is built on it) read their JSDoc from the exported schema declaration
+ * (#106). This warning covers the ones whose declaration could not be read:
+ * not found in the scanned sources, ambiguous, or found only in compiled
+ * JavaScript with no comments left.
+ */
+function warnSchemaEntityJsDocUnavailable(entityNames: string[], onWarn?: WarnHandler): void {
+  if (entityNames.length === 0) {
     return;
   }
+  const names = [...entityNames].sort();
 
   emitWarning(onWarn, {
     title: 'JSDoc unavailable for schema-defined entities',
     detail:
-      `JSDoc on EntitySchema declarations cannot be read yet: ${names.join(', ')}. ` +
-      "MikroORM 7's defineEntity() creates EntitySchema instances, so entities declared with it are affected too.",
+      `JSDoc could not be read for these schema-defined entities: ${names.join(', ')}. ` +
+      'Their schema declarations were not found in the scanned sources, or were found only in compiled ' +
+      'JavaScript where build tools strip comments.',
     impact: [
       'Descriptions written on these declarations will be missing.',
       '@namespace and @hidden tags on these declarations are not applied.',
       'Entities marked @hidden may appear in the generated document.',
     ],
-    fix: 'JSDoc support for schema-defined entities is tracked at https://github.com/iamkanguk97/mikro-orm-markdown/issues/106.',
+    fix: 'Pass --src "<glob to your .ts sources>" (or the `src` option) pointing at the files declaring these schemas.',
   });
 }
 
@@ -294,13 +330,24 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
   const effectiveOrm = await withTsMorphMetadataProvider(orm);
   const loaded = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm, onWarn);
   const { metas, sourcePaths, entitySourcePaths } = loaded;
-  warnSchemaEntityJsDocUnavailable(loaded, onWarn);
   const schemaEntityClassNames = new Set([...loaded.schemaEntityClassNames, ...loaded.unconfirmedEntityClassNames]);
+  const hasSchemaEntities = schemaEntityClassNames.size > 0;
   const explicitSrc = hasExplicitSrc(src);
-  const loadedJsDoc = loadJsDoc(resolveJsDocSources(sourcePaths, src, onWarn), onWarn);
-  const jsDocResult = bindJsDocToEntitySources(loadedJsDoc, entitySourcePaths, {
+  const jsDocSourcePaths = resolveJsDocSources(sourcePaths, src, onWarn);
+  // Schema entities often carry no meta.path (v7 never sets it), so widen the
+  // scan with the config's own entity strings — never overriding an explicit
+  // src, and never touching the decorator-only path.
+  const scanPaths =
+    hasSchemaEntities && !explicitSrc
+      ? [...new Set([...jsDocSourcePaths, ...collectConfiguredEntitySourceStrings(orm)])]
+      : jsDocSourcePaths;
+  const loadedJsDoc = loadJsDoc(scanPaths, onWarn, { scanSchemaDeclarations: hasSchemaEntities });
+  const classBoundJsDoc = bindJsDocToEntitySources(loadedJsDoc, entitySourcePaths, {
     allowCompiledSourceFallback: explicitSrc,
   });
+  const jsDocResult = hasSchemaEntities
+    ? bindSchemaJsDocWithWarning(loadedJsDoc, classBoundJsDoc, schemaEntityClassNames, entitySourcePaths, onWarn)
+    : classBoundJsDoc;
   if (explicitSrc) {
     assertExplicitJsDocSourcesMatched(jsDocResult, src);
     assertExplicitEntityJsDocSourceCoverage(metas, jsDocResult, schemaEntityClassNames, onWarn);
