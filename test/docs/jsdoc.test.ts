@@ -552,6 +552,30 @@ describe('loadJsDoc — schema declarations', () => {
     expect(byName.get('Draft')?.props.get('body')?.description).toBe('Draft body text.');
   });
 
+  it('reads property JSDoc through a parenthesized properties literal', () => {
+    const dir = makeTempDir('jsdoc-schema-paren-props-');
+    const filePath = path.join(dir, 'wrapped.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        "import { EntitySchema } from '@mikro-orm/core';",
+        '',
+        'export const WrappedSchema = new EntitySchema({',
+        "  name: 'Wrapped',",
+        '  properties: ({',
+        '    /** Documented despite the parentheses. */',
+        "    label: { type: 'string' },",
+        '  }),',
+        '});',
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations[0]?.props.get('label')?.description).toBe('Documented despite the parentheses.');
+  });
+
   it('leaves object-literal property JSDoc unread for class-linked schemas — the class documents properties', () => {
     const dir = makeTempDir('jsdoc-schema-linked-props-');
     fs.writeFileSync(path.join(dir, 'Author.ts'), 'export class Author { id!: number; }\n');

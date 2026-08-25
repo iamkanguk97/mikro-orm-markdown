@@ -473,7 +473,9 @@ function getPropertiesLiteral(configArg: ObjectLiteralExpression): ObjectLiteral
   if (property === undefined || !Node.isPropertyAssignment(property)) {
     return undefined;
   }
-  const initializer = property.getInitializer();
+  // Unwrapping first also covers a directly parenthesized literal or callback,
+  // e.g. `properties: ({...})`.
+  const initializer = unwrapParentheses(property.getInitializer());
   const direct = asObjectLiteral(initializer);
   if (direct !== undefined) {
     return direct;
