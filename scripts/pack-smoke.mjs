@@ -36,9 +36,8 @@ const V6_DECORATORS = '@mikro-orm/core';
 const V7_DECORATORS = '@mikro-orm/decorators/legacy';
 
 // Shared by every installed entry path: a decorator-based entity declared from
-// plain JavaScript and a JavaScript ORM config. Schema-defined consumers
-// (v6 EntitySchema, v7 defineEntity()) land with #106's pack-smoke step.
-// Types are given explicitly, so no metadata provider inference is needed.
+// plain JavaScript and a JavaScript ORM config. Types are given explicitly, so
+// no metadata provider inference is needed.
 const entityModule = (decorators) => `import { Entity, PrimaryKey, Property } from '${decorators}';
 
 export class PackSmokeUser {}
@@ -47,22 +46,84 @@ PrimaryKey({ type: 'integer' })(PackSmokeUser.prototype, 'id');
 Property({ type: 'string' })(PackSmokeUser.prototype, 'name');
 `;
 
+// Each major declares the schema-defined entity through its own API — v7's
+// defineEntity() is the successor built on EntitySchema — but both share the
+// entity name, JSDoc and shape, so every document assertion applies to both.
+const V6_SCHEMA_ENTITY_MODULE = `import { EntitySchema } from '@mikro-orm/core';
+
+/**
+ * Schema-defined tag for the pack smoke.
+ *
+ * @namespace Taxonomy
+ */
+export const PackSmokeTagSchema = new EntitySchema({
+  name: 'PackSmokeTag',
+  properties: {
+    id: { primary: true, type: 'integer' },
+    label: { type: 'string' },
+  },
+});
+`;
+
+const V7_SCHEMA_ENTITY_MODULE = `import { defineEntity } from '@mikro-orm/core';
+
+/**
+ * Schema-defined tag for the pack smoke.
+ *
+ * @namespace Taxonomy
+ */
+export const PackSmokeTagSchema = defineEntity({
+  name: 'PackSmokeTag',
+  properties: (p) => ({
+    id: p.integer().primary(),
+    label: p.string(),
+  }),
+});
+`;
+
+// The schema entity enters the config as a file-path string on purpose:
+// discovered that way, v7 leaves no meta.path on it, so its JSDoc is reachable
+// only through the config-string scan widening added for #106.
 const CONFIG_MODULE = `import { SqliteDriver } from '@mikro-orm/sqlite';
 import { PackSmokeUser } from './entities.mjs';
 
-export default { driver: SqliteDriver, dbName: ':memory:', entities: [PackSmokeUser] };
+export default {
+  driver: SqliteDriver,
+  dbName: ':memory:',
+  entities: [PackSmokeUser, './schema-entities.mjs'],
+};
 `;
+
+// Expected in every generated document (ESM API and CLI): the decorator entity
+// and the schema entity with its JSDoc description and @namespace group bound.
+const DOCUMENT_NEEDLES = [
+  'erDiagram',
+  '### PackSmokeUser',
+  '| name | string |',
+  '## Taxonomy',
+  '### PackSmokeTag',
+  '> Schema-defined tag for the pack smoke.',
+  '| label | string |',
+];
 
 const ESM_SMOKE = `import { generateMarkdown } from 'mikro-orm-markdown';
 import config from './mikro-orm.config.mjs';
 
 if (typeof generateMarkdown !== 'function') throw new Error('generateMarkdown export missing');
 
-const md = await generateMarkdown({ orm: config, title: 'Pack Smoke ESM' });
-for (const needle of ['# Pack Smoke ESM', 'erDiagram', '### PackSmokeUser', '| name | string |']) {
+const warnings = [];
+const md = await generateMarkdown({
+  orm: config,
+  title: 'Pack Smoke ESM',
+  onWarn: (message) => warnings.push(message),
+});
+for (const needle of ${JSON.stringify(['# Pack Smoke ESM', ...DOCUMENT_NEEDLES])}) {
   if (!md.includes(needle)) throw new Error('ESM generateMarkdown output is missing: ' + needle);
 }
-console.log('[pack-smoke] ESM API generated a real document');
+if (warnings.some((message) => message.includes('JSDoc could not be read for these schema-defined entities'))) {
+  throw new Error('schema-declaration JSDoc was not bound:\\n' + warnings.join('\\n'));
+}
+console.log('[pack-smoke] ESM API generated a real document with schema-declaration JSDoc bound');
 `;
 
 // CJS declares its own entity: each smoke script is a separate process, and a
@@ -104,7 +165,7 @@ function supportsMikroOrmV7() {
  * Installs the tarball next to one MikroORM major and drives every installed
  * entry point (ESM API, CJS API, CLI binary) against it.
  */
-function verifyConsumer({ label, dir, peers, decorators, tarballPath }) {
+function verifyConsumer({ label, dir, peers, decorators, schemaEntities, tarballPath }) {
   mkdirSync(dir);
 
   step(`install the tarball with explicit MikroORM ${label} peers`);
@@ -112,6 +173,7 @@ function verifyConsumer({ label, dir, peers, decorators, tarballPath }) {
   run('npm', ['install', '--ignore-scripts', '--no-audit', '--no-fund', tarballPath, ...peers], { cwd: dir });
 
   writeFileSync(path.join(dir, 'entities.mjs'), entityModule(decorators));
+  writeFileSync(path.join(dir, 'schema-entities.mjs'), schemaEntities);
   writeFileSync(path.join(dir, 'mikro-orm.config.mjs'), CONFIG_MODULE);
 
   step(`generate through the installed ESM API (${label})`);
@@ -130,7 +192,7 @@ function verifyConsumer({ label, dir, peers, decorators, tarballPath }) {
   run(binPath, ['-c', 'mikro-orm.config.mjs', '-o', outPath, '-t', 'Pack Smoke CLI'], { cwd: dir });
   assertContains(
     readFileSync(outPath, 'utf-8'),
-    ['# Pack Smoke CLI', 'erDiagram', '### PackSmokeUser', '| name | string |'],
+    ['# Pack Smoke CLI', ...DOCUMENT_NEEDLES],
     `CLI-generated document (${label})`
   );
   process.stdout.write(`[pack-smoke] installed CLI generated a real document against MikroORM ${label}\n`);
@@ -168,6 +230,7 @@ try {
     dir: path.join(workDir, 'consumer-v6'),
     peers: ['@mikro-orm/core@^6.0.0', '@mikro-orm/sqlite@^6.0.0'],
     decorators: V6_DECORATORS,
+    schemaEntities: V6_SCHEMA_ENTITY_MODULE,
     tarballPath,
   });
 
@@ -184,6 +247,7 @@ try {
         'reflect-metadata@^0.2.0',
       ],
       decorators: V7_DECORATORS,
+      schemaEntities: V7_SCHEMA_ENTITY_MODULE,
       tarballPath,
     });
   } else {
