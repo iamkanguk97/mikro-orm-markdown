@@ -41,11 +41,11 @@ const SCENARIOS = [
     title: '@hidden & EntitySchema',
     blurb:
       '@hidden removes an entity (and its relations) from every output; an EntitySchema-defined ' +
-      'entity renders from metadata right next to decorator entities.',
+      'entity renders from metadata, including the JSDoc written on its schema declaration.',
     dir: path.join(websiteDir, 'scenarios', 'hidden-entityschema'),
     entitiesDir: path.join(websiteDir, 'scenarios', 'hidden-entityschema', 'entities'),
     docTitle: 'Visibility & EntitySchema',
-    docDescription: 'What @hidden removes, and how schema-defined entities render.',
+    docDescription: 'What @hidden removes, and how schema-defined entities render with their declaration JSDoc.',
   },
 ];
 

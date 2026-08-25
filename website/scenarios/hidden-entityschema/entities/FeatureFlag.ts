@@ -2,7 +2,8 @@ import { EntitySchema } from '@mikro-orm/core';
 
 /**
  * Runtime feature toggle, declared with EntitySchema instead of decorators —
- * it renders from metadata right next to the decorator-based entities.
+ * this description and the namespace group are read from the schema declaration.
+ * @namespace Rollout
  */
 export const FeatureFlagSchema = new EntitySchema({
   name: 'FeatureFlag',
