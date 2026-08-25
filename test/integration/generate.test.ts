@@ -222,6 +222,10 @@ describe('generateMarkdown', () => {
     expect(md).toContain('## Storefront');
     expect(md).toContain('### Showcase');
     expect(md).toContain('> Featured storefront showcase.');
+    // Property JSDoc inside the schema object literal binds and beats the
+    // comment option in the Description column (#106).
+    expect(md).toContain('Display label shown on the storefront tile.');
+    expect(md).not.toContain('Comment fallback for the label.');
     expect(structuredWarnings).not.toContainEqual(
       expect.objectContaining({ title: 'JSDoc unavailable for schema-defined entities' })
     );

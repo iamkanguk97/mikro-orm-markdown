@@ -2,6 +2,7 @@ import type {
   ClassDeclaration,
   ExportedDeclarations,
   JSDoc as MorphJsDoc,
+  ObjectLiteralElementLike,
   ObjectLiteralExpression,
   ParameterDeclaration,
   SourceFile,
@@ -64,6 +65,11 @@ export interface SchemaJsDocDeclaration {
   sourcePath: string;
   /** JSDoc written on the schema variable statement itself. */
   entity?: EntityJsDocInfo;
+  /**
+   * Property JSDoc read from inside the `properties` object literal. Empty for
+   * class-linked schemas — the class is their property documentation site.
+   */
+  props: Map<string, PropJsDocInfo>;
   /** JSDoc of the `class:`-linked class declaration, resolved through its symbol (imports included). */
   linkedClass?: JsDocDeclaration;
 }
@@ -287,7 +293,9 @@ export interface SchemaJsDocBinding {
  *
  * Merge for class-linked schemas: property JSDoc comes from the class
  * unconditionally; entity-level JSDoc merges field by field with the class
- * winning conflicts; @hidden is OR'd across both locations (#106).
+ * winning conflicts; @hidden is OR'd across both locations (#106). Name-only
+ * schemas take property JSDoc from inside their `properties` object literal —
+ * the only documentation site they have.
  */
 export function bindSchemaJsDoc(
   loadedJsDoc: LoadedJsDocResult,
@@ -324,10 +332,18 @@ export function bindSchemaJsDoc(
     if (merged !== undefined) {
       entities.set(entityName, merged);
     }
-    if (declaration.linkedClass !== undefined && declaration.linkedClass.props.size > 0) {
-      props.set(entityName, declaration.linkedClass.props);
+    const schemaProps = declaration.linkedClass?.props ?? declaration.props;
+    if (schemaProps.size > 0) {
+      props.set(entityName, schemaProps);
     }
-    if (TYPESCRIPT_SOURCE.test(declaration.sourcePath) || declaration.entity !== undefined) {
+    // declaration.props (not linked-class props) as read evidence: only JSDoc
+    // surviving in the declaration's own file proves its comments weren't
+    // stripped by a build.
+    if (
+      TYPESCRIPT_SOURCE.test(declaration.sourcePath) ||
+      declaration.entity !== undefined ||
+      declaration.props.size > 0
+    ) {
       jsDocReadEntityNames.add(entityName);
     }
   }
@@ -412,12 +428,82 @@ function inspectSchemaExport(exported: ExportedDeclarations): SchemaJsDocDeclara
   const statementDocs = exported.getVariableStatement()?.getJsDocs() ?? [];
   const entity = statementDocs.length > 0 ? parseEntityJsDoc(statementDocs) : undefined;
 
+  // Any `class:` link — even one whose class could not be resolved — keeps the
+  // class as the property documentation site, so the literal stays unread.
+  const props = linked === undefined ? collectSchemaPropJsDocs(configArg) : new Map<string, PropJsDocInfo>();
+
   return {
     entityName,
     sourcePath: normalizeSourcePath(exported.getSourceFile().getFilePath()),
     ...(entity !== undefined && { entity }),
+    props,
     ...(linked?.declaration !== undefined && { linkedClass: linked.declaration }),
   };
+}
+
+/**
+ * Property JSDoc from inside the schema config's `properties` object literal —
+ * the property documentation site of name-only schemas (#106). PropertyAssignment
+ * nodes expose JSDoc only through the raw compiler API, like constructor
+ * parameter properties.
+ */
+function collectSchemaPropJsDocs(configArg: ObjectLiteralExpression): Map<string, PropJsDocInfo> {
+  const propMap = new Map<string, PropJsDocInfo>();
+  const literal = getPropertiesLiteral(configArg);
+  if (literal === undefined) {
+    return propMap;
+  }
+  for (const member of literal.getProperties()) {
+    const propName = getLiteralPropertyName(member);
+    if (propName === undefined) {
+      continue;
+    }
+    const info = parsePropInfo(fromCompilerJsDocs(ts.getJSDocCommentsAndTags(member.compilerNode)));
+    addPropInfo(propMap, propName, info);
+  }
+  return propMap;
+}
+
+/**
+ * Returns the `properties` object literal, unwrapping the builder callback of
+ * MikroORM 7's defineEntity() (`properties: (p) => ({...})`) when present.
+ */
+function getPropertiesLiteral(configArg: ObjectLiteralExpression): ObjectLiteralExpression | undefined {
+  const property = configArg.getProperty('properties');
+  if (property === undefined || !Node.isPropertyAssignment(property)) {
+    return undefined;
+  }
+  const initializer = property.getInitializer();
+  const direct = asObjectLiteral(initializer);
+  if (direct !== undefined) {
+    return direct;
+  }
+  if (initializer === undefined || (!Node.isArrowFunction(initializer) && !Node.isFunctionExpression(initializer))) {
+    return undefined;
+  }
+  const body = initializer.getBody();
+  const returned = Node.isBlock(body) ? body.getStatements().find(Node.isReturnStatement)?.getExpression() : body;
+  return asObjectLiteral(unwrapParentheses(returned));
+}
+
+function unwrapParentheses(node: Node | undefined): Node | undefined {
+  let current = node;
+  while (current !== undefined && Node.isParenthesizedExpression(current)) {
+    current = current.getExpression();
+  }
+  return current;
+}
+
+/** Spreads and computed names cannot be matched to a metadata property, so they carry no name. */
+function getLiteralPropertyName(member: ObjectLiteralElementLike): string | undefined {
+  if (!Node.isPropertyAssignment(member) && !Node.isShorthandPropertyAssignment(member)) {
+    return undefined;
+  }
+  const nameNode = member.getNameNode();
+  if (Node.isIdentifier(nameNode)) {
+    return nameNode.getText();
+  }
+  return Node.isStringLiteral(nameNode) ? nameNode.getLiteralValue() : undefined;
 }
 
 /**

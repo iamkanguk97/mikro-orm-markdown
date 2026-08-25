@@ -9,6 +9,7 @@ export const ShowcaseSchema = new EntitySchema({
   name: 'Showcase',
   properties: {
     id: { primary: true, type: 'number' },
-    label: { type: 'string' },
+    /** Display label shown on the storefront tile. */
+    label: { type: 'string', comment: 'Comment fallback for the label.' },
   },
 });
