@@ -480,6 +480,126 @@ describe('loadJsDoc — schema declarations', () => {
 
     expect(result.schemaDeclarations).toHaveLength(0);
   });
+
+  it('reads property JSDoc from inside the properties object literal for name-only schemas', () => {
+    const dir = makeTempDir('jsdoc-schema-props-');
+    const filePath = path.join(dir, 'subscription.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        "import { EntitySchema } from '@mikro-orm/core';",
+        '',
+        'export const SubscriptionSchema = new EntitySchema({',
+        "  name: 'Subscription',",
+        '  properties: {',
+        "    id: { primary: true, type: 'integer' },",
+        '    /** Plan the subscription is on. */',
+        "    plan: { type: 'string' },",
+        '    /** @atLeastOne */',
+        "    seats: { kind: '1:m', entity: 'Seat' },",
+        '    /** Documented despite the quoted key. */',
+        "    'renewed-at': { type: 'datetime' },",
+        '    ...sharedProps,',
+        "    [computedKey]: { type: 'string' },",
+        '  },',
+        '});',
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    const declaration = result.schemaDeclarations[0]!;
+    expect(declaration.props.get('plan')?.description).toBe('Plan the subscription is on.');
+    expect(declaration.props.get('seats')?.atLeastOne).toBe(true);
+    expect(declaration.props.get('renewed-at')?.description).toBe('Documented despite the quoted key.');
+    expect(declaration.props.has('id')).toBe(false);
+  });
+
+  it('unwraps the defineEntity() builder callback to reach property JSDoc', () => {
+    const dir = makeTempDir('jsdoc-schema-builder-props-');
+    const filePath = path.join(dir, 'orders.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        "import { defineEntity } from '@mikro-orm/core';",
+        '',
+        'export const orderEntity = defineEntity({',
+        "  name: 'Order',",
+        '  properties: (p) => ({',
+        '    /** Total in cents. */',
+        '    total: p.integer(),',
+        '  }),',
+        '});',
+        '',
+        'export const draftEntity = defineEntity({',
+        "  name: 'Draft',",
+        '  properties: (p) => {',
+        '    return {',
+        '      /** Draft body text. */',
+        '      body: p.text(),',
+        '    };',
+        '  },',
+        '});',
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    const byName = new Map(result.schemaDeclarations.map((declaration) => [declaration.entityName, declaration]));
+    expect(byName.get('Order')?.props.get('total')?.description).toBe('Total in cents.');
+    expect(byName.get('Draft')?.props.get('body')?.description).toBe('Draft body text.');
+  });
+
+  it('reads property JSDoc through a parenthesized properties literal', () => {
+    const dir = makeTempDir('jsdoc-schema-paren-props-');
+    const filePath = path.join(dir, 'wrapped.ts');
+    fs.writeFileSync(
+      filePath,
+      [
+        "import { EntitySchema } from '@mikro-orm/core';",
+        '',
+        'export const WrappedSchema = new EntitySchema({',
+        "  name: 'Wrapped',",
+        '  properties: ({',
+        '    /** Documented despite the parentheses. */',
+        "    label: { type: 'string' },",
+        '  }),',
+        '});',
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations[0]?.props.get('label')?.description).toBe('Documented despite the parentheses.');
+  });
+
+  it('leaves object-literal property JSDoc unread for class-linked schemas — the class documents properties', () => {
+    const dir = makeTempDir('jsdoc-schema-linked-props-');
+    fs.writeFileSync(path.join(dir, 'Author.ts'), 'export class Author { id!: number; }\n');
+    const schemaPath = path.join(dir, 'AuthorSchema.ts');
+    fs.writeFileSync(
+      schemaPath,
+      [
+        "import { Author } from './Author';",
+        '',
+        'export const AuthorSchema = new EntitySchema({',
+        '  class: Author,',
+        '  properties: {',
+        '    /** Ignored: property documentation belongs to the class. */',
+        "    id: { primary: true, type: 'number' },",
+        '  },',
+        '});',
+        '',
+      ].join('\n')
+    );
+
+    const result = loadJsDoc([schemaPath], undefined, { scanSchemaDeclarations: true });
+
+    expect(result.schemaDeclarations[0]?.props.size).toBe(0);
+  });
 });
 
 describe('bindSchemaJsDoc', () => {
@@ -617,5 +737,44 @@ describe('bindSchemaJsDoc', () => {
     const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['BareTs', undefined]]));
 
     expect(binding.jsDocReadEntityNames.has('BareTs')).toBe(true);
+  });
+
+  function writePropDocumentedSchema(filePath: string, entityName: string, description: string): void {
+    fs.writeFileSync(
+      filePath,
+      [
+        `export const ${entityName}Schema = new EntitySchema({`,
+        `  name: '${entityName}',`,
+        '  properties: {',
+        `    /** ${description} */`,
+        "    title: { type: 'string' },",
+        '  },',
+        '});',
+        '',
+      ].join('\n')
+    );
+  }
+
+  it('binds object-literal property JSDoc for name-only schemas', () => {
+    const dir = makeTempDir('jsdoc-bind-literal-props-');
+    const filePath = path.join(dir, 'Plan.ts');
+    writePropDocumentedSchema(filePath, 'Plan', 'Marketing name of the plan.');
+    const loaded = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['Plan', undefined]]));
+
+    expect(binding.jsDocResult.props.get('Plan')?.get('title')?.description).toBe('Marketing name of the plan.');
+  });
+
+  it('counts surviving property JSDoc as read for compiled-JS declarations', () => {
+    const dir = makeTempDir('jsdoc-bind-prop-js-');
+    const filePath = path.join(dir, 'plan.js');
+    writePropDocumentedSchema(filePath, 'Plan', 'Survived the build.');
+    const loaded = loadJsDoc([filePath], undefined, { scanSchemaDeclarations: true });
+
+    const binding = bindSchemaJsDoc(loaded, emptyJsDocResult(), new Map([['Plan', undefined]]));
+
+    expect(binding.jsDocResult.props.get('Plan')?.get('title')?.description).toBe('Survived the build.');
+    expect(binding.jsDocReadEntityNames.has('Plan')).toBe(true);
   });
 });

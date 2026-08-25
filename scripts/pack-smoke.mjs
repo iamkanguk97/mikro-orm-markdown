@@ -60,6 +60,7 @@ export const PackSmokeTagSchema = new EntitySchema({
   name: 'PackSmokeTag',
   properties: {
     id: { primary: true, type: 'integer' },
+    /** Human-readable tag label. */
     label: { type: 'string' },
   },
 });
@@ -76,6 +77,7 @@ export const PackSmokeTagSchema = defineEntity({
   name: 'PackSmokeTag',
   properties: (p) => ({
     id: p.integer().primary(),
+    /** Human-readable tag label. */
     label: p.string(),
   }),
 });
@@ -95,7 +97,8 @@ export default {
 `;
 
 // Expected in every generated document (ESM API and CLI): the decorator entity
-// and the schema entity with its JSDoc description and @namespace group bound.
+// and the schema entity with its JSDoc description, @namespace group, and
+// object-literal property JSDoc bound (v7 proves the builder-callback unwrap).
 const DOCUMENT_NEEDLES = [
   'erDiagram',
   '### PackSmokeUser',
@@ -104,6 +107,7 @@ const DOCUMENT_NEEDLES = [
   '### PackSmokeTag',
   '> Schema-defined tag for the pack smoke.',
   '| label | string |',
+  'Human-readable tag label.',
 ];
 
 const ESM_SMOKE = `import { generateMarkdown } from 'mikro-orm-markdown';
