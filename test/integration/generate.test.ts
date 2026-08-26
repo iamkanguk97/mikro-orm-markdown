@@ -229,6 +229,15 @@ describe('generateMarkdown', () => {
     expect(structuredWarnings).not.toContainEqual(
       expect.objectContaining({ title: 'JSDoc unavailable for schema-defined entities' })
     );
+    // The fallback warning must not advise `entitiesTs` for the schema-entity
+    // cause — following that advice drops every `entities` entry; pinning
+    // `metadataProvider` is the working fix (#122). The new text may still
+    // mention entitiesTs, but only to warn against it.
+    const fallbackWarning = structuredWarnings.find(
+      (warning) => warning.title === 'TypeScript metadata source unavailable'
+    );
+    expect(fallbackWarning?.fix).toContain('Pin `metadataProvider` explicitly');
+    expect(fallbackWarning?.fix).not.toContain('Configure `entitiesTs`');
   });
 
   // Same pipeline, other provider failure flavor: for a compiled .js glob the
