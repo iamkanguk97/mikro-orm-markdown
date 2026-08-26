@@ -17,7 +17,7 @@ Use the CLI or TypeScript API to document entity columns, relations, indexes, co
 
 See the [MikroORM ERD example output](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/examples/ERD.md).
 
-Agent users can also use the optional Agent Skill at `skills/mikro-orm-markdown/` with Claude Code or other Agent Skills-compatible tools to set up and troubleshoot `mikro-orm-markdown` in a MikroORM project. The skill is provided in this repository for users who want it; it is not required for normal npm usage and is not shipped in the npm package.
+Agent users (Claude Code and other Agent Skills-compatible tools) can optionally use the Agent Skill at `skills/mikro-orm-markdown/` to set up and troubleshoot this tool — it is not part of the npm package.
 
 > Heavily inspired by [prisma-markdown](https://github.com/samchon/prisma-markdown) by [@samchon](https://github.com/samchon). Thank you for the great idea.
 
@@ -37,15 +37,13 @@ Beyond what Prisma-based tools can express, `mikro-orm-markdown` also visualizes
 - **Single Table Inheritance (STI)** — subclasses like `Dog` and `Cat` share one `animals` table. A discriminator column (e.g. `type`) distinguishes which subclass each row belongs to.
 - **@Formula** — a virtual column with no physical DB column. Its value is computed by a SQL expression at SELECT time (e.g. `LENGTH(name)`).
 
-> These are first-class MikroORM features, though not every project uses all of them. `Embeddable` is especially useful for value objects, such as an `Address` stored as `address_*` columns or as JSON, and can also reduce duplication when several entities share the same column group.
-
 ## Requirements
 
 - **Node.js >= 18**
-- **MikroORM 6 or 7** — `@mikro-orm/core` is a peer dependency with the range `>=6.0.0 <8`. Both majors are exercised end-to-end (installed package, ESM/CJS API, CLI binary) in CI. MikroORM 7 itself requires Node.js >= 22.17, so on Node 18 or 20 only v6 is installable.
+- **MikroORM 6 or 7** — `@mikro-orm/core` is a peer dependency with the range `>=6.0.0 <8`. MikroORM 7 itself requires Node.js >= 22.17, so on Node 18 or 20 only v6 is installable.
 - **A MikroORM config file** — the CLI expects a default export of a plain MikroORM options object.
 - **The matching MikroORM driver package** — for example `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`. A live database connection is not required, but MikroORM still needs the driver to discover metadata.
-- **Decorator-based entities render fully; schema-defined entities render from metadata only** — `@Entity()` classes get full JSDoc support (descriptions, `@namespace`, `@hidden`, …). Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`, which builds on it) appear in the ERD and column tables, but JSDoc on the schema declaration is not read yet — generation emits a warning naming those entities ([#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106)).
+- **Decorator or schema-defined entities** — `@Entity()` classes read JSDoc from the class. Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`, which builds on it) render identically and read JSDoc from the exported schema declaration — see [Schema-defined entities](#schema-defined-entities).
 - **On MikroORM 7, import decorators from `@mikro-orm/decorators`** — v7 moved them out of `@mikro-orm/core` into `@mikro-orm/decorators/legacy` (TypeScript `experimentalDecorators`) and `@mikro-orm/decorators/es` (ES-standard decorators). Both work with this tool; on v6 they stay in `@mikro-orm/core`.
 - **Resolvable property types** — each entity property's type must be known during MikroORM discovery. Use explicit decorator options such as `type:` / `entity:`, or install `@mikro-orm/reflection` so the CLI can auto-use `TsMorphMetadataProvider` for TypeScript sources.
 - **`tsx` for TypeScript config files** — required only when loading a `.ts` MikroORM config through the CLI. `.js` config files do not need it.
@@ -98,7 +96,7 @@ npm run erd
 
 ## JSDoc Tags
 
-Annotate your entity classes to control sections and visibility in the generated document. JSDoc comments are read from TypeScript entity source files.
+Annotate your entity classes — or exported schema declarations, see [below](#schema-defined-entities) — to control sections and visibility in the generated document. JSDoc comments are read from TypeScript entity source files.
 
 > **Recommended setup:** Use a `.ts` MikroORM config with `entitiesTs` pointing at your source entities. In this setup, JSDoc is read from the original TypeScript files and `--src` is not needed.
 
@@ -126,6 +124,29 @@ Plain JSDoc text (no tag) becomes a description: text above a **class** describe
 
 Entities with no tag are placed in the `default` section.
 An entity can carry multiple tags to appear in more than one section.
+
+### Schema-defined entities
+
+Entities defined with [`EntitySchema`](https://mikro-orm.io/docs/entity-schema) — or MikroORM 7's `defineEntity()`, which builds on it — read JSDoc from the exported schema declaration. Descriptions and every tag above work the same way:
+
+```typescript
+/**
+ * Blog post declared without a decorator class.
+ * @namespace Blog
+ */
+export const PostSchema = new EntitySchema({
+  name: 'Post',
+  properties: {
+    id: { primary: true, type: 'integer' },
+    /** Post title */
+    title: { type: 'string' },
+  },
+});
+```
+
+- **Name-only schemas** (no `class:` link, like the example above) also read property JSDoc from inside the `properties` object literal — MikroORM 7's `properties: (p) => ({...})` builder callback included. In the column table it beats the `comment` property option, which stays the fallback.
+- **Class-linked schemas** (`class:`) read property JSDoc from the class. Entity-level JSDoc merges field by field with the class winning conflicts, and `@hidden` applies when either location has it.
+- A warning names any schema-defined entity whose declaration could not be read — not found in the scanned sources, ambiguous, or found only in comment-stripped compiled JavaScript — so a `@hidden` written there is never dropped silently.
 
 ### Compiled JavaScript Builds
 
@@ -162,12 +183,8 @@ This turns the ERD edge `Post }o--|| Author` into `Post }|--|| Author`. It is a 
 
 A relation edge has **two ends, set independently**:
 
-- **FK target side** (`@ManyToOne`, or the owning `@OneToOne`) — read from your schema automatically, no tag needed: _exactly-one_ (`||`) by default, or _zero-or-one_ (`o|`) when `nullable: true`.
-- **Many-to-one collection side** — _zero-or-more_ by default; `@atLeastOne` raises that side to _one-or-more_. Mermaid uses `}o` → `}|` depending on which side of the edge the collection is rendered on.
-- **Owning one-to-one inverse side** — always _zero-or-one_ (`o|`) from the physical schema. A unique FK guarantees that at most one owner can reference a target row, but it does not require every target row to be referenced.
-- **Many-to-many collection side** — _zero-or-more_ by default; `@atLeastOne` raises that side to _one-or-more_. Mermaid uses `}o` → `}|` or `o{` → `|{` depending on which side of the edge the collection is rendered on.
-
-Therefore an owning one-to-one renders as `Owner o|--|| Target` for a non-null FK and `Owner o|--o| Target` for a nullable FK. The marker next to `Owner` describes how many owner rows may reference one target row; FK nullability controls only the marker next to `Target`.
+- **Single (1) side** (`@ManyToOne`, or the owning `@OneToOne`) — read from your schema automatically, no tag needed: _exactly-one_ (`||`) by default, _zero-or-one_ (`o|`) when `nullable: true`. The inverse side of an owning one-to-one is always _zero-or-one_ — a unique FK caps references at one but does not require one.
+- **Collection (N) side** (`@OneToMany` / `@ManyToMany`) — _zero-or-more_ by default; `@atLeastOne` raises that side to _one-or-more_ (`}o` → `}|`, or `o{` → `|{`, depending on which side of the edge the collection is rendered on).
 
 The four combinations (`Post` ↔ `Author`):
 
@@ -178,7 +195,7 @@ Post }|--|| Author   →  author 1+ posts,  post exactly 1 author   (@atLeastOne
 Post }|--o| Author   →  author 1+ posts,  post 0-or-1 author      (both)
 ```
 
-> **NestJS Swagger Plugin**: `@namespace`, `@erd`, `@describe`, `@hidden`, and `@atLeastOne` are custom tags for `mikro-orm-markdown`. NestJS Swagger does not use these tags for OpenAPI metadata. If you use entity classes directly as DTOs and enable Swagger comment introspection, the plain JSDoc description may also appear in your Swagger docs, but these custom tags do not create a functional conflict.
+> **NestJS Swagger**: these five tags are custom to `mikro-orm-markdown` — Swagger ignores them, so there is no functional conflict even when entity classes double as DTOs. (With Swagger comment introspection enabled, plain untagged JSDoc descriptions may still appear in your Swagger docs.)
 
 ## Output Example
 
@@ -223,7 +240,7 @@ export class Author {
 }
 ```
 
-> **Example notes:** Imports are omitted for brevity. This example uses explicit `type:` options so it works without extra reflection setup. If `@mikro-orm/reflection` is installed, MikroORM can also discover simple scalar types from `@Property() title!: string`.
+> Imports are omitted. Explicit `type:` options keep the example working without `@mikro-orm/reflection`.
 
 Both entities share the `@namespace Blog` tag, so they land in one `## Blog` section. With MikroORM's default naming strategy, the generated `ERD.md` contains an ERD like this:
 
@@ -251,15 +268,6 @@ erDiagram
 - `unique: true` on `email` → `email` is marked `UK` (unique key)
 - `@Property({ nullable: true })` on `body` → the `Nullable` cell is marked `Y`
 - `/** Post title */` → fills the **Description** cell for `title`
-
-**Key legend:**
-
-| Marker | Meaning |
-| ------ | ------- |
-| `PK`   | Primary key |
-| `FK`   | Foreign key |
-| `UK`   | Unique key |
-| `Y` in `Nullable` | Nullable column |
 
 Each entity also gets a column table. For example, the generated `Post` section looks like this:
 
@@ -329,8 +337,6 @@ erDiagram
 The root (`Animal`) lists only the shared columns and marks the discriminator (`type`); each subclass (`Dog`) repeats the inherited columns and adds its own.
 
 The generated Markdown table also includes STI notes, such as `STI root — discriminator column: type` on the root and `Extends Animal (Single Table Inheritance, discriminator value: dog)` on each subclass.
-
-> **Trade-off:** STI keeps several entity types in one table, but can increase query complexity and produce sparse nullable columns. Use it when sharing one table is an intentional part of your model.
 
 ## Troubleshooting
 
@@ -426,8 +432,6 @@ By default, mikro-orm-markdown does not emit Mermaid frontmatter config. This pr
 You can opt into Mermaid rendering options via the CLI:
 
 ```bash
-mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-layout elk
-mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-theme forest
 mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-layout elk --mermaid-theme neutral
 ```
 
@@ -489,21 +493,6 @@ Useful during active development when you want the ERD to stay current without r
 
 ```bash
 mikro-orm-markdown --config ./mikro-orm.config.ts --watch
-```
-
-### JSDoc for `EntitySchema` entities
-
-[`EntitySchema`](https://mikro-orm.io/docs/entity-schema)-defined entities (including MikroORM 7's `defineEntity()`) already render in the ERD and column tables from their metadata.
-Reading JSDoc from the schema declarations — descriptions, `@namespace`, `@hidden` — is planned next, tracked in [#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106). Until it lands, generation emits a warning naming the schema-defined entities whose JSDoc was not read.
-
-```typescript
-const PostSchema = new EntitySchema({
-  name: 'Post',
-  properties: {
-    id: { primary: true, type: 'integer' },
-    title: { type: 'string' },
-  },
-});
 ```
 
 ## License
