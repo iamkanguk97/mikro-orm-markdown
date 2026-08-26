@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-08-26
+
+Closes the 1.2.0 caveat: JSDoc written on schema declarations is now read. Schema-defined entities — `EntitySchema`, and MikroORM 7's `defineEntity()` which builds on it — get their descriptions and tags (`@namespace`, `@erd`, `@describe`, `@hidden`) from the exported schema declaration, and name-only schemas additionally read property JSDoc from inside their `properties` object literal ([#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106)). Decorator-based projects are unaffected.
+
+### Added
+
+- JSDoc binds from exported schema declarations (`new EntitySchema({...})` / `defineEntity({...})`). For a class-linked schema (`class:`), entity-level JSDoc merges field by field with the class winning conflicts, `@hidden` applies when either location has it, and property JSDoc comes from the class; for a name-only schema, the declaration is the sole documentation site
+- Name-only schemas read property JSDoc from inside the `properties` object literal — MikroORM 7's `properties: (p) => ({...})` builder callback included. In the rendered column table it beats the `comment` property option, which stays the fallback
+- A GitHub Pages showcase website renders every scenario end-to-end: https://iamkanguk97.github.io/mikro-orm-markdown/
+
+### Changed
+
+- The "JSDoc unavailable for schema-defined entities" warning now fires only for schema entities whose declaration could not be read — not found in the scanned sources, ambiguous, or found only in comment-stripped compiled JavaScript — instead of unconditionally
+
+### Fixed
+
+- The "TypeScript metadata source unavailable" warning no longer suggests `entitiesTs` when schema-defined entities triggered the fallback — following that advice makes MikroORM discover only the `entitiesTs` entries and silently drop everything in `entities`. It now recommends pinning `metadataProvider` explicitly ([#122](https://github.com/iamkanguk97/mikro-orm-markdown/issues/122))
+
 ## [1.2.0] - 2026-08-14
 
 Schema-defined entities — `EntitySchema`, and MikroORM 7's `defineEntity()` which builds on it — are now rendered instead of rejected. One thing to know: JSDoc written on schema declarations (descriptions, `@namespace`, `@hidden`, …) is not read yet, so generation emits a warning naming those entities; JSDoc binding for them is tracked in [#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106). Decorator-based projects are unaffected — their output is byte-for-byte unchanged.
