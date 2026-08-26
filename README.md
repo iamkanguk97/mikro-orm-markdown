@@ -45,7 +45,7 @@ Beyond what Prisma-based tools can express, `mikro-orm-markdown` also visualizes
 - **MikroORM 6 or 7** — `@mikro-orm/core` is a peer dependency with the range `>=6.0.0 <8`. Both majors are exercised end-to-end (installed package, ESM/CJS API, CLI binary) in CI. MikroORM 7 itself requires Node.js >= 22.17, so on Node 18 or 20 only v6 is installable.
 - **A MikroORM config file** — the CLI expects a default export of a plain MikroORM options object.
 - **The matching MikroORM driver package** — for example `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`. A live database connection is not required, but MikroORM still needs the driver to discover metadata.
-- **Decorator-based entities render fully; schema-defined entities render from metadata only** — `@Entity()` classes get full JSDoc support (descriptions, `@namespace`, `@hidden`, …). Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`, which builds on it) appear in the ERD and column tables, but JSDoc on the schema declaration is not read yet — generation emits a warning naming those entities ([#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106)).
+- **Decorator or schema-defined entities** — `@Entity()` classes read JSDoc from the class. Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`, which builds on it) render identically and read JSDoc from the exported schema declaration — see [Schema-defined entities](#schema-defined-entities).
 - **On MikroORM 7, import decorators from `@mikro-orm/decorators`** — v7 moved them out of `@mikro-orm/core` into `@mikro-orm/decorators/legacy` (TypeScript `experimentalDecorators`) and `@mikro-orm/decorators/es` (ES-standard decorators). Both work with this tool; on v6 they stay in `@mikro-orm/core`.
 - **Resolvable property types** — each entity property's type must be known during MikroORM discovery. Use explicit decorator options such as `type:` / `entity:`, or install `@mikro-orm/reflection` so the CLI can auto-use `TsMorphMetadataProvider` for TypeScript sources.
 - **`tsx` for TypeScript config files** — required only when loading a `.ts` MikroORM config through the CLI. `.js` config files do not need it.
@@ -98,7 +98,7 @@ npm run erd
 
 ## JSDoc Tags
 
-Annotate your entity classes to control sections and visibility in the generated document. JSDoc comments are read from TypeScript entity source files.
+Annotate your entity classes — or exported schema declarations, see [below](#schema-defined-entities) — to control sections and visibility in the generated document. JSDoc comments are read from TypeScript entity source files.
 
 > **Recommended setup:** Use a `.ts` MikroORM config with `entitiesTs` pointing at your source entities. In this setup, JSDoc is read from the original TypeScript files and `--src` is not needed.
 
@@ -126,6 +126,29 @@ Plain JSDoc text (no tag) becomes a description: text above a **class** describe
 
 Entities with no tag are placed in the `default` section.
 An entity can carry multiple tags to appear in more than one section.
+
+### Schema-defined entities
+
+Entities defined with [`EntitySchema`](https://mikro-orm.io/docs/entity-schema) — or MikroORM 7's `defineEntity()`, which builds on it — read JSDoc from the exported schema declaration. Descriptions and every tag above work the same way:
+
+```typescript
+/**
+ * Blog post declared without a decorator class.
+ * @namespace Blog
+ */
+export const PostSchema = new EntitySchema({
+  name: 'Post',
+  properties: {
+    id: { primary: true, type: 'integer' },
+    /** Post title */
+    title: { type: 'string' },
+  },
+});
+```
+
+- **Name-only schemas** (no `class:` link, like the example above) also read property JSDoc from inside the `properties` object literal — MikroORM 7's `properties: (p) => ({...})` builder callback included. In the column table it beats the `comment` property option, which stays the fallback.
+- **Class-linked schemas** (`class:`) read property JSDoc from the class. Entity-level JSDoc merges field by field with the class winning conflicts, and `@hidden` applies when either location has it.
+- A warning names any schema-defined entity whose declaration could not be read — not found in the scanned sources, ambiguous, or found only in comment-stripped compiled JavaScript — so a `@hidden` written there is never dropped silently.
 
 ### Compiled JavaScript Builds
 
@@ -489,21 +512,6 @@ Useful during active development when you want the ERD to stay current without r
 
 ```bash
 mikro-orm-markdown --config ./mikro-orm.config.ts --watch
-```
-
-### JSDoc for `EntitySchema` entities
-
-[`EntitySchema`](https://mikro-orm.io/docs/entity-schema)-defined entities (including MikroORM 7's `defineEntity()`) already render in the ERD and column tables from their metadata.
-Reading JSDoc from the schema declarations — descriptions, `@namespace`, `@hidden` — is planned next, tracked in [#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106). Until it lands, generation emits a warning naming the schema-defined entities whose JSDoc was not read.
-
-```typescript
-const PostSchema = new EntitySchema({
-  name: 'Post',
-  properties: {
-    id: { primary: true, type: 'integer' },
-    title: { type: 'string' },
-  },
-});
 ```
 
 ## License

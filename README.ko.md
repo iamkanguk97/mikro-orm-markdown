@@ -45,7 +45,7 @@ Prisma 기반 도구로는 표현할 수 없는 MikroORM 고유 개념도 함께
 - **MikroORM 6 또는 7** — `@mikro-orm/core`는 peer dependency이며 범위는 `>=6.0.0 <8`입니다. 두 메이저 모두 CI에서 설치된 패키지·ESM/CJS API·CLI 바이너리까지 end-to-end로 검증합니다. 다만 MikroORM 7 자체가 Node.js >= 22.17을 요구하므로, Node 18이나 20에서는 v6만 설치할 수 있습니다.
 - **MikroORM config 파일** — CLI는 plain MikroORM options object를 default export로 내보내는 파일을 기대합니다.
 - **사용할 DB에 맞는 MikroORM 드라이버 패키지** — 예를 들어 `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, `@mikro-orm/sqlite`가 있습니다. 실행 중인 DB 연결은 필요 없지만, MikroORM이 메타데이터를 discovery하려면 드라이버는 필요합니다.
-- **데코레이터 기반 엔티티** — 엔티티는 `@Entity()` 클래스여야 합니다. `EntitySchema`로 정의한 엔티티는 현재 지원하지 않으며, `EntitySchema` 위에 만들어진 MikroORM 7의 `defineEntity()`도 지원하지 않습니다.
+- **데코레이터 또는 스키마 정의 엔티티** — `@Entity()` 클래스는 클래스에서 JSDoc을 읽습니다. `EntitySchema`(또는 그 위에 만들어진 MikroORM 7의 `defineEntity()`)로 정의한 엔티티도 동일하게 렌더링되며, export된 스키마 선언에서 JSDoc을 읽습니다 — [스키마 정의 엔티티](#스키마-정의-엔티티)를 참고하세요.
 - **MikroORM 7에서는 데코레이터를 `@mikro-orm/decorators`에서 임포트** — v7은 데코레이터를 `@mikro-orm/core`에서 분리해 `@mikro-orm/decorators/legacy`(TypeScript `experimentalDecorators`)와 `@mikro-orm/decorators/es`(ES 표준 데코레이터)로 옮겼습니다. 둘 다 이 도구와 함께 동작합니다. v6에서는 그대로 `@mikro-orm/core`에 있습니다.
 - **해석 가능한 프로퍼티 타입** — 각 엔티티 프로퍼티의 타입은 MikroORM discovery 시점에 알려져야 합니다. `type:` / `entity:` 같은 명시적인 데코레이터 옵션을 사용하거나, `@mikro-orm/reflection`을 설치해 CLI가 TypeScript 소스에 대해 `TsMorphMetadataProvider`를 자동으로 사용하게 하세요.
 - **TypeScript config 파일을 위한 `tsx`** — CLI에서 `.ts` MikroORM config를 로드할 때만 필요합니다. `.js` config 파일에는 필요하지 않습니다.
@@ -98,7 +98,7 @@ npm run erd
 
 ## JSDoc 태그
 
-엔티티 클래스에 JSDoc 태그를 추가해 문서의 섹션과 노출 여부를 제어합니다. JSDoc 주석은 TypeScript 엔티티 소스 파일에서 읽습니다.
+엔티티 클래스 — 또는 export된 스키마 선언, [아래 참고](#스키마-정의-엔티티) — 에 JSDoc 태그를 추가해 문서의 섹션과 노출 여부를 제어합니다. JSDoc 주석은 TypeScript 엔티티 소스 파일에서 읽습니다.
 
 > **권장 설정:** `.ts` MikroORM config를 사용하고 `entitiesTs`가 소스 엔티티를 가리키게 하세요. 이 설정에서는 JSDoc을 원본 TypeScript 파일에서 읽으므로 `--src`가 필요하지 않습니다.
 
@@ -126,6 +126,29 @@ export class Post {
 
 태그가 없는 엔티티는 `default` 섹션에 들어갑니다.
 하나의 엔티티에 여러 태그를 지정할 수 있습니다.
+
+### 스키마 정의 엔티티
+
+[`EntitySchema`](https://mikro-orm.io/docs/entity-schema) — 또는 그 위에 만들어진 MikroORM 7의 `defineEntity()` — 로 정의한 엔티티는 export된 스키마 선언에서 JSDoc을 읽습니다. 설명과 위의 모든 태그가 동일하게 동작합니다:
+
+```typescript
+/**
+ * 데코레이터 클래스 없이 선언한 블로그 게시글입니다.
+ * @namespace Blog
+ */
+export const PostSchema = new EntitySchema({
+  name: 'Post',
+  properties: {
+    id: { primary: true, type: 'integer' },
+    /** 게시글 제목 */
+    title: { type: 'string' },
+  },
+});
+```
+
+- **이름만 있는 스키마**(위 예시처럼 `class:` 연결이 없는 경우)는 `properties` 객체 리터럴 안의 프로퍼티 JSDoc도 읽습니다 — MikroORM 7의 `properties: (p) => ({...})` 빌더 콜백도 지원합니다. 컬럼 표에서는 이 JSDoc이 `comment` 옵션보다 우선하며, `comment`는 폴백으로 유지됩니다.
+- **클래스 연결 스키마**(`class:`)는 프로퍼티 JSDoc을 클래스에서 읽습니다. 엔티티 레벨 JSDoc은 필드별로 병합되며 충돌 시 클래스가 우선하고, `@hidden`은 두 위치 중 한 곳에만 있어도 적용됩니다.
+- 스키마 선언을 읽지 못한 엔티티(스캔한 소스에서 찾지 못함, 모호함, 주석이 제거된 컴파일된 JavaScript에서만 발견됨)는 경고로 이름이 알려지므로, 그곳에 적힌 `@hidden`이 조용히 사라지는 일은 없습니다.
 
 ### 컴파일된 JavaScript 빌드
 
@@ -483,20 +506,6 @@ mikro-orm-markdown --config ./mikro-orm.config.ts --check
 
 ```bash
 mikro-orm-markdown --config ./mikro-orm.config.ts --watch
-```
-
-### `EntitySchema` 지원
-
-현재는 decorator 기반 엔티티(`@Entity()` 클래스)만 지원합니다. 향후 릴리즈에서는 TypeScript decorator 없이 Plain Object로 스키마를 정의하는 [`EntitySchema`](https://mikro-orm.io/docs/entity-schema) 방식도 지원할 예정입니다.
-
-```typescript
-const PostSchema = new EntitySchema({
-  name: 'Post',
-  properties: {
-    id: { primary: true, type: 'integer' },
-    title: { type: 'string' },
-  },
-});
 ```
 
 ## 라이선스
