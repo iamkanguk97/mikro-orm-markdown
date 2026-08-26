@@ -17,7 +17,7 @@ CLI 또는 TypeScript API로 실행 중인 데이터베이스 연결 없이 엔�
 
 [MikroORM ERD 예시 출력](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/examples/ERD.md)을 확인하실 수 있습니다.
 
-Claude Code 또는 기타 Agent Skills 호환 도구를 사용한다면 `skills/mikro-orm-markdown/`의 선택적 Agent Skill로 MikroORM 프로젝트에 `mikro-orm-markdown`을 설정하고 문제를 진단할 수 있습니다. 이 Skill은 필요한 사용자가 저장소에서 가져가 쓰도록 제공되며, 일반적인 npm 사용에는 필요하지 않고 npm 패키지에는 포함되지 않습니다.
+Claude Code 등 Agent Skills 호환 도구를 쓴다면 `skills/mikro-orm-markdown/`의 선택적 Agent Skill로 이 도구를 설정하고 문제를 진단할 수 있습니다 — npm 패키지에는 포함되지 않습니다.
 
 > [@samchon](https://github.com/samchon)의 [prisma-markdown](https://github.com/samchon/prisma-markdown)에서 큰 영감을 받았습니다. 좋은 아이디어에 감사드립니다.
 
@@ -35,14 +35,12 @@ Prisma 기반 도구로는 표현할 수 없는 MikroORM 고유 개념도 함께
 
 - **Embeddable** — 소유 엔티티의 테이블 안에 저장되는 값 객체입니다. `@Embedded` 옵션에 따라 펼쳐진 컬럼(예: `address_street`, `address_city`) 또는 JSON 컬럼으로 저장됩니다. 별도 테이블은 생성되지 않습니다.
 - **Single Table Inheritance (STI)** — `Dog`, `Cat` 같은 자식 클래스가 `animals` 테이블 하나를 공유합니다. `type` 같은 discriminator 컬럼으로 어떤 자식 클래스인지 구분합니다.
-- **@Formula** — 실제 DB 컬럼 없이 SELECT 시 SQL 식으로 값을 계산하는 가상 컬럼입니다. 예를 들어 `LENGTH(name)`은 DB에 컬럼이 없지만 조회 시 이름의 길이를 반환합니다.
-
-> 이들은 MikroORM의 일급 기능이지만, 모든 프로젝트에서 전부 사용하는 것은 아닙니다. `Embeddable`은 `Address`를 `address_*` 컬럼이나 JSON으로 저장하는 값 객체에 특히 유용하며, 여러 엔티티가 같은 컬럼 묶음을 공유할 때 중복을 줄이는 데에도 사용할 수 있습니다.
+- **@Formula** — 실제 DB 컬럼 없이 SELECT 시 SQL 식(예: `LENGTH(name)`)으로 값을 계산하는 가상 컬럼입니다.
 
 ## 요구사항
 
 - **Node.js >= 18**
-- **MikroORM 6 또는 7** — `@mikro-orm/core`는 peer dependency이며 범위는 `>=6.0.0 <8`입니다. 두 메이저 모두 CI에서 설치된 패키지·ESM/CJS API·CLI 바이너리까지 end-to-end로 검증합니다. 다만 MikroORM 7 자체가 Node.js >= 22.17을 요구하므로, Node 18이나 20에서는 v6만 설치할 수 있습니다.
+- **MikroORM 6 또는 7** — `@mikro-orm/core`는 peer dependency이며 범위는 `>=6.0.0 <8`입니다. MikroORM 7 자체가 Node.js >= 22.17을 요구하므로, Node 18이나 20에서는 v6만 설치할 수 있습니다.
 - **MikroORM config 파일** — CLI는 plain MikroORM options object를 default export로 내보내는 파일을 기대합니다.
 - **사용할 DB에 맞는 MikroORM 드라이버 패키지** — 예를 들어 `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, `@mikro-orm/sqlite`가 있습니다. 실행 중인 DB 연결은 필요 없지만, MikroORM이 메타데이터를 discovery하려면 드라이버는 필요합니다.
 - **데코레이터 또는 스키마 정의 엔티티** — `@Entity()` 클래스는 클래스에서 JSDoc을 읽습니다. `EntitySchema`(또는 그 위에 만들어진 MikroORM 7의 `defineEntity()`)로 정의한 엔티티도 동일하게 렌더링되며, export된 스키마 선언에서 JSDoc을 읽습니다 — [스키마 정의 엔티티](#스키마-정의-엔티티)를 참고하세요.
@@ -185,7 +183,7 @@ export class Author {
 
 하나의 관계선은 **양 끝이 따로 결정**됩니다:
 
-- **단수(1) 쪽** (`@ManyToOne`, 또는 소유 측 `@OneToOne`) — 스키마에서 자동으로 읽으며 태그가 필요 없습니다: 기본 _정확히 1_ (`||`), `nullable: true`이면 _0 또는 1_ (`o|`).
+- **단수(1) 쪽** (`@ManyToOne`, 또는 소유 측 `@OneToOne`) — 스키마에서 자동으로 읽으며 태그가 필요 없습니다: 기본 _정확히 1_ (`||`), `nullable: true`이면 _0 또는 1_ (`o|`). 소유 측 `@OneToOne`의 반대쪽은 항상 _0 또는 1_ 입니다 — unique FK는 참조를 최대 1개로 제한할 뿐, 반드시 1개를 요구하지는 않습니다.
 - **컬렉션(N) 쪽** (`@OneToMany` / `@ManyToMany`) — 기본 _0개 이상_이며, `@atLeastOne`을 붙이면 해당 쪽이 _1개 이상_으로 바뀝니다. Mermaid에서는 컬렉션이 렌더링되는 방향에 따라 `}o` → `}|` 또는 `o{` → `|{`를 사용합니다.
 
 네 가지 조합 (`Post` ↔ `Author`):
@@ -197,7 +195,7 @@ Post }|--|| Author   →  작성자 글 1개+,  글은 작성자 정확히 1명 
 Post }|--o| Author   →  작성자 글 1개+,  글은 작성자 0~1명        (둘 다)
 ```
 
-> **NestJS Swagger Plugin**: `@namespace`, `@erd`, `@describe`, `@hidden`, `@atLeastOne`은 `mikro-orm-markdown`용 커스텀 태그입니다. NestJS Swagger는 이 태그들을 OpenAPI 메타데이터로 사용하지 않습니다. 엔티티 클래스를 DTO로 직접 사용하고 Swagger comment introspection을 켠 경우, 일반 JSDoc 설명은 Swagger 문서에도 표시될 수 있지만 이 커스텀 태그들이 기능적인 충돌을 만들지는 않습니다.
+> **NestJS Swagger**: 이 다섯 태그는 `mikro-orm-markdown` 전용 커스텀 태그입니다. Swagger는 이를 무시하므로, 엔티티 클래스를 DTO로 함께 쓰더라도 기능 충돌은 없습니다.
 
 ## 출력 예시
 
@@ -242,7 +240,7 @@ export class Author {
 }
 ```
 
-> **예시 참고:** import 문은 간결성을 위해 생략했습니다. 이 예시는 별도 reflection 설정 없이 동작하도록 `type:`을 명시합니다. `@mikro-orm/reflection`이 설치되어 있다면 MikroORM은 `@Property() title!: string` 같은 단순 scalar 타입도 discovery할 수 있습니다.
+> import 문은 생략했습니다. `type:`을 명시해 `@mikro-orm/reflection` 없이도 동작하는 예시입니다.
 
 두 엔티티 모두 `@namespace Blog` 태그를 가지므로 하나의 `## Blog` 섹션에 묶입니다. MikroORM의 기본 naming strategy를 기준으로 생성된 `ERD.md`에는 다음과 같은 ERD가 포함됩니다:
 
@@ -270,15 +268,6 @@ erDiagram
 - `email`의 `unique: true` → `email`이 `UK`(unique key)로 표시됨
 - `body`의 `@Property({ nullable: true })` → `Nullable` 칸이 `Y`로 표시됨
 - `/** 게시글 제목 */` → `title`의 **Description** 칸을 채움
-
-**키 표기:**
-
-| 표기 | 의미 |
-| ---- | ---- |
-| `PK` | Primary key |
-| `FK` | Foreign key |
-| `UK` | Unique key |
-| `Nullable`의 `Y` | nullable 컬럼 |
 
 각 엔티티는 컬럼 표로도 표현됩니다. 예를 들어 생성된 `Post` 섹션은 다음과 같습니다:
 
@@ -348,8 +337,6 @@ erDiagram
 루트(`Animal`)는 공유 컬럼만 나열하고 discriminator(`type`)를 표시하며, 각 서브클래스(`Dog`)는 상속 컬럼을 반복한 뒤 자기 컬럼을 추가합니다.
 
 생성된 Markdown 표에도 STI note가 함께 표시됩니다. 루트에는 `STI root — discriminator column: type`, 각 서브클래스에는 `Extends Animal (Single Table Inheritance, discriminator value: dog)` 같은 문구가 추가됩니다.
-
-> **트레이드오프:** STI는 여러 엔티티 타입을 하나의 테이블에 보관할 수 있게 하지만, 쿼리 복잡도를 높이고 nullable 컬럼이 많이 생길 수 있습니다. 하나의 테이블을 공유하는 것이 모델의 의도일 때 사용하세요.
 
 ## 문제 해결
 
@@ -445,8 +432,6 @@ const markdown = await generateMarkdown({ orm: ormConfig });
 CLI에서 Mermaid 렌더링 옵션을 사용하려면:
 
 ```bash
-mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-layout elk
-mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-theme forest
 mikro-orm-markdown --config ./mikro-orm.config.ts --mermaid-layout elk --mermaid-theme neutral
 ```
 
