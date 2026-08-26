@@ -292,13 +292,23 @@ async function loadEntityMetadataWithTsMorphFallback(
       throw err;
     }
 
+    // The fix branches by cause (#122): when schema-defined entities are in
+    // play, suggesting `entitiesTs` is actively harmful — MikroORM would then
+    // discover only the `entitiesTs` entries and silently drop everything in
+    // `entities` (verified empirically in PR #119). Pinning the provider the
+    // retry just succeeded with is the always-working advice for that case.
+    const hasSchemaEntities = loaded.schemaEntityClassNames.size > 0 || loaded.unconfirmedEntityClassNames.size > 0;
     emitWarning(onWarn, {
       title: 'TypeScript metadata source unavailable',
       detail:
         'The automatically selected TypeScript metadata provider could not analyse the sources for every entity, ' +
         'so generation succeeded by retrying with the original metadata provider.',
       impact: ['Type information will come from runtime decorator metadata instead of TypeScript source analysis.'],
-      fix: 'Configure `entitiesTs` to point at the original TypeScript entity sources when source analysis is required.',
+      fix: hasSchemaEntities
+        ? 'Pin `metadataProvider` explicitly in the ORM config (e.g. `ReflectMetadataProvider`): the TypeScript ' +
+          'provider cannot analyse schema-defined entities, and configuring `entitiesTs` would make MikroORM ' +
+          'discover only those entries.'
+        : 'Configure `entitiesTs` to point at the original TypeScript entity sources when source analysis is required.',
     });
     return loaded;
   }
