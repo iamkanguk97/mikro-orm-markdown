@@ -195,7 +195,7 @@ Post }|--|| Author   →  작성자 글 1개+,  글은 작성자 정확히 1명 
 Post }|--o| Author   →  작성자 글 1개+,  글은 작성자 0~1명        (둘 다)
 ```
 
-> **NestJS Swagger**: 이 다섯 태그는 `mikro-orm-markdown` 전용 커스텀 태그입니다. Swagger는 이를 무시하므로, 엔티티 클래스를 DTO로 함께 쓰더라도 기능 충돌은 없습니다.
+> **NestJS Swagger**: 이 다섯 태그는 `mikro-orm-markdown` 전용 커스텀 태그입니다. Swagger는 이를 무시하므로, 엔티티 클래스를 DTO로 함께 쓰더라도 기능 충돌은 없습니다. (다만 Swagger comment introspection을 켰다면 태그 없는 일반 JSDoc 설명은 Swagger 문서에도 표시될 수 있습니다.)
 
 ## 출력 예시
 

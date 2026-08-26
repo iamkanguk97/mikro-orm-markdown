@@ -195,7 +195,7 @@ Post }|--|| Author   →  author 1+ posts,  post exactly 1 author   (@atLeastOne
 Post }|--o| Author   →  author 1+ posts,  post 0-or-1 author      (both)
 ```
 
-> **NestJS Swagger**: these five tags are custom to `mikro-orm-markdown` — Swagger ignores them, so there is no functional conflict even when entity classes double as DTOs.
+> **NestJS Swagger**: these five tags are custom to `mikro-orm-markdown` — Swagger ignores them, so there is no functional conflict even when entity classes double as DTOs. (With Swagger comment introspection enabled, plain untagged JSDoc descriptions may still appear in your Swagger docs.)
 
 ## Output Example
 
