@@ -39,8 +39,8 @@ Beyond what Prisma-based tools can express, `mikro-orm-markdown` also visualizes
 
 ## Requirements
 
-- **Node.js >= 18**
-- **MikroORM 6 or 7** — `@mikro-orm/core` is a peer dependency with the range `>=6.0.0 <8`. MikroORM 7 itself requires Node.js >= 22.17, so on Node 18 or 20 only v6 is installable.
+- **Node.js >= 22.17**
+- **MikroORM 6 or 7** — `@mikro-orm/core` is a peer dependency with the range `>=6.0.0 <8`.
 - **A MikroORM config file** — the CLI expects a default export of a plain MikroORM options object.
 - **The matching MikroORM driver package** — for example `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`. A live database connection is not required, but MikroORM still needs the driver to discover metadata.
 - **Decorator or schema-defined entities** — `@Entity()` classes read JSDoc from the class. Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`, which builds on it) render identically and read JSDoc from the exported schema declaration — see [Schema-defined entities](#schema-defined-entities).
