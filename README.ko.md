@@ -39,8 +39,8 @@ Prisma 기반 도구로는 표현할 수 없는 MikroORM 고유 개념도 함께
 
 ## 요구사항
 
-- **Node.js >= 18**
-- **MikroORM 6 또는 7** — `@mikro-orm/core`는 peer dependency이며 범위는 `>=6.0.0 <8`입니다. MikroORM 7 자체가 Node.js >= 22.17을 요구하므로, Node 18이나 20에서는 v6만 설치할 수 있습니다.
+- **Node.js >= 22.17**
+- **MikroORM 6 또는 7** — `@mikro-orm/core`는 peer dependency이며 범위는 `>=6.0.0 <8`입니다.
 - **MikroORM config 파일** — CLI는 plain MikroORM options object를 default export로 내보내는 파일을 기대합니다.
 - **사용할 DB에 맞는 MikroORM 드라이버 패키지** — 예를 들어 `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, `@mikro-orm/sqlite`가 있습니다. 실행 중인 DB 연결은 필요 없지만, MikroORM이 메타데이터를 discovery하려면 드라이버는 필요합니다.
 - **데코레이터 또는 스키마 정의 엔티티** — `@Entity()` 클래스는 클래스에서 JSDoc을 읽습니다. `EntitySchema`(또는 그 위에 만들어진 MikroORM 7의 `defineEntity()`)로 정의한 엔티티도 동일하게 렌더링되며, export된 스키마 선언에서 JSDoc을 읽습니다 — [스키마 정의 엔티티](#스키마-정의-엔티티)를 참고하세요.
