@@ -90,6 +90,7 @@ describe('CLI smoke (built bin)', () => {
     expect(output.startsWith('# Excluded')).toBe(true);
     expect(output).not.toMatch(/^\s+\S+ created_at\b/m);
     expect(output).not.toContain('| created_at |');
+    expect(output).not.toMatch(/^\s+\S+ bio\b/m);
     expect(output).not.toContain('| bio |');
     expect(output).toContain('| email |');
   });

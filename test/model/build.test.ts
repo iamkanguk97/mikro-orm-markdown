@@ -957,6 +957,63 @@ describe('buildDocumentModel — excludeColumns', () => {
     expect(textEntity(withExclusion, 'User').model.constraints).toHaveLength(3);
   });
 
+  it('drops an entity from a foreign @erd diagram when all of its primary-key columns are excluded', () => {
+    // A cross-namespace @erd box renders only PK columns; with none left it is removed, edges included.
+    const order = makeEntityMeta({
+      className: 'Order',
+      tableName: 'order',
+      primaryKeys: ['id'],
+      properties: { id: pkProperty(), customer: manyToOne('customer', 'Customer', ['customer_id']) },
+    });
+    const customer = makeSimpleEntityMeta('Customer');
+    const jsDoc = makeJsDocResult({
+      entities: new Map([
+        ['Order', { hidden: false, namespaces: ['Shop'], erdNamespaces: [], describeNamespaces: [] }],
+        ['Customer', { hidden: false, namespaces: ['Crm'], erdNamespaces: ['Shop'], describeNamespaces: [] }],
+      ]),
+    });
+
+    const docModel = buildDocumentModel([order, customer], jsDoc, 'T', undefined, undefined, ['id']);
+    const shop = docModel.groups.find((group) => group.name === 'Shop')!;
+    const crm = docModel.groups.find((group) => group.name === 'Crm')!;
+
+    expect(shop.erdEntities.map((entity) => entity.model.className)).toEqual(['Order']);
+    expect(shop.erdRelations).toEqual([]);
+    // Its home namespace still renders it, just without the excluded column.
+    expect(crm.erdEntities.map((entity) => entity.model.className)).toEqual(['Customer']);
+  });
+
+  it('still drops constraints on an FK to a @hidden entity when that FK column is also excluded', () => {
+    // The output must not depend on whether a hidden-target FK is also listed in excludeColumns.
+    const order = makeEntityMeta({
+      className: 'Order',
+      tableName: 'order',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        status: scalarProperty('status', 'status', 'string'),
+        secret: manyToOne('secret', 'Secret', ['secret_id']),
+      },
+      indexes: [
+        { name: 'order_secret_idx', properties: ['secret'] },
+        { name: 'order_status_idx', properties: ['status'] },
+      ],
+      uniques: [{ name: 'order_secret_uq', properties: ['secret_id'] }],
+    });
+    const jsDoc = makeJsDocResult({
+      entities: new Map([['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
+    });
+    const metas = [order, makeSimpleEntityMeta('Secret')];
+
+    const hiddenOnly = buildDocumentModel(metas, jsDoc, 'T');
+    const hiddenAndExcluded = buildDocumentModel(metas, jsDoc, 'T', undefined, undefined, ['secret_id']);
+
+    expect(textEntity(hiddenAndExcluded, 'Order').model).toEqual(textEntity(hiddenOnly, 'Order').model);
+    expect(textEntity(hiddenAndExcluded, 'Order').model.constraints).toEqual([
+      { type: 'index', properties: ['status'], name: 'order_status_idx' },
+    ]);
+  });
+
   it('does not report @atLeastOne as ineffective when its edge was removed by an excluded FK column', () => {
     const parent = makeEntityMeta({
       className: 'Parent',

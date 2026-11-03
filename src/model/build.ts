@@ -73,14 +73,19 @@ export function buildDocumentModel(
     if (jsDoc?.hidden) {
       continue;
     }
-    const { model: trimmedModel, removedRelationLabels } = excludeConfiguredColumns(model, excludedFieldNames, onWarn);
+    // @hidden-target FK pruning runs on the full model first: it also drops the
+    // constraints on those FK columns, which it could not find once exclusion
+    // had already removed the columns.
+    const enriched = buildEnrichedEntity(model, jsDoc, jsDocResult, metadataByClass, hiddenClasses);
+    const { model: trimmedModel, removedRelationLabels } = excludeConfiguredColumns(
+      enriched.model,
+      excludedFieldNames,
+      onWarn
+    );
     for (const label of removedRelationLabels) {
       excludedEdgeKeys.add(relationEdgeKey(model.className, label));
     }
-    enrichedByClass.set(
-      model.className,
-      buildEnrichedEntity(trimmedModel, jsDoc, jsDocResult, metadataByClass, hiddenClasses)
-    );
+    enrichedByClass.set(model.className, { ...enriched, model: trimmedModel });
   }
 
   // @atLeastOne is matched against the full edge list first, so excluding an
