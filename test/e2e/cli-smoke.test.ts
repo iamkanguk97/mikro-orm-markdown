@@ -77,6 +77,23 @@ describe('CLI smoke (built bin)', () => {
     expect(output).toContain('### DualUser');
   });
 
+  it('omits columns passed to --exclude-columns from the generated document', () => {
+    const outFile = path.join(makeTempDir('cli-smoke-'), 'ERD.md');
+    execFileSync(
+      'node',
+      [cliPath, '-c', exampleConfig, '-o', outFile, '--exclude-columns', 'created_at', 'bio', '-t', 'Excluded'],
+      { cwd: REPO_ROOT, stdio: 'ignore' }
+    );
+
+    const output = fs.readFileSync(outFile, 'utf-8');
+    // `-t` after the variadic list proves the list stops at the next flag.
+    expect(output.startsWith('# Excluded')).toBe(true);
+    expect(output).not.toMatch(/^\s+\S+ created_at\b/m);
+    expect(output).not.toContain('| created_at |');
+    expect(output).not.toContain('| bio |');
+    expect(output).toContain('| email |');
+  });
+
   it('rejects invalid Mermaid option choices through Commander validation', () => {
     const result = spawnSync('node', [cliPath, '-c', exampleConfig, '--mermaid-layout', 'grid'], {
       cwd: REPO_ROOT,

@@ -89,10 +89,23 @@ npm run erd
 | `-d, --description <string>` | —           | Optional description paragraph shown below the title                            |
 | `--tsconfig <path>`    | —                 | `tsconfig.json` used when loading a `.ts` config; defaults to the nearest one beside the config file |
 | `--src <paths...>`     | —                 | Original TypeScript entity source paths/globs; only needed when MikroORM discovers entities from compiled JavaScript |
+| `--exclude-columns <names...>` | —         | DB column names to omit from every entity. See [Excluding columns](#excluding-columns). |
 | `--mermaid-layout <layout>` | —            | Mermaid layout engine (`dagre\|elk\|elk.stress`). Omit to use the viewer's default. |
 | `--mermaid-theme <theme>`   | —            | Mermaid theme (`default\|neutral\|dark\|forest\|base`). Omit to use the viewer's default. |
 
 > For a long or multiline description, use the [programmatic API](#programmatic-api) instead — it accepts any string directly, without shell quoting limits.
+
+### Excluding columns
+
+Audit columns inherited from a shared base entity (`created_at`, `updated_at`, …) repeat on every table. List their DB column names to drop them from every ERD box and column table:
+
+```bash
+mikro-orm-markdown --config ./mikro-orm.config.ts --exclude-columns created_at updated_at deleted_at
+```
+
+- Names are matched exactly against the DB column name (as shown in the output), not the TypeScript property name. Flattened embedded columns such as `address_street` can be listed too.
+- Excluding a foreign key column also removes its relation edge from the ERD. For a composite foreign key, list all of its columns; listing only some leaves the key untouched and emits a warning.
+- Index, unique, and check constraints are always kept, even when they cover an excluded column — they describe the real schema, so `UNIQUE (email, deleted_at)` still renders after `deleted_at` is excluded.
 
 ## JSDoc Tags
 
@@ -417,6 +430,7 @@ Programmatic options:
 | `src` | Original TypeScript entity source paths/globs. Only needed when `orm.entities` discovers compiled JavaScript. |
 | `onWarn` | Callback for non-fatal warnings, such as compiled JavaScript JSDoc loss. Always receives a plain message string. Handlers that declare a second parameter also receive a structured `{ title, detail, impact, fix }` object for long guidance warnings; variadic loggers passed directly (e.g. `console.warn`) keep receiving just the string. |
 | `mermaid` | Optional Mermaid rendering options. See [Mermaid rendering options](#mermaid-rendering-options) below. |
+| `excludeColumns` | DB column names to omit from every entity, e.g. `['created_at', 'updated_at']`. See [Excluding columns](#excluding-columns). |
 
 If your MikroORM config is asynchronous, resolve it yourself and pass the resulting options object:
 

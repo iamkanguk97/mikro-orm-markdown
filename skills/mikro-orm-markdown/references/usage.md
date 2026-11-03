@@ -50,6 +50,7 @@ Useful CLI options:
 | `--description <text>` | Optional paragraph below the title. |
 | `--tsconfig <path>` | Explicit tsconfig for loading `.ts` configs. |
 | `--src <paths...>` | Original TypeScript entity sources when discovery uses compiled JavaScript. |
+| `--exclude-columns <names...>` | Exact DB column names to omit from every entity (e.g. shared audit columns). Constraints are kept. |
 | `--mermaid-layout <layout>` | `dagre`, `elk`, or `elk.stress`. |
 | `--mermaid-theme <theme>` | `default`, `neutral`, `dark`, `forest`, or `base`. |
 
@@ -139,6 +140,7 @@ Options:
 | `src` | Original TypeScript source paths/globs for compiled JavaScript discovery. |
 | `onWarn` | Callback for non-fatal warnings. |
 | `mermaid` | Optional Mermaid layout/theme config. |
+| `excludeColumns` | Exact DB column names to omit from every entity. Excluding an FK's columns also drops its edge. |
 
 ## Output Review Checklist
 
