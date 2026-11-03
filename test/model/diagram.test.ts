@@ -2,7 +2,7 @@ import { type EntityMetadata, type FormulaTable, type IndexCallback, ReferenceKi
 import { describe, expect, it } from 'vitest';
 import { buildDiagramModel } from '../../src/model/diagram.js';
 import { renderErDiagram } from '../../src/render/mermaid.js';
-import { makeEntityMeta, pkProperty } from '../helpers/entity-meta.js';
+import { makeEntityMeta, makeSimpleEntityMeta, pkProperty } from '../helpers/entity-meta.js';
 import { getFixtureDiagramModel } from '../helpers/pipeline.js';
 
 // ─── buildDiagramModel (integration: uses real MikroORM metadata) ─────────────
@@ -573,6 +573,28 @@ describe('buildDiagramModel — STI (Single Table Inheritance)', () => {
     expect(model.entities.find((e) => e.className === 'Dog')?.extendsEntity).toBe('Animal');
     // The root must still read as a root, not as its own child.
     expect(model.entities.find((e) => e.className === 'Animal')?.discriminatorColumn).toBe('type');
+  });
+});
+
+describe('buildDiagramModel — table comment', () => {
+  it('copies the entity table comment into the entity model', () => {
+    const model = buildDiagramModel([
+      makeEntityMeta({
+        className: 'Account',
+        tableName: 'account',
+        comment: 'Each row represents a customer account',
+        primaryKeys: ['id'],
+        properties: { id: pkProperty() },
+      }),
+    ]);
+
+    expect(model.entities[0]?.comment).toBe('Each row represents a customer account');
+  });
+
+  it('leaves comment unset when the entity has no table comment', () => {
+    const model = buildDiagramModel([makeSimpleEntityMeta('Account')]);
+
+    expect(model.entities[0]).not.toHaveProperty('comment');
   });
 });
 

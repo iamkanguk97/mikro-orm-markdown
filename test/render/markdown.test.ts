@@ -119,6 +119,70 @@ describe('renderMarkdown — entity descriptions', () => {
     expect(md).toContain('Extends `Animal` (Single Table Inheritance, discriminator value: `dog`)');
   });
 
+  describe('table comment fallback', () => {
+    /** A one-entity document; `description` is the class-level JSDoc description, if any. */
+    function renderAccount(options: { comment?: string; jsDoc?: { description?: string } }): string {
+      const docModel: DocumentModel = {
+        title: 'Comments',
+        groups: [
+          {
+            name: 'default',
+            erdEntities: [],
+            erdRelations: [],
+            textEntities: [
+              {
+                model: {
+                  className: 'Account',
+                  tableName: 'account',
+                  columns: [],
+                  constraints: [],
+                  ...(options.comment !== undefined && { comment: options.comment }),
+                },
+                jsDoc:
+                  options.jsDoc === undefined
+                    ? undefined
+                    : { ...options.jsDoc, namespaces: [], erdNamespaces: [], describeNamespaces: [], hidden: false },
+                propDocs: new Map(),
+              },
+            ],
+          },
+        ],
+      };
+      return renderMarkdown(docModel);
+    }
+
+    it('uses the @Entity({ comment }) table comment when the entity has no JSDoc', () => {
+      const md = renderAccount({ comment: 'Each row represents a customer account' });
+      expect(md).toContain('*Table: `account`*\n\n> Each row represents a customer account');
+    });
+
+    it('uses the table comment when JSDoc exists but carries only tags, no description', () => {
+      const md = renderAccount({ comment: 'Each row represents a customer account', jsDoc: {} });
+      expect(md).toContain('> Each row represents a customer account');
+    });
+
+    it('prefers the class-level JSDoc description over the table comment', () => {
+      const md = renderAccount({ comment: 'DDL table comment', jsDoc: { description: 'JSDoc description' } });
+      expect(md).toContain('> JSDoc description');
+      expect(md).not.toContain('DDL table comment');
+    });
+
+    it('renders no description blockquote when there is neither JSDoc nor a table comment', () => {
+      const md = renderAccount({});
+      expect(md).not.toMatch(/^> /m);
+    });
+
+    it('ignores an empty table comment', () => {
+      const md = renderAccount({ comment: '' });
+      expect(md).not.toMatch(/^>/m);
+    });
+
+    it('escapes a multiline table comment as a blockquote like a JSDoc description', () => {
+      const md = renderAccount({ comment: 'First | line\n# not heading' });
+      expect(md).toContain('> First \\| line\n> \\# not heading');
+    });
+  });
+
   it('preserves line breaks in a multiline document description (L6)', () => {
     const docModel: DocumentModel = {
       title: 'Multiline',

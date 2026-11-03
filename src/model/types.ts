@@ -93,6 +93,11 @@ export interface EntityModel {
    * (e.g. "dog"). Stringified so a numeric value like 0 is preserved.
    */
   discriminatorValue?: string;
+  /**
+   * Table comment from @Entity({ comment }) / EntitySchema `comment`; used as the
+   * entity description fallback when no class-level JSDoc description exists.
+   */
+  comment?: string;
   /** Indexes, unique constraints, and check constraints rendered in the markdown tables. */
   constraints: ConstraintModel[];
 }

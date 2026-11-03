@@ -94,7 +94,7 @@ Add JSDoc to entity classes and properties to shape the generated document:
 | `@hidden` | Entity class | Exclude entity from all output. |
 | `@atLeastOne` | Collection property | Render the collection side as one-or-more instead of zero-or-more. |
 
-Plain class JSDoc becomes the entity description. Plain property JSDoc becomes the column description. If property JSDoc is absent, `@Property({ comment })` is used as a fallback column description.
+Plain class JSDoc becomes the entity description. Plain property JSDoc becomes the column description. If property JSDoc is absent, `@Property({ comment })` is used as a fallback column description. If class JSDoc has no description, `@Entity({ comment })` (or an `EntitySchema` `comment`) is used as a fallback entity description.
 
 Example:
 
