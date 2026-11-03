@@ -384,6 +384,14 @@ function parseMermaidOptions(opts: CliOptions): MermaidRenderOptions | undefined
   };
 }
 
+/**
+ * Commander action for the CLI: loads the MikroORM config, forwards the parsed
+ * flags to `generateMarkdown`, and writes the document atomically to `--out`.
+ *
+ * Each stage reports its own failure on stderr and exits with code 1. The tsx
+ * loader is kept registered through generation (entity discovery may import
+ * `.ts` entity files) and unregistered before writing.
+ */
 async function run(opts: CliOptions): Promise<void> {
   const configPath = path.resolve(opts.config);
   const outPath = path.resolve(opts.out);
