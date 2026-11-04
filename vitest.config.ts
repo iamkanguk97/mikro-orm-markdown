@@ -5,6 +5,10 @@ export default defineConfig({
     environment: 'node',
     restoreMocks: true,
     include: ['test/**/*.test.ts'],
+    // Integration tests boot MikroORM and ts-morph per test, which takes
+    // ~5s on the 2-vCPU GitHub runner. Vitest 4 counts that against the 5s
+    // default where Vitest 2 let it pass, so give them real headroom.
+    testTimeout: 20_000,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
