@@ -8,8 +8,9 @@ on:
 
 jobs:
   # Contributor tooling (Biome, commitlint, vitest, tsup) is validated once on
-  # Node 22; the package's Node 18/20/22 runtime promise is validated by the
-  # consumer jobs below against the packed artifact.
+  # Node 22; the package's Node >=22.17 runtime promise is validated by the
+  # consumer jobs below against the packed artifact, on the exact floor and
+  # on the current LTS.
   quality:
     runs-on: ubuntu-latest
 
@@ -58,7 +59,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        node-version: ['22.17.0', '24.x']
 
     steps:
       - uses: actions/checkout@v7

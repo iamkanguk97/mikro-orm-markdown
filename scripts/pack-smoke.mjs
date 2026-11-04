@@ -159,12 +159,6 @@ generateMarkdown({
   });
 `;
 
-/** MikroORM v7 declares `engines.node >= 22.17`, so older runtimes cannot install it. */
-function supportsMikroOrmV7() {
-  const [major, minor] = process.versions.node.split('.').map(Number);
-  return major > 22 || (major === 22 && minor >= 17);
-}
-
 /**
  * Installs the tarball next to one MikroORM major and drives every installed
  * entry point (ESM API, CJS API, CLI binary) against it.
@@ -238,28 +232,21 @@ try {
     tarballPath,
   });
 
-  if (supportsMikroOrmV7()) {
-    verifyConsumer({
-      label: 'v7',
-      dir: path.join(workDir, 'consumer-v7'),
-      // @mikro-orm/decorators/legacy imports reflect-metadata, so the consumer
-      // must have it installed even though the entity gives explicit types.
-      peers: [
-        '@mikro-orm/core@^7.0.0',
-        '@mikro-orm/sqlite@^7.0.0',
-        '@mikro-orm/decorators@^7.0.0',
-        'reflect-metadata@^0.2.0',
-      ],
-      decorators: V7_DECORATORS,
-      schemaEntities: V7_SCHEMA_ENTITY_MODULE,
-      tarballPath,
-    });
-  } else {
-    step('skip the MikroORM v7 consumer');
-    process.stdout.write(
-      `[pack-smoke] SKIPPED MikroORM v7: it requires Node >=22.17, running ${process.versions.node}\n`
-    );
-  }
+  verifyConsumer({
+    label: 'v7',
+    dir: path.join(workDir, 'consumer-v7'),
+    // @mikro-orm/decorators/legacy imports reflect-metadata, so the consumer
+    // must have it installed even though the entity gives explicit types.
+    peers: [
+      '@mikro-orm/core@^7.0.0',
+      '@mikro-orm/sqlite@^7.0.0',
+      '@mikro-orm/decorators@^7.0.0',
+      'reflect-metadata@^0.2.0',
+    ],
+    decorators: V7_DECORATORS,
+    schemaEntities: V7_SCHEMA_ENTITY_MODULE,
+    tarballPath,
+  });
 } catch (error) {
   process.stderr.write(`\n[pack-smoke] FAILED at step: ${currentStep}\n`);
   throw error;
