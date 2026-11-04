@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-11-04
+
+Entity descriptions now fall back to the table comment. When an entity class has no JSDoc description, the `comment` option from `@Entity({ comment })` (or `comment` on an `EntitySchema`) is rendered as the entity description in the Markdown section, mirroring the column-level fallback from `@Property({ comment })` that already existed ([#135](https://github.com/iamkanguk97/mikro-orm-markdown/issues/135)). Contributed by [@smailliwniloc](https://github.com/smailliwniloc).
+
+### Added
+
+- Entity description falls back to the table comment (`@Entity({ comment })` / `EntitySchema` `comment`) when the class has no JSDoc description. JSDoc still wins when present, and tag-only JSDoc (for example a lone `@namespace`) falls through to the comment while the tag still applies. The Mermaid ERD does not render entity descriptions, so it is unchanged
+
 ## [1.3.0] - 2026-08-26
 
 Closes the 1.2.0 caveat: JSDoc written on schema declarations is now read. Schema-defined entities — `EntitySchema`, and MikroORM 7's `defineEntity()` which builds on it — get their descriptions and tags (`@namespace`, `@erd`, `@describe`, `@hidden`) from the exported schema declaration, and name-only schemas additionally read property JSDoc from inside their `properties` object literal ([#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106)). Decorator-based projects are unaffected.
