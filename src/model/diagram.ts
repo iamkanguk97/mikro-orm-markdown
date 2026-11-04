@@ -53,6 +53,7 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
     ...(isStiRoot && { discriminatorColumn: meta.discriminatorColumn as string }),
     ...(isStiChild && { extendsEntity }),
     ...(isStiChild && meta.discriminatorValue !== undefined && { discriminatorValue: String(meta.discriminatorValue) }),
+    ...(meta.comment !== undefined && { comment: meta.comment }),
     constraints: buildConstraints(meta),
   };
 }
