@@ -113,7 +113,7 @@ export class Post {
 }
 ```
 
-Plain JSDoc text (no tag) becomes a description: text above a **class** describes the entity, and text above a **property** describes its column. When a property has no JSDoc, its `@Property({ comment })` value (the DDL column comment) is used as the column description instead.
+Plain JSDoc text (no tag) becomes a description: text above a **class** describes the entity, and text above a **property** describes its column. When a property has no JSDoc, its `@Property({ comment })` value (the DDL column comment) is used as the column description instead. Likewise, when a class has no JSDoc description, its `@Entity({ comment })` value (the DDL table comment, or `comment` on an `EntitySchema`) is used as the entity description.
 
 | Tag                 | Description                                         |
 | ------------------- | --------------------------------------------------- |

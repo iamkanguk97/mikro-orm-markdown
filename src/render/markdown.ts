@@ -105,8 +105,11 @@ function renderEntitySection(entity: EnrichedEntity): string {
   // and it is not otherwise visible (the ERD and heading use the class name).
   parts.push(`*Table: ${renderMarkdownInlineCode(entity.model.tableName)}*`);
 
-  if (entity.jsDoc?.description) {
-    parts.push(renderMarkdownBlockQuote(entity.jsDoc.description));
+  // Class-level JSDoc description wins; fall back to the @Entity({ comment }) table
+  // comment, mirroring the column-level JSDoc → @Property({ comment }) fallback.
+  const description = entity.jsDoc?.description ?? entity.model.comment;
+  if (description) {
+    parts.push(renderMarkdownBlockQuote(description));
   }
 
   // STI metadata note

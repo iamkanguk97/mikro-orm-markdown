@@ -28,6 +28,11 @@ import {
 import config from '../fixtures/mikro-orm.config.js';
 import typeOmittedConfig from '../fixtures/mikro-orm.type-omitted.config.js';
 import { CollisionEntity } from '../fixtures/source-identity/entity/CollisionEntity.js';
+import {
+  DescribedJsDocAddress,
+  TableCommentSoftDeletableBase,
+  TagOnlyJsDocAddress,
+} from '../fixtures/table-comment/Entities.js';
 import { inMemorySqliteOptions } from '../helpers/orm.js';
 import { COLLISION_DTO_SOURCE, COLLISION_ENTITY_SOURCE, fixturePath } from '../helpers/paths.js';
 import { makeTempDir } from '../helpers/temp-dir.js';
@@ -690,5 +695,51 @@ describe('resolveJsDocSources', () => {
     const result = resolveJsDocSources(['/src/User.ts'], undefined, onWarn);
     expect(result).toEqual(['/src/User.ts']);
     expect(onWarn).not.toHaveBeenCalled();
+  });
+});
+
+describe('generateMarkdown — table comment fallback', () => {
+  it('uses the table comment from real discovery as the description for decorator and schema entities', async () => {
+    // Fresh runtime-decorated classes have no source file, so no JSDoc: the
+    // table comment is the only description available.
+    class CommentedAccount {}
+    Entity({ comment: 'Each row represents a customer account' })(CommentedAccount);
+    PrimaryKey({ type: 'integer' })(CommentedAccount.prototype, 'id');
+
+    class UncommentedAccount {}
+    Entity()(UncommentedAccount);
+    PrimaryKey({ type: 'integer' })(UncommentedAccount.prototype, 'id');
+
+    const commentedSchema = new EntitySchema({
+      name: 'CommentedLedger',
+      comment: 'Append-only ledger entries',
+      properties: { id: { type: 'integer', primary: true } },
+    });
+
+    const md = await generateMarkdown({
+      orm: {
+        ...inMemorySqliteOptions([CommentedAccount, UncommentedAccount, commentedSchema]),
+        metadataProvider: ReflectMetadataProvider,
+      },
+      onWarn: () => {},
+    });
+
+    expect(md).toContain('*Table: `commented_account`*\n\n> Each row represents a customer account');
+    expect(md).toContain('*Table: `commented_ledger`*\n\n> Append-only ledger entries');
+    expect(md).toMatch(/\*Table: `uncommented_account`\*\n\n\| Column/);
+  });
+
+  // Regression: a real tag-only class JSDoc (`/** @namespace Core */`) parses to
+  // no description, so the table comment fills in while the tag still applies.
+  it('uses the table comment when the parsed class JSDoc carries only tags, and JSDoc text still wins', async () => {
+    const md = await generateMarkdown({
+      orm: inMemorySqliteOptions([TagOnlyJsDocAddress, DescribedJsDocAddress, TableCommentSoftDeletableBase]),
+    });
+
+    const core = md.slice(md.indexOf('## Core'));
+    expect(core).toContain('*Table: `tag_only_address`*\n\n> Each row represents a single postal address\n\n');
+    expect(core).toContain('*Table: `described_address`*\n\n> JSDoc description that must win over the table comment.');
+    expect(md).not.toContain('Table comment that must not render');
+    expect(md).not.toContain('@namespace');
   });
 });
