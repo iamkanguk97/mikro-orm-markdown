@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-11-04
+
+Raises the minimum supported Node.js version from 18.19.0 to **22.17.0**. Node 18 (end of life April 2025) and Node 20 (end of life April 2026) are no longer maintained upstream, and `commander` 15 — a runtime dependency since July 2026 — already required Node >= 22.12, so the old floor had not held for some time. 22.17.0 is also MikroORM 7's floor, so one number now covers both supported MikroORM majors ([#131](https://github.com/iamkanguk97/mikro-orm-markdown/pull/131)). Nothing changes in the generated output or the API; projects already on Node 22.17 or newer can upgrade without any code changes.
+
+### Changed
+
+- **BREAKING:** `engines.node` is now `>=22.17.0` (was `>=18.19.0`). Node 18 and 20 are no longer supported
+- The package smoke test always verifies both MikroORM v6 and v7 consumers (the "skip v7 below Node 22.17" branch is gone), and CI runs the consumer jobs on the exact floor (22.17.0) and the current LTS (24.x)
+- `@types/node` follows the new floor major (`^22`)
+- README (en/ko), CONTRIBUTING, AGENTS.md and the bug-report template state the new requirement
+
 ## [1.4.0] - 2026-11-04
 
 Entity descriptions now fall back to the table comment. When an entity class has no JSDoc description, the `comment` option from `@Entity({ comment })` (or `comment` on an `EntitySchema`) is rendered as the entity description in the Markdown section, mirroring the column-level fallback from `@Property({ comment })` that already existed ([#135](https://github.com/iamkanguk97/mikro-orm-markdown/issues/135)). Contributed by [@smailliwniloc](https://github.com/smailliwniloc).
