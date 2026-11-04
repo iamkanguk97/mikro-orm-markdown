@@ -11,6 +11,9 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       // Floors sit a few points under the measured baseline (recorded in #66)
       // so coverage noise passes but a meaningful regression fails the run.
+      // The src/cli.ts branch/function floors were re-based on 2026-11-04:
+      // Vitest 4's AST-aware remapping measures that file at 68% branches and
+      // 81% functions (was 83% / 87% under Vitest 2) with no code change.
       thresholds: {
         statements: 90,
         branches: 89,
@@ -18,8 +21,8 @@ export default defineConfig({
         lines: 90,
         'src/cli.ts': {
           statements: 65,
-          branches: 75,
-          functions: 80,
+          branches: 65,
+          functions: 75,
           lines: 65,
         },
       },

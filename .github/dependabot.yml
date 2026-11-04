@@ -17,6 +17,18 @@ updates:
       # (Node 22) so src/ cannot compile against newer Node APIs.
       - dependency-name: '@types/node'
         update-types: ['version-update:semver-major']
+      # Vitest 5 runs on Vite 8, whose oxc transformer imports the legacy
+      # decorator helper from a virtual module instead of inlining it. MikroORM
+      # derives each entity's source path from the __decorate stack frame, so
+      # every decorator fixture resolves to that virtual id and metadata loading
+      # fails (57 tests). Stay on Vitest 4 / Vite 7 until MikroORM copes with
+      # it, then drop these three entries and the explicit vite devDependency.
+      - dependency-name: 'vitest'
+        update-types: ['version-update:semver-major']
+      - dependency-name: '@vitest/*'
+        update-types: ['version-update:semver-major']
+      - dependency-name: 'vite'
+        update-types: ['version-update:semver-major']
     groups:
       mikro-orm:
         patterns:
@@ -31,6 +43,7 @@ updates:
         patterns:
           - 'vitest'
           - '@vitest/*'
+          - 'vite'
       production-dependencies:
         dependency-type: 'production'
         patterns:
