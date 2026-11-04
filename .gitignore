@@ -13,3 +13,6 @@ ERD.md
 
 # Claude Code personal settings
 .claude/settings.local.json
+
+# Local probe scripts (never committed)
+.probe/
