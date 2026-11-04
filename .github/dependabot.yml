@@ -29,6 +29,16 @@ updates:
         update-types: ['version-update:semver-major']
       - dependency-name: 'vite'
         update-types: ['version-update:semver-major']
+      # tsup 9 requires Node >=22.18 to run, one patch line above the Node
+      # >=22.17.0 floor the package promises. Keep the contributor toolchain on
+      # the same floor as consumers: stay on tsup 8 until the floor moves.
+      - dependency-name: 'tsup'
+        update-types: ['version-update:semver-major']
+      # TypeScript 7 (the Go compiler) ships no JavaScript compiler API (its
+      # main export is lib/version.cjs), so tsup's DTS build cannot run on it.
+      # Keep TypeScript below 7 until tsup supports the native compiler.
+      - dependency-name: 'typescript'
+        versions: ['>=7.0.0']
     groups:
       mikro-orm:
         patterns:
