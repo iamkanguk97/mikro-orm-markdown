@@ -1,8 +1,9 @@
 ---
 // Home hero (overrides Starlight's Hero). Instead of a logo image it shows what the
-// tool does: an entity file next to the ERD generated from it, joined by the command
-// that produces it. Title, tagline, and actions still come from the page frontmatter.
-import { Code, LinkButton } from '@astrojs/starlight/components';
+// tool does: the entity files next to the ERD generated from them, joined by the command
+// that produces it. ERD_SOURCE mirrors the CLI's real output for these two entities;
+// only `direction LR` is added so the boxes sit side by side in the demo pane. Title, tagline, and actions still come from the page frontmatter.
+import { Code, LinkButton, TabItem, Tabs } from '@astrojs/starlight/components';
 import type { StarlightRouteData } from '@astrojs/starlight/route-data';
 import Mermaid from './Mermaid.astro';
 
@@ -18,7 +19,7 @@ const actions: NonNullable<HeroData['actions']> = hero.actions ?? [];
 const INSTALL_COMMAND = 'npm install -D mikro-orm-markdown';
 const RUN_COMMAND = 'npx mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md';
 
-const ENTITY_SOURCE = `/**
+const POST_SOURCE = `/**
  * Blog post authored by a registered user.
  * @namespace Blog
  */
@@ -38,13 +39,29 @@ export class Post {
   author!: Author;
 }`;
 
+const AUTHOR_SOURCE = `/**
+ * Registered user who writes posts.
+ * @namespace Blog
+ */
+@Entity()
+export class Author {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  @Property({ type: 'string' })
+  name!: string;
+
+  @Property({ type: 'string', unique: true })
+  email!: string;
+}`;
+
 const ERD_SOURCE = `erDiagram
   direction LR
   Post {
     integer id PK
     string title
     string body
-    integer author_id FK
+    integer author_id
   }
   Author {
     integer id PK
@@ -75,7 +92,14 @@ const ERD_SOURCE = `erDiagram
   <figure class="home-demo not-content">
     <div class="home-demo-panes">
       <div class="home-demo-pane home-demo-input">
-        <Code code={ENTITY_SOURCE} lang="ts" title="post.entity.ts" mark={[17, 18]} />
+        <Tabs>
+          <TabItem label="post.entity.ts">
+            <Code code={POST_SOURCE} lang="ts" mark={[17, 18]} />
+          </TabItem>
+          <TabItem label="author.entity.ts">
+            <Code code={AUTHOR_SOURCE} lang="ts" />
+          </TabItem>
+        </Tabs>
       </div>
       <div class="home-demo-pane home-demo-output">
         <p class="home-demo-file">ERD.md</p>

@@ -439,6 +439,43 @@ starlight-tabs [role="tab"] {
   background: var(--site-color-mark);
 }
 
+/* Entity file tabs: same height and type as the "ERD.md" bar beside them, and every
+   panel stacked in one grid cell so switching files does not resize the demo. */
+.home-demo-input starlight-tabs {
+  display: grid;
+}
+
+.home-demo-input [role="tablist"] {
+  min-height: calc(2.5rem + 1px);
+  border-bottom-width: 1px;
+}
+
+.home-demo-input .tab {
+  display: flex;
+}
+
+/* Starlight draws the active tab line as an outer shadow below the tab, which the
+   scrolling tablist wrapper clips here; draw it inside the tab instead. */
+.home-demo-input [role="tab"] {
+  padding-inline: 1rem;
+  font-size: var(--sl-text-sm);
+  box-shadow: inset 0 -2px 0 var(--sl-tab-color-border);
+}
+
+.home-demo-input [role="tab"]:not([aria-selected="true"]) {
+  --sl-tab-color-border: transparent;
+}
+
+.home-demo-input [role="tabpanel"] {
+  grid-area: 2 / 1;
+  margin-top: 0;
+}
+
+.home-demo-input [role="tabpanel"][hidden] {
+  display: block;
+  visibility: hidden;
+}
+
 .home-demo-output {
   display: grid;
   grid-template-rows: auto 1fr;
