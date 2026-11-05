@@ -1,0 +1,13 @@
+---
+// A diagram rendered in the browser by src/scripts/mermaid.ts.
+interface Props {
+  code: string;
+}
+const { code }: Props = Astro.props;
+---
+
+<div class="mermaid-diagram not-content" data-mermaid={code.trim()}></div>
+
+<script>
+  import '../scripts/mermaid';
+</script>

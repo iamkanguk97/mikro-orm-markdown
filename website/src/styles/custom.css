@@ -1,0 +1,109 @@
+/* Brand: the green from assets/logo.png. Starlight's default (no attribute) is dark. */
+:root {
+  --sl-color-accent-low: #0f3a1f;
+  --sl-color-accent: #34a35b;
+  --sl-color-accent-high: #b9e6c8;
+}
+
+:root[data-theme="light"] {
+  --sl-color-accent-low: #cdeed8;
+  --sl-color-accent: #1f7a3d;
+  --sl-color-accent-high: #0e3b1d;
+}
+
+/* Home hero: the logo artwork has a white background, so frame it as a card. */
+.hero img {
+  border-radius: 1rem;
+  background: #fff;
+  padding: 1rem;
+  box-shadow: var(--sl-shadow-md);
+}
+
+/* Mermaid diagrams (src/scripts/mermaid.ts) */
+.mermaid-diagram {
+  overflow-x: auto;
+  padding: 1rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.5rem;
+  background: var(--sl-color-bg-nav);
+  text-align: center;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Home: entity code next to the ERD it produces */
+.input-output {
+  display: grid;
+  gap: 1rem;
+  align-items: start;
+}
+
+/* Let long code lines scroll inside the block instead of widening the page. */
+.input-output > * {
+  min-width: 0;
+}
+
+@media (min-width: 60rem) {
+  .input-output {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Examples page: widen the content column for the side-by-side panes. */
+:root:has(.scenario-viewer) {
+  --sl-content-width: 90rem;
+}
+
+.scenario-blurb {
+  color: var(--sl-color-gray-2);
+}
+
+.scenario-panes {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 72rem) {
+  .scenario-panes {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.scenario-pane {
+  min-width: 0;
+}
+
+.sl-markdown-content .scenario-pane-title {
+  margin-top: 0;
+  font-size: var(--sl-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sl-color-gray-3);
+}
+
+/* The generated document is a full page of its own; scale its headings down. */
+.scenario-output {
+  min-width: 0;
+  max-height: 80rem;
+  overflow: auto;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.5rem;
+}
+
+.sl-markdown-content .scenario-output h1 {
+  margin-top: 0;
+  font-size: var(--sl-text-2xl);
+}
+
+.sl-markdown-content .scenario-output h2 {
+  font-size: var(--sl-text-xl);
+}
+
+.sl-markdown-content .scenario-output h3 {
+  font-size: var(--sl-text-lg);
+}
