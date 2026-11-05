@@ -10,10 +10,11 @@ export default defineConfig({
     starlight({
       title: 'mikro-orm-markdown',
       description: 'Mermaid ERD and Markdown schema docs generated from MikroORM entities.',
-      logo: { src: './src/assets/mark.svg' },
+      logo: { light: './src/assets/mark.svg', dark: './src/assets/mark-dark.svg' },
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
       components: {
+        Hero: './src/components/Hero.astro',
         SocialIcons: './src/components/SocialIcons.astro',
         ThemeSelect: './src/components/ThemeToggle.astro',
       },
@@ -49,7 +50,20 @@ export default defineConfig({
         'troubleshooting',
         'examples',
       ],
-      customCss: ['./src/styles/custom.css'],
+      expressiveCode: {
+        styleOverrides: { borderRadius: '0.375rem' },
+      },
+      customCss: [
+        '@fontsource/ibm-plex-sans/400.css',
+        '@fontsource/ibm-plex-sans/500.css',
+        '@fontsource/ibm-plex-sans/600.css',
+        '@fontsource/ibm-plex-sans-kr/400.css',
+        '@fontsource/ibm-plex-sans-kr/500.css',
+        '@fontsource/ibm-plex-sans-kr/600.css',
+        '@fontsource/ibm-plex-mono/400.css',
+        '@fontsource/ibm-plex-mono/500.css',
+        './src/styles/custom.css',
+      ],
     }),
   ],
 });

@@ -4,11 +4,8 @@ description: Generate Mermaid ER diagrams and Markdown schema documentation from
 template: splash
 hero:
   tagline: Mermaid ERD and Markdown schema docs, generated straight from your MikroORM entities. No database connection required.
-  image:
-    file: ../../assets/logo-mark.png
-    alt: mikro-orm-markdown logo — a database, the MikroORM mark, and an ERD document
   actions:
-    - text: Get Started
+    - text: Get started
       link: /mikro-orm-markdown/getting-started/overview/
       icon: right-arrow
     - text: See examples
@@ -16,74 +13,41 @@ hero:
       variant: minimal
 ---
 
-import { Card, CardGrid, Code } from '@astrojs/starlight/components';
-import Mermaid from '../../components/Mermaid.astro';
+## What you get
 
-## Why mikro-orm-markdown
+<dl class="home-features">
+  <div>
+    <dt>An ERD and column tables</dt>
+    <dd>
+      A Mermaid ER diagram plus per-entity tables with real DB column names, keys, nullability,
+      descriptions, indexes, and constraints.
+    </dd>
+  </div>
+  <div>
+    <dt>Driven by JSDoc</dt>
+    <dd>
+      Descriptions, sections (`@namespace`, `@erd`, `@describe`), and visibility (`@hidden`) come
+      from the comments already in your entity files.
+    </dd>
+  </div>
+  <div>
+    <dt>MikroORM-aware</dt>
+    <dd>
+      Embeddables, single table inheritance, `@Formula`, and `EntitySchema` / `defineEntity()`
+      entities render as first-class concepts.
+    </dd>
+  </div>
+  <div>
+    <dt>No database needed</dt>
+    <dd>
+      Reads entity metadata through MikroORM discovery. Works with MikroORM 6 and 7 on SQLite,
+      PostgreSQL, MySQL, and MariaDB drivers.
+    </dd>
+  </div>
+</dl>
 
-<CardGrid>
-  <Card title="ERD + column tables" icon="document">
-    A Mermaid ER diagram plus per-entity tables with real DB column names, keys, nullability,
-    descriptions, indexes, and constraints.
-  </Card>
-  <Card title="Driven by JSDoc" icon="pencil">
-    Descriptions, sections (`@namespace`, `@erd`, `@describe`), and visibility (`@hidden`) come
-    from the comments already in your entity files.
-  </Card>
-  <Card title="MikroORM-aware" icon="puzzle">
-    Embeddables, single table inheritance, `@Formula`, and `EntitySchema` / `defineEntity()`
-    entities render as first-class concepts.
-  </Card>
-  <Card title="No database needed" icon="rocket">
-    Reads entity metadata through MikroORM discovery. Works with MikroORM 6 and 7 on SQLite,
-    PostgreSQL, MySQL, and MariaDB drivers.
-  </Card>
-</CardGrid>
+## Where to go next
 
-## From entity to diagram
-
-<div class="input-output">
-<Code
-  title="post.entity.ts"
-  lang="ts"
-  code={`/**
- * Blog post authored by a registered user.
- * @namespace Blog
- */
-@Entity()
-export class Post {
-  @PrimaryKey({ type: 'integer' })
-  id!: number;
-
-  /** Post title */
-  @Property({ type: 'string' })
-  title!: string;
-
-  @Property({ type: 'text', nullable: true })
-  body?: string;
-
-  @ManyToOne({ entity: () => Author })
-  author!: Author;
-}`}
-/>
-<Mermaid
-  code={`erDiagram
-  Post {
-    integer id PK
-    string title
-    string body
-    integer author_id FK
-  }
-  Author {
-    integer id PK
-    string name
-    string email UK
-  }
-  Post }o--|| Author : "author"`}
-/>
-</div>
-
-```bash
-npm install -D mikro-orm-markdown
-npx mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md
-```
+- [Quick start](/mikro-orm-markdown/getting-started/quick-start/) — add a script and generate your first `ERD.md`.
+- [CLI options](/mikro-orm-markdown/reference/cli/) — every flag, with defaults.
+- [Examples](/mikro-orm-markdown/examples/) — real documents generated from sample entities.

@@ -1,0 +1,90 @@
+---
+// Home hero (overrides Starlight's Hero). Instead of a logo image it shows what the
+// tool does: an entity file next to the ERD generated from it, joined by the command
+// that produces it. Title, tagline, and actions still come from the page frontmatter.
+import { Code, LinkButton } from '@astrojs/starlight/components';
+import type { StarlightRouteData } from '@astrojs/starlight/route-data';
+import Mermaid from './Mermaid.astro';
+
+type PageData = StarlightRouteData['entry']['data'];
+type HeroData = NonNullable<PageData['hero']>;
+
+const page: PageData = Astro.locals.starlightRoute.entry.data;
+const hero: Partial<HeroData> = page.hero ?? {};
+const title: string = hero.title ?? page.title;
+const tagline: string | undefined = hero.tagline;
+const actions: NonNullable<HeroData['actions']> = hero.actions ?? [];
+
+const INSTALL_COMMAND = 'npm install -D mikro-orm-markdown';
+const RUN_COMMAND = 'npx mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md';
+
+const ENTITY_SOURCE = `/**
+ * Blog post authored by a registered user.
+ * @namespace Blog
+ */
+@Entity()
+export class Post {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  /** Post title */
+  @Property({ type: 'string' })
+  title!: string;
+
+  @Property({ type: 'text', nullable: true })
+  body?: string;
+
+  @ManyToOne({ entity: () => Author })
+  author!: Author;
+}`;
+
+const ERD_SOURCE = `erDiagram
+  direction LR
+  Post {
+    integer id PK
+    string title
+    string body
+    integer author_id FK
+  }
+  Author {
+    integer id PK
+    string name
+    string email UK
+  }
+  Post }o--|| Author : "author"`;
+---
+
+<div class="home-hero">
+  <div class="home-hero-copy">
+    <h1 id="_top" data-page-title set:html={title} />
+    {tagline && <p class="home-hero-tagline" set:html={tagline} />}
+    <div class="home-hero-actions">
+      {
+        actions.map(({ link: href, text, variant, icon }) => (
+          <LinkButton href={href} variant={variant} icon={icon?.name}>
+            {text}
+          </LinkButton>
+        ))
+      }
+    </div>
+    <div class="home-hero-install">
+      <Code code={INSTALL_COMMAND} lang="bash" frame="none" />
+    </div>
+  </div>
+
+  <figure class="home-demo not-content">
+    <div class="home-demo-panes">
+      <div class="home-demo-pane home-demo-input">
+        <Code code={ENTITY_SOURCE} lang="ts" title="post.entity.ts" mark={[17, 18]} />
+      </div>
+      <div class="home-demo-pane home-demo-output">
+        <p class="home-demo-file">ERD.md</p>
+        <Mermaid code={ERD_SOURCE} />
+      </div>
+    </div>
+    <figcaption class="home-demo-command">
+      <span aria-hidden="true">$</span>
+      <code>{RUN_COMMAND}</code>
+    </figcaption>
+  </figure>
+</div>
