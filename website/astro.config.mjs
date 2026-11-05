@@ -54,12 +54,7 @@ export default defineConfig({
         styleOverrides: { borderRadius: '0.375rem' },
       },
       customCss: [
-        '@fontsource/ibm-plex-sans/400.css',
-        '@fontsource/ibm-plex-sans/500.css',
-        '@fontsource/ibm-plex-sans/600.css',
-        '@fontsource/ibm-plex-sans-kr/400.css',
-        '@fontsource/ibm-plex-sans-kr/500.css',
-        '@fontsource/ibm-plex-sans-kr/600.css',
+        'pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css',
         '@fontsource/ibm-plex-mono/400.css',
         '@fontsource/ibm-plex-mono/500.css',
         './src/styles/custom.css',

@@ -4,8 +4,8 @@
    Starlight's default (no attribute) is dark; light overrides follow.
    ------------------------------------------------------------------------- */
 :root {
-  --sl-font: "IBM Plex Sans", "IBM Plex Sans KR";
-  --sl-font-mono: "IBM Plex Mono", "IBM Plex Sans KR";
+  --sl-font: "Pretendard Variable";
+  --sl-font-mono: "IBM Plex Mono", "Pretendard Variable";
   --sl-line-height: 1.7;
 
   --sl-color-white: #f2f5fa;
@@ -86,9 +86,16 @@ h1[data-page-title] {
   border-bottom-color: var(--sl-color-gray-5);
 }
 
+/* Keep the mark and the name close and matched in weight so they read as one logo. */
 .site-title {
+  gap: 0.625rem;
   color: var(--sl-color-white);
+  font-size: var(--sl-text-xl);
   font-weight: 600;
+}
+
+.site-title img {
+  height: 2rem;
 }
 
 /* On phones the title shares a row with search and the menu button; keep it whole. */

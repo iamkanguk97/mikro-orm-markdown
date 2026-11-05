@@ -40,7 +40,7 @@ function themeVariables(): Record<string, string> {
     nodeTextColor: colors.textColor,
     tertiaryColor: colors.background,
     edgeLabelBackground: colors.background,
-    fontFamily: "'IBM Plex Sans', 'IBM Plex Sans KR', sans-serif",
+    fontFamily: "'Pretendard Variable', sans-serif",
     fontSize: '14px',
   };
 }
