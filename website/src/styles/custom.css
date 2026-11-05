@@ -467,13 +467,26 @@ starlight-tabs [role="tab"] {
 }
 
 .home-demo-input [role="tabpanel"] {
+  display: flex;
   grid-area: 2 / 1;
   margin-top: 0;
 }
 
 .home-demo-input [role="tabpanel"][hidden] {
-  display: block;
+  display: flex;
   visibility: hidden;
+}
+
+/* Stretch the shorter file's code block to the panel height so the space below it
+   keeps the code background instead of showing the sheet color. */
+.home-demo-input [role="tabpanel"] :is(.expressive-code, .frame) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.home-demo-input [role="tabpanel"] pre {
+  flex: 1;
 }
 
 .home-demo-output {
