@@ -13,7 +13,7 @@ Use the CLI or TypeScript API to document entity columns, relations, indexes, co
 [![CI](https://github.com/iamkanguk97/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/iamkanguk97/mikro-orm-markdown/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[한국어 문서](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/README.ko.md)
+**[Documentation](https://iamkanguk97.github.io/mikro-orm-markdown/)** · [한국어 문서](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/README.ko.md)
 
 See the [MikroORM ERD example output](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/examples/ERD.md).
 

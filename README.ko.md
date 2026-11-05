@@ -13,7 +13,7 @@ CLI 또는 TypeScript API로 실행 중인 데이터베이스 연결 없이 엔�
 [![CI](https://github.com/iamkanguk97/mikro-orm-markdown/actions/workflows/ci.yml/badge.svg)](https://github.com/iamkanguk97/mikro-orm-markdown/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-[English](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/README.md)
+**[문서 사이트](https://iamkanguk97.github.io/mikro-orm-markdown/ko/)** · [English](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/README.md)
 
 [MikroORM ERD 예시 출력](https://github.com/iamkanguk97/mikro-orm-markdown/blob/main/examples/ERD.md)을 확인하실 수 있습니다.
 
