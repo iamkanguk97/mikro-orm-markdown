@@ -54,6 +54,14 @@ export interface GenerateMarkdownOptions {
    * is prepended to each erDiagram fence. Omit to preserve default viewer behavior.
    */
   mermaid?: MermaidRenderOptions;
+  /**
+   * DB column names to omit from every entity's ERD box and column table,
+   * e.g. shared audit columns like `['created_at', 'updated_at']`. Matching is
+   * exact. Excluding all columns of a foreign key also removes its relation
+   * edge. Index, unique, and check constraints are always kept, even when they
+   * cover an excluded column.
+   */
+  excludeColumns?: string[];
 }
 
 /** File extensions produced by a TypeScript build, where comments are stripped. */
@@ -335,7 +343,7 @@ async function loadEntityMetadataWithTsMorphFallback(
  * ```
  */
 export async function generateMarkdown(options: GenerateMarkdownOptions): Promise<string> {
-  const { orm, title = DEFAULT_TITLE, description, src, onWarn, mermaid } = options;
+  const { orm, title = DEFAULT_TITLE, description, src, onWarn, mermaid, excludeColumns } = options;
 
   const effectiveOrm = await withTsMorphMetadataProvider(orm);
   const loaded = await loadEntityMetadataWithTsMorphFallback(orm, effectiveOrm, onWarn);
@@ -362,7 +370,7 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
     assertExplicitJsDocSourcesMatched(jsDocResult, src);
     assertExplicitEntityJsDocSourceCoverage(metas, jsDocResult, schemaEntityClassNames, onWarn);
   }
-  const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn);
+  const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn, excludeColumns);
   if (explicitSrc) {
     assertExplicitEmbeddableJsDocSourceCoverage(jsDocResult, docModel);
   }

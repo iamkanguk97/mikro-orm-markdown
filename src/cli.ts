@@ -20,6 +20,7 @@ interface CliOptions {
   description?: string;
   tsconfig?: string;
   src?: string[];
+  excludeColumns?: string[];
   mermaidLayout?: MermaidLayout;
   mermaidTheme?: MermaidTheme;
 }
@@ -383,6 +384,14 @@ function parseMermaidOptions(opts: CliOptions): MermaidRenderOptions | undefined
   };
 }
 
+/**
+ * Commander action for the CLI: loads the MikroORM config, forwards the parsed
+ * flags to `generateMarkdown`, and writes the document atomically to `--out`.
+ *
+ * Each stage reports its own failure on stderr and exits with code 1. The tsx
+ * loader is kept registered through generation (entity discovery may import
+ * `.ts` entity files) and unregistered before writing.
+ */
 async function run(opts: CliOptions): Promise<void> {
   const configPath = path.resolve(opts.config);
   const outPath = path.resolve(opts.out);
@@ -403,6 +412,7 @@ async function run(opts: CliOptions): Promise<void> {
       title: opts.title,
       ...(opts.description !== undefined && { description: opts.description }),
       ...(opts.src !== undefined && { src: opts.src }),
+      ...(opts.excludeColumns !== undefined && { excludeColumns: opts.excludeColumns }),
       ...(mermaid !== undefined && { mermaid }),
       onWarn: (message: string, warning?: StructuredMessage): void =>
         void process.stderr.write(formatCliWarning(message, warning)),
@@ -439,6 +449,10 @@ const program = new Command()
   .option(
     '--src <paths...>',
     'Source .ts file globs to read JSDoc from when entities run from compiled .js (comments are stripped at build time)'
+  )
+  .option(
+    '--exclude-columns <names...>',
+    'DB column names to omit from every ERD box and column table (exact match; constraints are kept)'
   )
   .addOption(
     new Option(

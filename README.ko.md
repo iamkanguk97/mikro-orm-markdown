@@ -89,10 +89,24 @@ npm run erd
 | `-d, --description <string>` | —           | 제목 아래에 표시할 설명 문단 (선택)                                   |
 | `--tsconfig <path>`    | —                 | `.ts` config 로드 시 사용할 `tsconfig.json`; 기본값은 config 파일 근처의 가장 가까운 파일 |
 | `--src <paths...>`     | —                 | 원본 TypeScript 엔티티 소스 경로/glob; MikroORM이 컴파일된 JavaScript에서 엔티티를 discovery할 때만 필요 |
+| `--exclude-columns <names...>` | —         | 모든 엔티티에서 생략할 DB 컬럼 이름. [컬럼 제외](#컬럼-제외) 참고. |
 | `--mermaid-layout <layout>` | —           | Mermaid 레이아웃 엔진 (`dagre\|elk\|elk.stress`). 생략하면 뷰어 기본값 사용. |
 | `--mermaid-theme <theme>`   | —           | Mermaid 테마 (`default\|neutral\|dark\|forest\|base`). 생략하면 뷰어 기본값 사용. |
 
 > 설명이 길거나 여러 줄이라면 CLI 대신 [프로그래밍 API](#프로그래밍-api)를 사용하세요 — 쉘 인용 부호 제약 없이 문자열을 그대로 전달할 수 있습니다.
+
+### 컬럼 제외
+
+공통 base 엔티티에서 상속한 감사(audit) 컬럼(`created_at`, `updated_at` 등)은 모든 테이블에 반복됩니다. DB 컬럼 이름을 나열하면 모든 ERD 박스와 컬럼 표에서 제외됩니다:
+
+```bash
+mikro-orm-markdown --config ./mikro-orm.config.ts --exclude-columns created_at updated_at deleted_at
+```
+
+- 이름은 TypeScript 프로퍼티 이름이 아니라 출력에 표시되는 DB 컬럼 이름과 정확히 일치해야 합니다. `address_street` 같은 펼쳐진 embedded 컬럼도 지정할 수 있습니다.
+- 외래 키 컬럼을 제외하면 ERD에서 해당 관계선도 함께 제거됩니다. 복합 외래 키는 모든 컬럼을 나열해야 하며, 일부만 나열하면 해당 키는 그대로 두고 warning을 출력합니다.
+- `@erd`로 다른 namespace의 다이어그램에 포함된 엔티티는 그곳에서 기본 키 컬럼만 표시됩니다. 기본 키 컬럼을 모두 제외하면(예: `--exclude-columns id`) 해당 엔티티와 관계선이 다른 namespace의 다이어그램에서 제거되며, 엔티티 자신의 섹션에서는 제외된 컬럼만 빠집니다.
+- 인덱스, unique, check 제약 조건은 제외된 컬럼을 포함하더라도 항상 유지됩니다. 실제 스키마를 설명하는 정보이므로, `deleted_at`을 제외해도 `UNIQUE (email, deleted_at)`은 그대로 표시됩니다.
 
 ## JSDoc 태그
 
@@ -417,6 +431,7 @@ await writeFile('./ERD.md', markdown, 'utf-8');
 | `src` | 원본 TypeScript 엔티티 소스 경로/glob입니다. `orm.entities`가 컴파일된 JavaScript를 discovery할 때만 필요합니다. |
 | `onWarn` | 컴파일된 JavaScript에서 JSDoc을 읽지 못하는 상황 같은 non-fatal warning을 받을 callback입니다. 첫 번째 인자는 항상 일반 문자열 메시지입니다. 두 번째 파라미터를 선언한 callback은 긴 안내형 warning에서 `{ title, detail, impact, fix }` 구조의 객체를 추가로 받으며, `console.warn`처럼 가변 인자 로거를 그대로 전달한 경우에는 문자열만 받습니다. |
 | `mermaid` | Mermaid 렌더링 옵션입니다. 아래 [Mermaid 렌더링 옵션](#mermaid-렌더링-옵션)을 참고하세요. |
+| `excludeColumns` | 모든 엔티티에서 생략할 DB 컬럼 이름 목록입니다 (예: `['created_at', 'updated_at']`). [컬럼 제외](#컬럼-제외)를 참고하세요. |
 
 MikroORM config를 비동기적으로 만들어야 한다면 직접 resolve한 뒤 결과 options object를 전달하세요:
 

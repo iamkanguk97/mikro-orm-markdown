@@ -743,3 +743,31 @@ describe('generateMarkdown — table comment fallback', () => {
     expect(md).not.toContain('@namespace');
   });
 });
+
+describe('generateMarkdown — excludeColumns', () => {
+  it('omits listed columns from the ERD and column tables, drops the FK edge, and keeps constraints', async () => {
+    const baseline = await generateMarkdown({ orm: config });
+    const md = await generateMarkdown({ orm: config, excludeColumns: ['body', 'author_id', 'address_zip_code'] });
+
+    // Sanity: the fixture really renders these lines without the option.
+    expect(baseline).toContain('    integer author_id');
+    expect(baseline).toContain('Post }|--|| Author : "author"');
+    expect(baseline).toContain('| address_zip_code |');
+
+    // Scalar, FK, and flattened embedded columns are gone from both renderers.
+    expect(md).not.toContain('    string body');
+    expect(md).not.toContain('| body |');
+    expect(md).not.toContain('    integer author_id');
+    expect(md).not.toContain('| author_id |');
+    expect(md).not.toContain('    string address_zip_code');
+    expect(md).not.toContain('| address_zip_code |');
+
+    // The excluded FK's edge is removed; unrelated edges and columns stay.
+    expect(md).not.toContain('Post }|--|| Author : "author"');
+    expect(md).toContain('Post }o--o{ Tag : "tags"');
+    expect(md).toContain('| address_street |');
+
+    // Constraints describe the real schema and are kept.
+    expect(md).toContain('- Index: (author_id)');
+  });
+});

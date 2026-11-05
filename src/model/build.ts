@@ -46,6 +46,8 @@ export interface DocumentModel {
  * result into namespace groups for rendering.
  *
  * Entities with @hidden are excluded.
+ * Columns whose DB name is listed in `excludeColumns` are dropped (exact match);
+ * see `excludeConfiguredColumns` for the FK and constraint rules.
  * Entities with no namespace tags fall into the "default" group.
  * Groups are ordered alphabetically, with "default" always last.
  */
@@ -54,12 +56,15 @@ export function buildDocumentModel(
   jsDocResult: JsDocResult,
   title: string,
   description?: string,
-  onWarn?: WarnHandler
+  onWarn?: WarnHandler,
+  excludeColumns: readonly string[] = []
 ): DocumentModel {
   const { entities: diagramEntities, relations } = buildDiagramModel(metas);
   const metadataByClass = new Map(metas.map((meta) => [meta.className, meta]));
-  const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props, onWarn);
   const hiddenClasses = collectHiddenClasses(diagramEntities, jsDocResult);
+  const excludedFieldNames = new Set(excludeColumns);
+  // Keys (see relationEdgeKey) of edges whose FK columns were all excluded.
+  const excludedEdgeKeys = new Set<string>();
 
   // Build enriched entity map, filtering out @hidden entities.
   const enrichedByClass = new Map<string, EnrichedEntity>();
@@ -68,11 +73,26 @@ export function buildDocumentModel(
     if (jsDoc?.hidden) {
       continue;
     }
-    enrichedByClass.set(
-      model.className,
-      buildEnrichedEntity(model, jsDoc, jsDocResult, metadataByClass, hiddenClasses)
+    // @hidden-target FK pruning runs on the full model first: it also drops the
+    // constraints on those FK columns, which it could not find once exclusion
+    // had already removed the columns.
+    const enriched = buildEnrichedEntity(model, jsDoc, jsDocResult, metadataByClass, hiddenClasses);
+    const { model: trimmedModel, removedRelationLabels } = excludeConfiguredColumns(
+      enriched.model,
+      excludedFieldNames,
+      onWarn
     );
+    for (const label of removedRelationLabels) {
+      excludedEdgeKeys.add(relationEdgeKey(model.className, label));
+    }
+    enrichedByClass.set(model.className, { ...enriched, model: trimmedModel });
   }
+
+  // @atLeastOne is matched against the full edge list first, so excluding an
+  // FK column never turns a valid tag into a spurious "had no effect" warning.
+  const allRelations = applyAtLeastOne(relations, metas, jsDocResult.props, onWarn).filter(
+    (edge) => !excludedEdgeKeys.has(relationEdgeKey(edge.fromEntity, edge.label))
+  );
 
   const groups: NamespaceGroup[] = [];
   for (const groupName of collectGroupNames(enrichedByClass.values())) {
@@ -106,6 +126,73 @@ function collectHiddenClasses(diagramEntities: EntityModel[], jsDocResult: JsDoc
     }
   }
   return hiddenClasses;
+}
+
+/** Identifies a relation edge; edges are unique per owning entity and property name. */
+function relationEdgeKey(fromEntity: string, label: string): string {
+  return `${fromEntity}\0${label}`;
+}
+
+/**
+ * Drops columns whose DB column name is listed in `excludeColumns`.
+ *
+ * - Scalar and embedded columns are dropped on an exact field-name match.
+ * - An FK property is dropped only when every one of its columns is listed;
+ *   its relation edge is then reported back so the caller can remove it.
+ * - A composite FK with only some columns listed is left untouched and a
+ *   warning is emitted, rather than guessing what a half-hidden key means.
+ * - Constraints are deliberately kept: they describe the real schema, and
+ *   hiding `deleted_at` must not make `UNIQUE (email, deleted_at)` vanish.
+ */
+function excludeConfiguredColumns(
+  model: EntityModel,
+  excludedFieldNames: ReadonlySet<string>,
+  onWarn?: WarnHandler
+): { model: EntityModel; removedRelationLabels: string[] } {
+  if (excludedFieldNames.size === 0) {
+    return { model, removedRelationLabels: [] };
+  }
+
+  const foreignKeyColumnsByProp = new Map<string, ColumnModel[]>();
+  for (const column of model.columns) {
+    if (column.isForeignKey) {
+      const columns = foreignKeyColumnsByProp.get(column.propName) ?? [];
+      columns.push(column);
+      foreignKeyColumnsByProp.set(column.propName, columns);
+    }
+  }
+
+  const removedRelationLabels: string[] = [];
+  const partiallyExcludedProps = new Set<string>();
+  for (const [propName, columns] of foreignKeyColumnsByProp) {
+    const allFieldNames = columns.map((column) => column.fieldName);
+    const listedFieldNames = allFieldNames.filter((fieldName) => excludedFieldNames.has(fieldName));
+    if (listedFieldNames.length === 0) {
+      continue;
+    }
+    if (listedFieldNames.length === allFieldNames.length) {
+      removedRelationLabels.push(propName);
+      continue;
+    }
+    partiallyExcludedProps.add(propName);
+    emitWarning(onWarn, {
+      title: 'Composite foreign key partially excluded',
+      detail:
+        `excludeColumns lists only some columns (${listedFieldNames.join(', ')}) of the composite foreign key ` +
+        `${model.className}.${propName} (${allFieldNames.join(', ')}), so the property was left untouched.`,
+      impact: ['The listed columns and the relation edge still appear in the generated document.'],
+      fix: `List every column of the foreign key (${allFieldNames.join(', ')}) to exclude it, or none of them.`,
+    });
+  }
+
+  const columns = model.columns.filter(
+    (column) =>
+      !excludedFieldNames.has(column.fieldName) || (column.isForeignKey && partiallyExcludedProps.has(column.propName))
+  );
+  if (columns.length === model.columns.length) {
+    return { model, removedRelationLabels };
+  }
+  return { model: { ...model, columns }, removedRelationLabels };
 }
 
 /** Merges one diagram entity with its JSDoc, pruning columns and constraints that reference @hidden targets. */

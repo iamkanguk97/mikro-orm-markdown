@@ -4,7 +4,7 @@ import type { JsDocResult } from '../../src/docs/jsdoc.js';
 import { loadJsDoc } from '../../src/docs/jsdoc.js';
 import type { StructuredMessage } from '../../src/messages.js';
 import { loadEntityMetadata } from '../../src/metadata/load.js';
-import { buildDocumentModel } from '../../src/model/build.js';
+import { buildDocumentModel, type DocumentModel, type EnrichedEntity } from '../../src/model/build.js';
 import config from '../fixtures/mikro-orm.config.js';
 import { makeEntityMeta, makeSimpleEntityMeta, pkProperty } from '../helpers/entity-meta.js';
 import { makeJsDocResult } from '../helpers/jsdoc.js';
@@ -759,5 +759,289 @@ describe('buildDocumentModel — enriched entities', () => {
     const author = blog.textEntities.find((e) => e.model.className === 'Author')!;
     expect(author.propDocs.get('name')?.description).toBe('작성자 이름');
     expect(author.propDocs.get('email')?.description).toBe('이메일 주소');
+  });
+});
+
+describe('buildDocumentModel — excludeColumns', () => {
+  /** Scalar property whose DB column name differs from its property name (camelCase → snake_case). */
+  function scalarProperty(name: string, fieldName: string, type = 'datetime'): Record<string, unknown> {
+    return { name, fieldNames: [fieldName], type, kind: ReferenceKind.SCALAR };
+  }
+
+  function auditedEntityMeta(className: string, extra: Record<string, unknown> = {}): EntityMetadata {
+    return makeEntityMeta({
+      className,
+      tableName: className.toLowerCase(),
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        createdAt: scalarProperty('createdAt', 'created_at'),
+        updatedAt: scalarProperty('updatedAt', 'updated_at'),
+        ...extra,
+      },
+    });
+  }
+
+  function manyToOne(name: string, type: string, fieldNames: string[]): Record<string, unknown> {
+    return { name, fieldNames, type, kind: ReferenceKind.MANY_TO_ONE, referencedColumnNames: ['id'] };
+  }
+
+  function textEntity(docModel: DocumentModel, className: string): EnrichedEntity {
+    return docModel.groups.flatMap((g) => g.textEntities).find((e) => e.model.className === className)!;
+  }
+
+  function erdEntity(docModel: DocumentModel, className: string): EnrichedEntity {
+    return docModel.groups.flatMap((g) => g.erdEntities).find((e) => e.model.className === className)!;
+  }
+
+  function fieldNamesOf(entity: { model: { columns: { fieldName: string }[] } }): string[] {
+    return entity.model.columns.map((column) => column.fieldName);
+  }
+
+  it('drops listed DB columns from every entity in both the ERD and the text tables', () => {
+    const metas = [auditedEntityMeta('User'), auditedEntityMeta('Post')];
+
+    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', undefined, undefined, [
+      'created_at',
+      'updated_at',
+    ]);
+
+    for (const className of ['User', 'Post']) {
+      expect(fieldNamesOf(textEntity(docModel, className))).toEqual(['id']);
+      expect(fieldNamesOf(erdEntity(docModel, className))).toEqual(['id']);
+    }
+  });
+
+  it('matches DB column names exactly, not property names', () => {
+    const metas = [auditedEntityMeta('User')];
+
+    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', undefined, undefined, ['createdAt', 'updated']);
+
+    expect(fieldNamesOf(textEntity(docModel, 'User'))).toEqual(['id', 'created_at', 'updated_at']);
+  });
+
+  it('leaves the model untouched when the list is empty', () => {
+    const metas = [auditedEntityMeta('User')];
+
+    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', undefined, undefined, []);
+
+    expect(fieldNamesOf(textEntity(docModel, 'User'))).toEqual(['id', 'created_at', 'updated_at']);
+  });
+
+  it('removes an excluded FK column together with its relation edge', () => {
+    const user = makeSimpleEntityMeta('User');
+    const team = makeSimpleEntityMeta('Team');
+    const post = auditedEntityMeta('Post', {
+      createdBy: manyToOne('createdBy', 'User', ['created_by']),
+      team: manyToOne('team', 'Team', ['team_id']),
+    });
+
+    const docModel = buildDocumentModel([post, user, team], makeJsDocResult(), 'T', undefined, undefined, [
+      'created_by',
+    ]);
+
+    expect(fieldNamesOf(textEntity(docModel, 'Post'))).toEqual(['id', 'created_at', 'updated_at', 'team_id']);
+    const labels = docModel.groups.flatMap((g) => g.erdRelations).map((edge) => edge.label);
+    expect(labels).toEqual(['team']);
+  });
+
+  it('only removes the edge owned by the entity whose FK column was excluded', () => {
+    // Both entities have an FK property named "owner"; only Post's column is excluded.
+    const user = makeSimpleEntityMeta('User');
+    const post = auditedEntityMeta('Post', { owner: manyToOne('owner', 'User', ['post_owner_id']) });
+    const team = auditedEntityMeta('Team', { owner: manyToOne('owner', 'User', ['team_owner_id']) });
+
+    const docModel = buildDocumentModel([post, team, user], makeJsDocResult(), 'T', undefined, undefined, [
+      'post_owner_id',
+    ]);
+
+    const edges = docModel.groups.flatMap((g) => g.erdRelations);
+    expect(edges.map((edge) => `${edge.fromEntity}.${edge.label}`)).toEqual(['Team.owner']);
+  });
+
+  it('removes a composite FK and its edge when every one of its columns is listed', () => {
+    const tenantUser = makeEntityMeta({
+      className: 'TenantUser',
+      tableName: 'tenant_user',
+      primaryKeys: ['tenantId', 'id'],
+      properties: {
+        tenantId: { ...pkProperty('tenantId'), fieldNames: ['tenant_id'] },
+        id: pkProperty(),
+      },
+    });
+    const doc = makeEntityMeta({
+      className: 'Doc',
+      tableName: 'doc',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        author: manyToOne('author', 'TenantUser', ['author_tenant_id', 'author_id']),
+      },
+    });
+    const warnings: string[] = [];
+
+    const docModel = buildDocumentModel(
+      [doc, tenantUser],
+      makeJsDocResult(),
+      'T',
+      undefined,
+      (message) => warnings.push(message),
+      ['author_tenant_id', 'author_id']
+    );
+
+    expect(fieldNamesOf(textEntity(docModel, 'Doc'))).toEqual(['id']);
+    expect(docModel.groups.flatMap((g) => g.erdRelations)).toEqual([]);
+    expect(warnings).toEqual([]);
+  });
+
+  it('warns and leaves a composite FK untouched when only some of its columns are listed', () => {
+    const tenantUser = makeEntityMeta({
+      className: 'TenantUser',
+      tableName: 'tenant_user',
+      primaryKeys: ['tenantId', 'id'],
+      properties: {
+        tenantId: { ...pkProperty('tenantId'), fieldNames: ['tenant_id'] },
+        id: pkProperty(),
+      },
+    });
+    const doc = makeEntityMeta({
+      className: 'Doc',
+      tableName: 'doc',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        author: manyToOne('author', 'TenantUser', ['author_tenant_id', 'author_id']),
+      },
+    });
+    const calls: [string, StructuredMessage | undefined][] = [];
+
+    const docModel = buildDocumentModel(
+      [doc, tenantUser],
+      makeJsDocResult(),
+      'T',
+      undefined,
+      (message, warning) => calls.push([message, warning]),
+      ['author_tenant_id']
+    );
+
+    expect(fieldNamesOf(textEntity(docModel, 'Doc'))).toEqual(['id', 'author_tenant_id', 'author_id']);
+    expect(docModel.groups.flatMap((g) => g.erdRelations).map((edge) => edge.label)).toEqual(['author']);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.[0]).toContain('Doc.author');
+    expect(calls[0]?.[1]).toMatchObject({ title: 'Composite foreign key partially excluded' });
+    expect(calls[0]?.[1]?.detail).toContain('author_tenant_id');
+  });
+
+  it('keeps index, unique, and check constraints that cover an excluded column', () => {
+    const user = makeEntityMeta({
+      className: 'User',
+      tableName: 'user',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        email: scalarProperty('email', 'email', 'string'),
+        deletedAt: scalarProperty('deletedAt', 'deleted_at'),
+      },
+      indexes: [{ name: 'user_deleted_idx', properties: ['deletedAt'] }],
+      uniques: [{ name: 'user_email_live_uq', properties: ['email', 'deletedAt'] }],
+      checks: [{ name: 'user_deleted_check', expression: 'deleted_at > 0' }],
+    });
+
+    const withoutExclusion = buildDocumentModel([user], makeJsDocResult(), 'T');
+    const withExclusion = buildDocumentModel([user], makeJsDocResult(), 'T', undefined, undefined, ['deleted_at']);
+
+    expect(fieldNamesOf(textEntity(withExclusion, 'User'))).toEqual(['id', 'email']);
+    expect(textEntity(withExclusion, 'User').model.constraints).toEqual(
+      textEntity(withoutExclusion, 'User').model.constraints
+    );
+    expect(textEntity(withExclusion, 'User').model.constraints).toHaveLength(3);
+  });
+
+  it('drops an entity from a foreign @erd diagram when all of its primary-key columns are excluded', () => {
+    // A cross-namespace @erd box renders only PK columns; with none left it is removed, edges included.
+    const order = makeEntityMeta({
+      className: 'Order',
+      tableName: 'order',
+      primaryKeys: ['id'],
+      properties: { id: pkProperty(), customer: manyToOne('customer', 'Customer', ['customer_id']) },
+    });
+    const customer = makeSimpleEntityMeta('Customer');
+    const jsDoc = makeJsDocResult({
+      entities: new Map([
+        ['Order', { hidden: false, namespaces: ['Shop'], erdNamespaces: [], describeNamespaces: [] }],
+        ['Customer', { hidden: false, namespaces: ['Crm'], erdNamespaces: ['Shop'], describeNamespaces: [] }],
+      ]),
+    });
+
+    const docModel = buildDocumentModel([order, customer], jsDoc, 'T', undefined, undefined, ['id']);
+    const shop = docModel.groups.find((group) => group.name === 'Shop')!;
+    const crm = docModel.groups.find((group) => group.name === 'Crm')!;
+
+    expect(shop.erdEntities.map((entity) => entity.model.className)).toEqual(['Order']);
+    expect(shop.erdRelations).toEqual([]);
+    // Its home namespace still renders it, just without the excluded column.
+    expect(crm.erdEntities.map((entity) => entity.model.className)).toEqual(['Customer']);
+  });
+
+  it('still drops constraints on an FK to a @hidden entity when that FK column is also excluded', () => {
+    // The output must not depend on whether a hidden-target FK is also listed in excludeColumns.
+    const order = makeEntityMeta({
+      className: 'Order',
+      tableName: 'order',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        status: scalarProperty('status', 'status', 'string'),
+        secret: manyToOne('secret', 'Secret', ['secret_id']),
+      },
+      indexes: [
+        { name: 'order_secret_idx', properties: ['secret'] },
+        { name: 'order_status_idx', properties: ['status'] },
+      ],
+      uniques: [{ name: 'order_secret_uq', properties: ['secret_id'] }],
+    });
+    const jsDoc = makeJsDocResult({
+      entities: new Map([['Secret', { hidden: true, namespaces: [], erdNamespaces: [], describeNamespaces: [] }]]),
+    });
+    const metas = [order, makeSimpleEntityMeta('Secret')];
+
+    const hiddenOnly = buildDocumentModel(metas, jsDoc, 'T');
+    const hiddenAndExcluded = buildDocumentModel(metas, jsDoc, 'T', undefined, undefined, ['secret_id']);
+
+    expect(textEntity(hiddenAndExcluded, 'Order').model).toEqual(textEntity(hiddenOnly, 'Order').model);
+    expect(textEntity(hiddenAndExcluded, 'Order').model.constraints).toEqual([
+      { type: 'index', properties: ['status'], name: 'order_status_idx' },
+    ]);
+  });
+
+  it('does not report @atLeastOne as ineffective when its edge was removed by an excluded FK column', () => {
+    const parent = makeEntityMeta({
+      className: 'Parent',
+      tableName: 'parent',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        children: { name: 'children', type: 'Child', kind: ReferenceKind.ONE_TO_MANY, mappedBy: 'parent' },
+      },
+    });
+    const child = makeEntityMeta({
+      className: 'Child',
+      tableName: 'child',
+      primaryKeys: ['id'],
+      properties: { id: pkProperty(), parent: manyToOne('parent', 'Parent', ['parent_id']) },
+    });
+    const warnings: string[] = [];
+
+    const docModel = buildDocumentModel(
+      [parent, child],
+      createAtLeastOneJsDoc('Parent', 'children'),
+      'T',
+      undefined,
+      (message) => warnings.push(message),
+      ['parent_id']
+    );
+
+    expect(docModel.groups.flatMap((g) => g.erdRelations)).toEqual([]);
+    expect(warnings).toEqual([]);
   });
 });
