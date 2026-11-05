@@ -296,14 +296,19 @@ starlight-tabs [role="tab"] {
 /* ---------------------------------------------------------------------------
    Home
    ------------------------------------------------------------------------- */
+/* minmax(0, 1fr) on both hero grids: an auto column never shrinks below its content,
+   so the unwrapped install line and the demo's tab list pushed the page wider than a
+   phone screen. With a 0 floor those overflow inside their own scrollable boxes. */
 .home-hero {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 3rem;
   padding-block: 2.5rem 1rem;
 }
 
 .home-hero-copy {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 1.25rem;
   max-width: 40rem;
 }
