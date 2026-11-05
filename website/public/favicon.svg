@@ -1,4 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <path d="M32 3 57 17.5v29L32 61 7 46.5v-29Z" fill="#1d4e89"/>
-  <path d="M19 44V20h5l8 11 8-11h5v24h-6V30l-7 9.5L25 30v14Z" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <style>
+    .ink { fill: #1d4e89; }
+    @media (prefers-color-scheme: dark) { .ink { fill: #7db0ee; } }
+  </style>
+  <defs>
+    <mask id="page-cut">
+      <rect width="32" height="32" fill="#fff"/>
+      <path d="M19 12h7M19 17h7" stroke="#000" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M1 20a9 4 0 0 1 18 0v7a9 4 0 0 1-18 0Z" stroke="#000" stroke-width="4"/>
+    </mask>
+    <mask id="disc-cut">
+      <rect width="32" height="32" fill="#fff"/>
+      <path d="M1 20a9 4 0 0 0 18 0M1 24.5a9 4 0 0 0 18 0" fill="none" stroke="#000" stroke-width="1.6"/>
+    </mask>
+  </defs>
+  <path class="ink" mask="url(#page-cut)" d="M14 1h9l7 7v14a2 2 0 0 1-2 2H14a2 2 0 0 1-2-2V3a2 2 0 0 1 2-2Z"/>
+  <path class="ink" mask="url(#disc-cut)" d="M1 20a9 4 0 0 1 18 0v7a9 4 0 0 1-18 0Z"/>
 </svg>
