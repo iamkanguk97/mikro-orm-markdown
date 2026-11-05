@@ -12,10 +12,11 @@ export default defineConfig({
       description: 'Mermaid ERD and Markdown schema docs generated from MikroORM entities.',
       logo: { src: './src/assets/mark.svg' },
       favicon: '/favicon.svg',
-      social: [
-        { icon: 'github', label: 'GitHub', href: REPO_URL },
-        { icon: 'npm', label: 'npm', href: 'https://www.npmjs.com/package/mikro-orm-markdown' },
-      ],
+      social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
+      components: {
+        SocialIcons: './src/components/SocialIcons.astro',
+        ThemeSelect: './src/components/ThemeToggle.astro',
+      },
       editLink: { baseUrl: `${REPO_URL}/edit/main/website/` },
       defaultLocale: 'root',
       locales: {

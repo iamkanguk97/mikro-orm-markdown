@@ -1,0 +1,16 @@
+---
+// Replaces Starlight's social links with bordered square icon buttons that match
+// the theme toggle (src/components/ThemeToggle.astro).
+import { Icon } from '@astrojs/starlight/components';
+import config from 'virtual:starlight/user-config';
+
+const links: NonNullable<typeof config.social> = config.social ?? [];
+---
+
+{
+  links.map(({ label, href, icon }) => (
+    <a href={href} rel="me" class="header-icon-button" aria-label={label}>
+      <Icon name={icon} />
+    </a>
+  ))
+}
