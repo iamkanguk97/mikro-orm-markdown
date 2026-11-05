@@ -405,6 +405,51 @@ starlight-tabs [role="tab"] {
   color: var(--sl-color-gray-4);
 }
 
+.home-demo-wrap {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* Definition-style switch (Hero.astro): small toggle buttons above the demo sheet. */
+.home-demo-styles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.home-demo-styles-label {
+  margin-inline-end: 0.375rem;
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-3);
+}
+
+.home-demo-styles button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sl-color-gray-2);
+  font: inherit;
+  font-size: var(--sl-text-sm);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.home-demo-styles button:hover {
+  border-color: var(--sl-color-gray-4);
+  color: var(--sl-color-white);
+}
+
+.home-demo-styles button[aria-pressed="true"] {
+  border-color: var(--sl-color-text-accent);
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-white);
+  font-weight: 500;
+}
+
 /* The demo: entity source and the ERD it becomes, on one sheet. */
 .home-demo {
   margin: 0;
@@ -433,10 +478,27 @@ starlight-tabs [role="tab"] {
   border: 0;
 }
 
+/* Definition-style variants share one grid cell; the inactive ones are only made
+   invisible, so the demo keeps the tallest variant's height whichever is shown. */
+.home-demo-input {
+  display: grid;
+}
+
+.home-demo-variant {
+  display: grid;
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.home-demo-variant[data-inactive] {
+  visibility: hidden;
+}
+
 /* Entity file tabs: same height and type as the "ERD.md" bar beside them, and every
    panel stacked in one grid cell so switching files does not resize the demo. */
 .home-demo-input starlight-tabs {
   display: grid;
+  grid-template-rows: auto 1fr;
 }
 
 .home-demo-input [role="tablist"] {
