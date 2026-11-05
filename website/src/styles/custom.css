@@ -393,6 +393,16 @@ starlight-tabs [role="tab"] {
   border-radius: 0.375rem;
 }
 
+/* On phones the install line keeps one line down to 360px wide (clear of the copy
+   button, which stays visible on touch screens); narrower, it wraps (Hero.astro sets
+   `wrap`) instead of scrolling inside its box. */
+@media (max-width: 30rem) {
+  .home-hero-install .expressive-code {
+    --ec-codeFontSize: 0.78125rem;
+    --ec-codePadInl: 0.75rem;
+  }
+}
+
 /* The code theme colors shell words differently per theme (all one blue in light),
    so paint the install line from the site palette: muted command, accented package.
    The "$" is a pseudo-element, so the copy button copies only the command. */
@@ -403,6 +413,8 @@ starlight-tabs [role="tab"] {
 .home-hero-install .ec-line .code span:last-child {
   color: var(--sl-color-text-accent);
   font-weight: 500;
+  /* When the line wraps, move the package name down whole rather than at a hyphen. */
+  white-space: nowrap;
 }
 
 .home-hero-install .ec-line .code::before {
