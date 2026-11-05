@@ -54,6 +54,12 @@
   content: none;
 }
 
+/* Pull the theme toggle closer to the GitHub button: Starlight's 1rem header gap
+   becomes 0.5rem here only, so the language select keeps its spacing. */
+.header .social-icons + starlight-theme-toggle {
+  margin-inline-start: -0.5rem;
+}
+
 .header-icon-button:hover {
   border-color: var(--sl-color-gray-3);
   color: var(--sl-color-white);
