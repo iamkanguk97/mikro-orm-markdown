@@ -1,0 +1,64 @@
+---
+// Replaces Starlight's theme <select> with a single light/dark toggle button.
+// The visible icon is chosen by CSS from <html data-theme>, which Starlight's
+// inline ThemeProvider sets before paint, so the button never flashes the wrong icon.
+import { Icon } from '@astrojs/starlight/components';
+---
+
+<starlight-theme-toggle>
+  <button type="button" class="header-icon-button" aria-label={Astro.locals.t('themeSelect.accessibleLabel')}>
+    <Icon name="sun" class="theme-icon-light" />
+    <Icon name="moon" class="theme-icon-dark" />
+  </button>
+</starlight-theme-toggle>
+
+<script>
+  type Theme = 'light' | 'dark';
+
+  /** Same key Starlight's ThemeProvider reads on page load. */
+  const STORAGE_KEY = 'starlight-theme';
+
+  const systemTheme = (): Theme => (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+
+  function storedTheme(): Theme | undefined {
+    try {
+      const value = localStorage.getItem(STORAGE_KEY);
+      return value === 'light' || value === 'dark' ? value : undefined;
+    } catch {
+      return undefined; // storage blocked (private mode etc.): just follow the system
+    }
+  }
+
+  function applyTheme(theme: Theme, shouldStore: boolean): void {
+    document.documentElement.dataset.theme = theme;
+    if (!shouldStore) {
+      return;
+    }
+    try {
+      localStorage.setItem(STORAGE_KEY, theme);
+    } catch {
+      // Storage blocked: the theme still applies for this page view.
+    }
+  }
+
+  // Without an explicit choice, keep following the system setting.
+  matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
+    if (storedTheme() === undefined) {
+      applyTheme(systemTheme(), false);
+    }
+  });
+
+  class StarlightThemeToggle extends HTMLElement {
+    constructor() {
+      super();
+      this.querySelector('button')?.addEventListener('click', () => {
+        const next: Theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        applyTheme(next, true);
+      });
+    }
+  }
+
+  if (!customElements.get('starlight-theme-toggle')) {
+    customElements.define('starlight-theme-toggle', StarlightThemeToggle);
+  }
+</script>

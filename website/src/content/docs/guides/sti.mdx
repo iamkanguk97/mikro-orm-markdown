@@ -1,0 +1,46 @@
+---
+title: Single table inheritance
+description: How STI entities are drawn in the ERD and described in the tables.
+---
+
+import Mermaid from '../../../components/Mermaid.astro';
+
+STI is a pattern where multiple entity classes share a single database table, using a discriminator column to tell rows apart.
+
+```ts
+@Entity({ discriminatorColumn: 'type', abstract: true })
+export class Animal {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  @Property({ type: 'string' })
+  name!: string;
+}
+
+@Entity({ discriminatorValue: 'dog' })
+export class Dog extends Animal {
+  @Property({ type: 'string', nullable: true })
+  breed?: string;
+}
+```
+
+When an entity uses `discriminatorColumn`, `mikro-orm-markdown` detects it automatically. Even though the subclasses share one physical table, each class is drawn as its **own box** so the diagram shows the effective shape of every subclass:
+
+<Mermaid
+  code={`erDiagram
+  Animal {
+    integer id PK
+    string name
+    string type "discriminator"
+  }
+  Dog {
+    integer id PK
+    string name
+    string type
+    string breed
+  }`}
+/>
+
+The root (`Animal`) lists only the shared columns and marks the discriminator (`type`); each subclass (`Dog`) repeats the inherited columns and adds its own.
+
+The generated Markdown table also includes STI notes, such as `STI root — discriminator column: type` on the root and `Extends Animal (Single Table Inheritance, discriminator value: dog)` on each subclass.

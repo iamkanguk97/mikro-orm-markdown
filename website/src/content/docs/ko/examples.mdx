@@ -1,0 +1,31 @@
+---
+title: 예시
+description: CLI가 실제로 생성한 출력을, 그 바탕이 된 엔티티 소스와 나란히 보여줍니다.
+tableOfContents: false
+---
+
+import ScenarioViewer from '../../../components/ScenarioViewer.astro';
+
+이 페이지의 모든 문서는 사이트를 빌드할 때 실제 CLI가 생성합니다 — 직접 손으로 쓴 부분은 없습니다. 시나리오를 고른 뒤, 엔티티 파일을 바꿔 가며 확인해 보세요.
+
+<ScenarioViewer
+  sourcesLabel="엔티티 소스"
+  outputLabel="생성된 문서"
+  text={{
+    'full-tour': {
+      title: '전체 둘러보기',
+      blurb:
+        'examples/ 스키마 전체입니다 — 모든 관계 종류, 상속, embeddable, @namespace 그룹, 컬럼 표기를 한 문서에 담았습니다.',
+    },
+    'relations-namespaces': {
+      title: '관계와 namespace',
+      blurb:
+        '두 @namespace 그룹에 걸친 작은 엔티티 세 개로, ERD에서 관계가 어떻게 그려지는지와 그룹이 문서 구성을 어떻게 바꾸는지 보여줍니다.',
+    },
+    'hidden-entityschema': {
+      title: '@hidden과 EntitySchema',
+      blurb:
+        '@hidden은 엔티티(와 그 관계)를 모든 출력에서 제거합니다. EntitySchema로 정의한 엔티티는 스키마 선언의 JSDoc으로 렌더링되며, 컬럼 설명은 `comment` 프로퍼티 옵션에서 가져옵니다.',
+    },
+  }}
+/>

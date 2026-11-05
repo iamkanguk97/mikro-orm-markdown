@@ -1,0 +1,103 @@
+---
+// Home hero (overrides Starlight's Hero). Instead of a logo image it shows what the
+// tool does: the entity files next to the ERD generated from them, joined by the command
+// that produces it. A switch above the demo swaps the entity code between MikroORM's
+// definition styles; the ERD stays the same because every style yields the same output.
+// Title, tagline, and actions still come from the page frontmatter.
+import { Code, LinkButton, TabItem, Tabs } from '@astrojs/starlight/components';
+import type { StarlightRouteData } from '@astrojs/starlight/route-data';
+import { DEFINITION_STYLES, ERD_SOURCE, STYLE_SWITCH_LABEL } from './hero-demo.js';
+import Mermaid from './Mermaid.astro';
+
+type PageData = StarlightRouteData['entry']['data'];
+type HeroData = NonNullable<PageData['hero']>;
+
+const page: PageData = Astro.locals.starlightRoute.entry.data;
+const hero: Partial<HeroData> = page.hero ?? {};
+const title: string = hero.title ?? page.title;
+const tagline: string | undefined = hero.tagline;
+const actions: NonNullable<HeroData['actions']> = hero.actions ?? [];
+
+const INSTALL_COMMAND = 'npm install -D mikro-orm-markdown';
+const RUN_COMMAND = 'npx mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md';
+
+const lang: 'en' | 'ko' = Astro.locals.starlightRoute.lang === 'ko' ? 'ko' : 'en';
+const FILE_TABS_SYNC_KEY = 'home-demo-file';
+---
+
+<div class="home-hero">
+  <div class="home-hero-copy">
+    <h1 id="_top" data-page-title set:html={title} />
+    {tagline && <p class="home-hero-tagline" set:html={tagline} />}
+    <div class="home-hero-actions">
+      {
+        actions.map(({ link: href, text, variant, icon }) => (
+          <LinkButton href={href} variant={variant} icon={icon?.name}>
+            {text}
+          </LinkButton>
+        ))
+      }
+    </div>
+    <div class="home-hero-install">
+      <Code code={INSTALL_COMMAND} lang="bash" frame="none" wrap />
+    </div>
+  </div>
+
+  <div class="home-demo-wrap">
+    <div class="home-demo-styles" role="group" aria-label={STYLE_SWITCH_LABEL[lang]}>
+      <span class="home-demo-styles-label" aria-hidden="true">{STYLE_SWITCH_LABEL[lang]}</span>
+      {
+        DEFINITION_STYLES.map((style, index) => (
+          <button type="button" data-style={style.id} aria-pressed={index === 0 ? 'true' : 'false'}>
+            {style.label[lang]}
+          </button>
+        ))
+      }
+    </div>
+
+    <figure class="home-demo not-content">
+      <div class="home-demo-panes">
+        <div class="home-demo-pane home-demo-input">
+          {
+            DEFINITION_STYLES.map((style, index) => (
+              <div class="home-demo-variant" data-style={style.id} data-inactive={index === 0 ? undefined : ''}>
+                <Tabs syncKey={FILE_TABS_SYNC_KEY}>
+                  <TabItem label="post.entity.ts">
+                    <Code code={style.post} lang="ts" />
+                  </TabItem>
+                  <TabItem label="author.entity.ts">
+                    <Code code={style.author} lang="ts" />
+                  </TabItem>
+                </Tabs>
+              </div>
+            ))
+          }
+        </div>
+        <div class="home-demo-pane home-demo-output">
+          <p class="home-demo-file">ERD.md</p>
+          <Mermaid code={ERD_SOURCE} />
+        </div>
+      </div>
+      <figcaption class="home-demo-command">
+        <span aria-hidden="true">$</span>
+        <code>{RUN_COMMAND}</code>
+      </figcaption>
+    </figure>
+  </div>
+</div>
+
+<script>
+  // Definition-style switch: show one variant at a time. Variants stay stacked in one
+  // grid cell (hidden ones are only made invisible), so switching never resizes the demo.
+  for (const wrap of document.querySelectorAll<HTMLElement>('.home-demo-wrap')) {
+    const buttons = [...wrap.querySelectorAll<HTMLButtonElement>('.home-demo-styles button')];
+    const variants = [...wrap.querySelectorAll<HTMLElement>('.home-demo-variant')];
+    for (const button of buttons) {
+      button.addEventListener('click', () => {
+        const selected = button.dataset.style;
+        for (const other of buttons) other.setAttribute('aria-pressed', String(other === button));
+        for (const variant of variants) variant.toggleAttribute('data-inactive', variant.dataset.style !== selected);
+      });
+    }
+  }
+</script>

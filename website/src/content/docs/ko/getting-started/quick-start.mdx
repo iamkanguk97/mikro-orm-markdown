@@ -1,0 +1,118 @@
+---
+title: 빠른 시작
+description: MikroORM config로 첫 ERD.md를 생성합니다.
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+
+## 1. 스크립트 추가
+
+`--config`에 MikroORM config 파일 경로를 지정하세요:
+
+```json title="package.json"
+{
+  "scripts": {
+    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title 'My Database'"
+  }
+}
+```
+
+- **`.ts` config** — `tsx`를 devDependency로 설치하세요 (`npm install -D tsx`). CLI가 자동으로 로드하며, `preferTs`를 명시하지 않았다면 MikroORM discovery가 `entitiesTs`를 우선 사용하도록 설정합니다.
+- **`.js` config** — 추가 패키지 불필요. 직접 작성한 파일이든, 빌드 결과물(예: `./dist/mikro-orm.config.js`)이든 상관없습니다.
+
+## 2. JSDoc으로 엔티티 설명하기
+
+```ts
+/**
+ * Blog post authored by a registered user.
+ * @namespace Blog
+ */
+@Entity()
+export class Post {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  /** Post title */
+  @Property({ type: 'string' })
+  title!: string;
+
+  @Property({ type: 'text', nullable: true })
+  body?: string;
+
+  @ManyToOne({ entity: () => Author })
+  author!: Author;
+}
+
+/** @namespace Blog */
+@Entity()
+export class Author {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  @Property({ type: 'string' })
+  name!: string;
+
+  @Property({ type: 'string', unique: true })
+  email!: string;
+
+  /** @atLeastOne */
+  @OneToMany({ entity: () => Post, mappedBy: 'author' })
+  posts = new Collection<Post>(this);
+}
+```
+
+예시에서는 import 문을 생략했습니다. `type:`을 명시해 `@mikro-orm/reflection` 없이도 동작하는 예시입니다.
+
+## 3. 실행
+
+```bash
+npm run erd
+```
+
+## 생성 결과
+
+두 엔티티 모두 `@namespace Blog` 태그를 가지므로 하나의 `## Blog` 섹션에 묶입니다. MikroORM의 기본 naming strategy를 기준으로 생성된 `ERD.md`에는 다음과 같은 ERD가 포함됩니다:
+
+<Mermaid
+  code={`erDiagram
+  Post {
+    integer id PK
+    string title
+    string body
+    integer author_id FK
+  }
+  Author {
+    integer id PK
+    string name
+    string email UK
+  }
+  Post }|--|| Author : "author"`}
+/>
+
+**코드가 출력으로 어떻게 매핑되는가:**
+
+- `@namespace Blog` → 두 엔티티가 `## Blog` 섹션 아래로 묶임
+- `@ManyToOne({ entity: () => Author })` → `Post`에서 `Author`로 향하는 관계선과 `author_id FK` 컬럼
+- `Author.posts`의 `@atLeastOne` → 컬렉션 쪽이 1개 이상으로 렌더링됨: `Post }|--|| Author`
+- `email`의 `unique: true` → `email`이 `UK`(unique key)로 표시됨
+- `body`의 `@Property({ nullable: true })` → `Nullable` 칸이 `Y`로 표시됨
+- `/** Post title */` → `title`의 **Description** 칸을 채움
+
+각 엔티티는 컬럼 표로도 표현됩니다. 예를 들어 생성된 `Post` 섹션은 다음과 같습니다:
+
+```markdown
+### Post
+
+*Table: `post`*
+
+> Blog post authored by a registered user.
+
+| Column    | Type    | Key         | Nullable | Description |
+| --------- | ------- | ----------- | -------- | ----------- |
+| id        | integer | PK          |          |             |
+| title     | string  |             |          | Post title  |
+| body      | text    |             | Y        |             |
+| author_id | integer | FK (author) |          |             |
+```
+
+다음 단계: 모든 [CLI 옵션](/mikro-orm-markdown/ko/reference/cli/)과 [JSDoc 태그](/mikro-orm-markdown/ko/reference/jsdoc-tags/)를 확인하세요.

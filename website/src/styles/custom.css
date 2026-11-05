@@ -1,0 +1,709 @@
+/* ---------------------------------------------------------------------------
+   Palette: Prussian blue (the pigment of drafting blueprints, where ER diagrams
+   come from) on cool ink/paper neutrals. Key yellow marks primary keys only.
+   Starlight's default (no attribute) is dark; light overrides follow.
+   ------------------------------------------------------------------------- */
+:root {
+  --sl-font: "Pretendard Variable";
+  --sl-font-mono: "IBM Plex Mono", "Pretendard Variable";
+  --sl-line-height: 1.7;
+
+  --sl-color-white: #f2f5fa;
+  --sl-color-gray-1: #e3e8f0;
+  --sl-color-gray-2: #c3cbd8;
+  --sl-color-gray-3: #8e99ab;
+  --sl-color-gray-4: #5a6578;
+  --sl-color-gray-5: #2e3746;
+  --sl-color-gray-6: #1a2130;
+  --sl-color-black: #121722;
+
+  --sl-color-accent-low: #16294a;
+  --sl-color-accent: #7db0ee;
+  --sl-color-accent-high: #cfe2fa;
+  --sl-color-text-accent: #7db0ee;
+  --sl-color-text-invert: #121722;
+
+  --site-color-key: #e9b44c;
+}
+
+:root[data-theme="light"] {
+  --sl-color-white: #18202c;
+  --sl-color-gray-1: #252f3e;
+  --sl-color-gray-2: #3a4556;
+  --sl-color-gray-3: #5b6575;
+  --sl-color-gray-4: #8e99ab;
+  --sl-color-gray-5: #d3dae4;
+  --sl-color-gray-6: #eef2f7;
+  --sl-color-gray-7: #f6f8fb;
+  --sl-color-black: #ffffff;
+
+  --sl-color-accent-low: #dce7f5;
+  --sl-color-accent: #1d4e89;
+  --sl-color-accent-high: #12345e;
+  --sl-color-text-accent: #1d4e89;
+  --sl-color-text-invert: #ffffff;
+
+  --site-color-key: #9a6200;
+}
+
+/* ---------------------------------------------------------------------------
+   Type
+   ------------------------------------------------------------------------- */
+.sl-markdown-content :is(h1, h2, h3, h4, h5) {
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Korean text needs no negative tracking and breaks better between words. */
+:root[lang="ko"] .sl-markdown-content :is(h1, h2, h3, h4, h5),
+:root[lang="ko"] h1[data-page-title] {
+  letter-spacing: 0;
+  word-break: keep-all;
+}
+
+h1[data-page-title] {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.sl-markdown-content code:not(:where(.not-content *, pre *)) {
+  padding: 0.1em 0.35em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+}
+
+.sl-markdown-content a:not(:where(.not-content *)) {
+  text-underline-offset: 0.2em;
+  text-decoration-thickness: 1px;
+}
+
+/* ---------------------------------------------------------------------------
+   Header
+   ------------------------------------------------------------------------- */
+.header {
+  border-bottom-color: var(--sl-color-gray-5);
+}
+
+/* Keep the mark and the name close and matched in weight so they read as one logo. */
+.site-title {
+  gap: 0.625rem;
+  color: var(--sl-color-white);
+  font-size: var(--sl-text-xl);
+  font-weight: 600;
+}
+
+.site-title img {
+  height: 2rem;
+}
+
+/* On phones the title shares a row with search and the menu button; keep it whole. */
+@media (max-width: 30rem) {
+  .site-title {
+    font-size: var(--sl-text-base);
+    gap: 0.5rem;
+  }
+}
+
+/* GitHub link and theme toggle as square outlined icon buttons */
+.header-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.375rem;
+  background: transparent;
+  color: var(--sl-color-gray-2);
+  font-size: 1.125rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+/* GitHub button with a star count grows to fit the number. */
+.header-icon-button.has-count {
+  width: auto;
+  gap: 0.375rem;
+  padding: 0 0.625rem;
+}
+
+.header-icon-count {
+  font-size: var(--sl-text-sm);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.header-icon-button:hover {
+  border-color: var(--sl-color-gray-4);
+  color: var(--sl-color-white);
+}
+
+.header-icon-button:focus-visible {
+  outline: 2px solid var(--sl-color-text-accent);
+  outline-offset: 2px;
+}
+
+/* The home page (the only page with a hero) has no search box. */
+:root[data-has-hero] site-search {
+  display: none;
+}
+
+/* No divider between the GitHub button and the theme toggle. */
+.header .social-icons::after {
+  content: none;
+}
+
+/* Pull the theme toggle closer to the GitHub button: Starlight's 1rem header gap
+   becomes 0.5rem here only, so the language select keeps its spacing. */
+.header .social-icons + starlight-theme-toggle {
+  margin-inline-start: -0.5rem;
+}
+
+/* Mobile menu footer: keep the GitHub button, toggle, and language select on one line. */
+.mobile-preferences {
+  align-items: center;
+}
+
+/* Show the icon of the current theme; <html data-theme> is set before paint. */
+:root[data-theme="light"] .theme-icon-dark,
+:root[data-theme="dark"] .theme-icon-light {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Sidebar: the current page is marked with a bar, not a filled block.
+   ------------------------------------------------------------------------- */
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background: none;
+  color: var(--sl-color-text-accent);
+  font-weight: 600;
+  box-shadow: inset 2px 0 0 var(--sl-color-text-accent);
+  border-radius: 0;
+}
+
+.sidebar-content ul ul li {
+  border-inline-start-color: var(--sl-color-gray-5);
+}
+
+/* Nested items sit on the guide line, so the current-page bar replaces it. */
+.sidebar-content ul ul li:has(> a[aria-current="page"]) {
+  border-inline-start-color: transparent;
+}
+
+.sidebar-content ul ul li > a[aria-current="page"] {
+  margin-inline-start: calc(-1 * var(--sl-sidebar-item-padding-inline) - 1px);
+  padding-inline-start: calc(2 * var(--sl-sidebar-item-padding-inline) + 1px);
+}
+
+/* ---------------------------------------------------------------------------
+   Tables: tinted header row and horizontal rules only.
+   ------------------------------------------------------------------------- */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  font-size: var(--sl-text-sm);
+  border-collapse: collapse;
+}
+
+.sl-markdown-content :is(th, td):not(:where(.not-content *)) {
+  border: 0;
+  border-bottom: 1px solid var(--sl-color-gray-5);
+  padding: 0.5rem 0.75rem;
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  background-color: var(--sl-color-gray-6);
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+.sl-markdown-content tr:not(:where(.not-content *)) {
+  background: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Asides: one quiet shape; only the rule color says which kind it is.
+   ------------------------------------------------------------------------- */
+.starlight-aside {
+  border-inline-start-width: 3px;
+  border-radius: 0 0.375rem 0.375rem 0;
+  background-color: var(--sl-color-gray-6);
+  color: var(--sl-color-gray-1);
+}
+
+.starlight-aside--note,
+.starlight-aside--tip {
+  --sl-color-asides-border: var(--sl-color-text-accent);
+  --sl-color-asides-text-accent: var(--sl-color-text-accent);
+}
+
+.starlight-aside--caution {
+  --sl-color-asides-border: var(--site-color-key);
+  --sl-color-asides-text-accent: var(--site-color-key);
+}
+
+.starlight-aside__title {
+  font-size: var(--sl-text-base);
+}
+
+/* ---------------------------------------------------------------------------
+   Tabs (Starlight <Tabs>): wrap instead of scrolling sideways.
+   ------------------------------------------------------------------------- */
+starlight-tabs [role="tablist"] {
+  flex-wrap: wrap;
+  overflow: visible;
+  border-bottom-color: var(--sl-color-gray-5);
+}
+
+starlight-tabs [role="tab"] {
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------------------
+   Mermaid diagrams (src/scripts/mermaid.ts)
+   ------------------------------------------------------------------------- */
+.mermaid-diagram {
+  overflow-x: auto;
+  padding: 1rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.375rem;
+  background: var(--sl-color-black);
+  text-align: center;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Relationship names sit on the line; give them the page background so the line
+   does not strike through the text. */
+.mermaid-diagram .labelBkg {
+  background-color: var(--sl-color-black) !important;
+}
+
+/* Primary keys are the one place the key color appears. */
+.mermaid-diagram .erd-key-pk {
+  fill: var(--site-color-key) !important;
+  color: var(--site-color-key) !important;
+  font-weight: 600;
+}
+
+/* ---------------------------------------------------------------------------
+   Home
+   ------------------------------------------------------------------------- */
+/* minmax(0, 1fr) on both hero grids: an auto column never shrinks below its content,
+   so the unwrapped install line and the demo's tab list pushed the page wider than a
+   phone screen. With a 0 floor those overflow inside their own scrollable boxes. */
+.home-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3rem;
+  padding-block: 2.5rem 1rem;
+}
+
+.home-hero-copy {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.25rem;
+  max-width: 40rem;
+}
+
+.home-hero h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 6vw, 3.75rem);
+  line-height: 1.05;
+  color: var(--sl-color-white);
+}
+
+.home-hero-tagline {
+  margin: 0;
+  font-size: var(--sl-text-xl);
+  line-height: 1.5;
+  color: var(--sl-color-gray-2);
+}
+
+:root[lang="ko"] .home-hero-tagline {
+  word-break: keep-all;
+}
+
+.home-hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.5rem;
+}
+
+.home-hero-actions .sl-link-button {
+  min-height: 2.75rem;
+  padding: 0.625rem 1.125rem;
+  border-radius: 0.5rem;
+  font-size: var(--sl-text-base);
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+/* One filled call to action; the arrow nudges forward on hover. */
+.home-hero-actions .sl-link-button.primary {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.12),
+    0 4px 12px -4px var(--sl-color-accent);
+}
+
+.home-hero-actions .sl-link-button.primary svg {
+  transition: transform 0.15s;
+}
+
+.home-hero-actions .sl-link-button.primary:hover svg {
+  transform: translateX(3px);
+}
+
+/* The secondary action stays a plain link: the install box below already draws a
+   border, and a second outlined box would stack up. The hover underline marks it
+   as clickable. */
+.home-hero-actions .sl-link-button.minimal {
+  padding-inline: 0;
+  color: var(--sl-color-white);
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.3em;
+  transition: text-decoration-color 0.15s;
+}
+
+.home-hero-actions .sl-link-button.minimal:hover {
+  text-decoration-color: currentColor;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-hero-actions .sl-link-button.primary:hover svg {
+    transform: none;
+  }
+}
+
+.home-hero-install {
+  max-width: 26rem;
+}
+
+.home-hero-install .expressive-code pre {
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.375rem;
+}
+
+/* On phones the install line keeps one line down to 360px wide (clear of the copy
+   button, which stays visible on touch screens); narrower, it wraps (Hero.astro sets
+   `wrap`) instead of scrolling inside its box. */
+@media (max-width: 30rem) {
+  .home-hero-install .expressive-code {
+    --ec-codeFontSize: 0.78125rem;
+    --ec-codePadInl: 0.75rem;
+  }
+}
+
+/* The code theme colors shell words differently per theme (all one blue in light),
+   so paint the install line from the site palette: muted command, accented package.
+   The "$" is a pseudo-element, so the copy button copies only the command. */
+.home-hero-install .ec-line .code span {
+  color: var(--sl-color-gray-2);
+}
+
+.home-hero-install .ec-line .code span:last-child {
+  color: var(--sl-color-text-accent);
+  font-weight: 500;
+  /* When the line wraps, move the package name down whole rather than at a hyphen. */
+  white-space: nowrap;
+}
+
+.home-hero-install .ec-line .code::before {
+  content: "$ ";
+  color: var(--sl-color-gray-4);
+}
+
+.home-demo-wrap {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* Definition-style switch (Hero.astro): small toggle buttons above the demo sheet. */
+.home-demo-styles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+.home-demo-styles-label {
+  margin-inline-end: 0.375rem;
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-3);
+}
+
+.home-demo-styles button {
+  padding: 0.3rem 0.75rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sl-color-gray-2);
+  font: inherit;
+  font-size: var(--sl-text-sm);
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.home-demo-styles button:hover {
+  border-color: var(--sl-color-gray-4);
+  color: var(--sl-color-white);
+}
+
+.home-demo-styles button[aria-pressed="true"] {
+  border-color: var(--sl-color-text-accent);
+  background: var(--sl-color-accent-low);
+  color: var(--sl-color-white);
+  font-weight: 500;
+}
+
+/* The demo: entity source and the ERD it becomes, on one sheet. */
+.home-demo {
+  margin: 0;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.5rem;
+  background: var(--sl-color-gray-6);
+  overflow: hidden;
+}
+
+.home-demo-panes {
+  display: grid;
+}
+
+.home-demo-pane {
+  min-width: 0;
+}
+
+.home-demo-input .expressive-code .frame {
+  --button-spacing: 0.4rem;
+  box-shadow: none;
+}
+
+/* Square off the code frame so it sits flush inside the sheet. */
+.home-demo-input .expressive-code :is(.frame, pre, .header) {
+  border-radius: 0;
+  border: 0;
+}
+
+/* Definition-style variants share one grid cell; the inactive ones are only made
+   invisible, so the demo keeps the tallest variant's height whichever is shown. */
+.home-demo-input {
+  display: grid;
+}
+
+.home-demo-variant {
+  display: grid;
+  grid-area: 1 / 1;
+  min-width: 0;
+}
+
+.home-demo-variant[data-inactive] {
+  visibility: hidden;
+}
+
+/* Entity file tabs: same height and type as the "ERD.md" bar beside them, and every
+   panel stacked in one grid cell so switching files does not resize the demo. */
+.home-demo-input starlight-tabs {
+  display: grid;
+  grid-template-rows: auto 1fr;
+}
+
+.home-demo-input [role="tablist"] {
+  min-height: calc(2.5rem + 1px);
+  border-bottom-width: 1px;
+}
+
+.home-demo-input .tab {
+  display: flex;
+}
+
+/* Starlight draws the active tab line as an outer shadow below the tab, which the
+   scrolling tablist wrapper clips here; draw it inside the tab instead. */
+.home-demo-input [role="tab"] {
+  padding-inline: 1rem;
+  font-size: var(--sl-text-sm);
+  box-shadow: inset 0 -2px 0 var(--sl-tab-color-border);
+}
+
+.home-demo-input [role="tab"]:not([aria-selected="true"]) {
+  --sl-tab-color-border: transparent;
+}
+
+.home-demo-input [role="tabpanel"] {
+  display: flex;
+  grid-area: 2 / 1;
+  margin-top: 0;
+}
+
+.home-demo-input [role="tabpanel"][hidden] {
+  display: flex;
+  visibility: hidden;
+}
+
+/* Stretch the shorter file's code block to the panel height so the space below it
+   keeps the code background instead of showing the sheet color. */
+.home-demo-input [role="tabpanel"] :is(.expressive-code, .frame) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.home-demo-input [role="tabpanel"] pre {
+  flex: 1;
+}
+
+.home-demo-output {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border-top: 1px solid var(--sl-color-gray-5);
+  background: var(--sl-color-black);
+}
+
+.home-demo-file {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--sl-color-gray-5);
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-2);
+}
+
+.home-demo-output .mermaid-diagram {
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0;
+  padding: 1.5rem;
+}
+
+.home-demo-command {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--sl-color-gray-5);
+  font-family: var(--__sl-font-mono);
+  font-size: var(--sl-text-sm);
+  color: var(--sl-color-gray-2);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.home-demo-command > span {
+  color: var(--sl-color-gray-3);
+  user-select: none;
+}
+
+@media (min-width: 60rem) {
+  .home-hero {
+    padding-block-start: 3rem;
+  }
+
+  .home-demo-panes {
+    grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  }
+
+  .home-demo-output {
+    border-top: 0;
+    border-inline-start: 1px solid var(--sl-color-gray-5);
+  }
+}
+
+/* "What you get": a two-column definition list instead of a card grid. */
+.home-features {
+  display: grid;
+  gap: 1.5rem 3rem;
+  margin-top: 1.5rem;
+}
+
+.home-features > div {
+  margin: 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--sl-color-gray-5);
+}
+
+.home-features dt {
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+.home-features dd {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  color: var(--sl-color-gray-2);
+}
+
+.home-features dd > p {
+  margin: 0;
+}
+
+@media (min-width: 50rem) {
+  .home-features {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Examples page: the scenario viewer
+   ------------------------------------------------------------------------- */
+:root:has(.scenario-viewer) {
+  --sl-content-width: 90rem;
+}
+
+.scenario-blurb {
+  color: var(--sl-color-gray-2);
+}
+
+.scenario-panes {
+  display: grid;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (min-width: 72rem) {
+  .scenario-panes {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+.scenario-pane {
+  min-width: 0;
+}
+
+.sl-markdown-content .scenario-pane-title {
+  margin-top: 0;
+  font-size: var(--sl-text-base);
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+/* The generated document is a full page of its own; scale its headings down. */
+.scenario-output {
+  min-width: 0;
+  max-height: 80rem;
+  overflow: auto;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--sl-color-gray-5);
+  border-radius: 0.375rem;
+}
+
+.sl-markdown-content .scenario-output h1 {
+  margin-top: 0;
+  font-size: var(--sl-text-2xl);
+}
+
+.sl-markdown-content .scenario-output h2 {
+  font-size: var(--sl-text-xl);
+}
+
+.sl-markdown-content .scenario-output h3 {
+  font-size: var(--sl-text-lg);
+}

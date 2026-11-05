@@ -1,0 +1,54 @@
+---
+title: mikro-orm-markdown
+description: MikroORM 엔티티에서 Mermaid ER 다이어그램과 Markdown 스키마 문서를 생성합니다 — 실행 중인 데이터베이스 연결이 필요 없습니다.
+template: splash
+editUrl: false
+hero:
+  tagline: MikroORM 엔티티에서 바로 만드는 Mermaid ERD와 Markdown 스키마 문서. DB 연결이 필요 없습니다.
+  actions:
+    - text: 시작하기
+      link: /mikro-orm-markdown/ko/getting-started/overview/
+      icon: right-arrow
+    - text: 예시 보기
+      link: /mikro-orm-markdown/ko/examples/
+      variant: minimal
+---
+
+## 무엇을 만들어 주나요
+
+<dl class="home-features">
+  <div>
+    <dt>ERD + 컬럼 표</dt>
+    <dd>
+      Mermaid ER 다이어그램과 함께, 실제 DB 컬럼명, 키, nullable 여부, 설명, 인덱스, 제약 조건을
+      담은 엔티티별 표를 만듭니다.
+    </dd>
+  </div>
+  <div>
+    <dt>JSDoc 기반</dt>
+    <dd>
+      설명, 섹션(`@namespace`, `@erd`, `@describe`), 노출 여부(`@hidden`)를 엔티티 파일에 이미
+      있는 주석에서 가져옵니다.
+    </dd>
+  </div>
+  <div>
+    <dt>MikroORM 개념 지원</dt>
+    <dd>
+      Embeddable, Single Table Inheritance, `@Formula`, `EntitySchema` / `defineEntity()`
+      엔티티를 각각 독립된 개념으로 제대로 표현합니다.
+    </dd>
+  </div>
+  <div>
+    <dt>DB 연결 불필요</dt>
+    <dd>
+      MikroORM discovery로 엔티티 메타데이터를 읽습니다. SQLite, PostgreSQL, MySQL, MariaDB
+      드라이버에서 MikroORM 6과 7 모두 동작합니다.
+    </dd>
+  </div>
+</dl>
+
+## 다음으로 볼 곳
+
+- [빠른 시작](/mikro-orm-markdown/ko/getting-started/quick-start/) — 스크립트를 추가하고 첫 `ERD.md`를 만듭니다.
+- [CLI 옵션](/mikro-orm-markdown/ko/reference/cli/) — 모든 옵션과 기본값.
+- [예시](/mikro-orm-markdown/ko/examples/) — 예제 엔티티로 실제 생성한 문서.

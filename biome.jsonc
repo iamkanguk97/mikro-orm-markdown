@@ -81,6 +81,21 @@
       }
     }
   },
+  "overrides": [
+    {
+      // Biome lints only the frontmatter of .astro files and cannot see what the template
+      // below it uses, so these two rules report (and would "fix") false positives there.
+      "includes": ["**/*.astro"],
+      "linter": {
+        "rules": {
+          "correctness": {
+            "noUnusedImports": "off",
+            "noUnusedVariables": "off"
+          }
+        }
+      }
+    }
+  ],
   "assist": {
     "enabled": true,
     "actions": {

@@ -1,0 +1,118 @@
+---
+title: Quick Start
+description: Generate your first ERD.md from a MikroORM config.
+---
+
+import Mermaid from '../../../components/Mermaid.astro';
+
+## 1. Add a script
+
+Point `--config` at your MikroORM config file:
+
+```json title="package.json"
+{
+  "scripts": {
+    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title 'My Database'"
+  }
+}
+```
+
+- **`.ts` config** — install `tsx` as a dev dependency (`npm install -D tsx`). The CLI loads it automatically and defaults MikroORM discovery to `entitiesTs` unless you explicitly set `preferTs`.
+- **`.js` config** — no extra packages needed. It can be hand-written, or your own build output (e.g. `./dist/mikro-orm.config.js`).
+
+## 2. Describe your entities with JSDoc
+
+```ts
+/**
+ * Blog post authored by a registered user.
+ * @namespace Blog
+ */
+@Entity()
+export class Post {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  /** Post title */
+  @Property({ type: 'string' })
+  title!: string;
+
+  @Property({ type: 'text', nullable: true })
+  body?: string;
+
+  @ManyToOne({ entity: () => Author })
+  author!: Author;
+}
+
+/** @namespace Blog */
+@Entity()
+export class Author {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  @Property({ type: 'string' })
+  name!: string;
+
+  @Property({ type: 'string', unique: true })
+  email!: string;
+
+  /** @atLeastOne */
+  @OneToMany({ entity: () => Post, mappedBy: 'author' })
+  posts = new Collection<Post>(this);
+}
+```
+
+Imports are omitted. Explicit `type:` options keep the example working without `@mikro-orm/reflection`.
+
+## 3. Run it
+
+```bash
+npm run erd
+```
+
+## What you get
+
+Both entities share the `@namespace Blog` tag, so they land in one `## Blog` section. With MikroORM's default naming strategy, the generated `ERD.md` contains an ERD like this:
+
+<Mermaid
+  code={`erDiagram
+  Post {
+    integer id PK
+    string title
+    string body
+    integer author_id FK
+  }
+  Author {
+    integer id PK
+    string name
+    string email UK
+  }
+  Post }|--|| Author : "author"`}
+/>
+
+**How the code maps to the output:**
+
+- `@namespace Blog` → both entities are grouped under the `## Blog` section
+- `@ManyToOne({ entity: () => Author })` → the `Post` to `Author` relation line and the `author_id FK` column
+- `@atLeastOne` on `Author.posts` → the collection side is rendered as one-or-more: `Post }|--|| Author`
+- `unique: true` on `email` → `email` is marked `UK` (unique key)
+- `@Property({ nullable: true })` on `body` → the `Nullable` cell is marked `Y`
+- `/** Post title */` → fills the **Description** cell for `title`
+
+Each entity also gets a column table. For example, the generated `Post` section looks like this:
+
+```markdown
+### Post
+
+*Table: `post`*
+
+> Blog post authored by a registered user.
+
+| Column    | Type    | Key         | Nullable | Description |
+| --------- | ------- | ----------- | -------- | ----------- |
+| id        | integer | PK          |          |             |
+| title     | string  |             |          | Post title  |
+| body      | text    |             | Y        |             |
+| author_id | integer | FK (author) |          |             |
+```
+
+Next: see every [CLI option](/mikro-orm-markdown/reference/cli/) and [JSDoc tag](/mikro-orm-markdown/reference/jsdoc-tags/).

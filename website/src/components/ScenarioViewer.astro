@@ -1,0 +1,60 @@
+---
+// Examples viewer: one tab per scenario, the entity sources on one side and the
+// document the real CLI generated from them on the other. The data comes from
+// website/build.mjs, which must run before `astro build`.
+import { Code, TabItem, Tabs } from '@astrojs/starlight/components';
+import scenarios from '../data/scenarios/scenarios.json';
+import { renderScenarioMarkdown } from '../lib/scenario-markdown';
+
+interface ScenarioText {
+  title: string;
+  blurb: string;
+}
+
+interface Props {
+  /** Per-scenario title/blurb overrides (e.g. translations), keyed by scenario id. */
+  text?: Record<string, ScenarioText>;
+  sourcesLabel?: string;
+  outputLabel?: string;
+}
+
+const { text = {}, sourcesLabel = 'Entity sources', outputLabel = 'Generated document' }: Props = Astro.props;
+
+const rendered = scenarios.map((scenario) => ({
+  ...scenario,
+  ...text[scenario.id],
+  html: renderScenarioMarkdown(scenario.id, scenario.markdown),
+}));
+---
+
+<div class="scenario-viewer">
+  <Tabs syncKey="scenario">
+    {
+      rendered.map((scenario) => (
+        <TabItem label={scenario.title}>
+          <p class="scenario-blurb">{scenario.blurb}</p>
+          <div class="scenario-panes">
+            <section class="scenario-pane">
+              <h3 class="scenario-pane-title">{sourcesLabel}</h3>
+              <Tabs>
+                {scenario.files.map((file) => (
+                  <TabItem label={file.name}>
+                    <Code code={file.code} lang="ts" />
+                  </TabItem>
+                ))}
+              </Tabs>
+            </section>
+            <section class="scenario-pane">
+              <h3 class="scenario-pane-title">{outputLabel}</h3>
+              <article class="scenario-output" set:html={scenario.html} />
+            </section>
+          </div>
+        </TabItem>
+      ))
+    }
+  </Tabs>
+</div>
+
+<script>
+  import '../scripts/mermaid';
+</script>

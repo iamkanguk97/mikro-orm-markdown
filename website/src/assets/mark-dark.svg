@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <mask id="page-cut">
+      <rect width="64" height="64" fill="#fff"/>
+      <path d="M3 41a15 6.5 0 0 1 30 0v14a15 6.5 0 0 1-30 0Z" stroke="#000" stroke-width="7" stroke-linejoin="round"/>
+    </mask>
+    <mask id="disc-cut">
+      <rect width="64" height="64" fill="#fff"/>
+      <ellipse cx="18" cy="41" rx="6" ry="2.6"/>
+      <path d="M3 41a15 6.5 0 0 0 30 0M3 48a15 6.5 0 0 0 30 0" fill="none" stroke="#000" stroke-width="2.6"/>
+    </mask>
+  </defs>
+  <g mask="url(#page-cut)" fill="none" stroke="#7db0ee" stroke-width="4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M28 4h18l12 12v30a3 3 0 0 1-3 3H28a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3Z"/>
+    <path d="M46 4v9a3 3 0 0 0 3 3h9M38 27h12M38 35h12"/>
+  </g>
+  <path mask="url(#disc-cut)" d="M3 41a15 6.5 0 0 1 30 0v14a15 6.5 0 0 1-30 0Z" fill="#7db0ee"/>
+</svg>

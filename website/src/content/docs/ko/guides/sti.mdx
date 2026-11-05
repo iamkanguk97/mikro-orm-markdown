@@ -1,0 +1,46 @@
+---
+title: Single Table Inheritance (STI)
+description: STI 엔티티가 ERD에 그려지는 방식과 표에 설명되는 방식입니다.
+---
+
+import Mermaid from '../../../../components/Mermaid.astro';
+
+STI는 여러 엔티티 클래스가 하나의 DB 테이블을 공유하는 패턴으로, discriminator 컬럼으로 행을 구분합니다.
+
+```ts
+@Entity({ discriminatorColumn: 'type', abstract: true })
+export class Animal {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  @Property({ type: 'string' })
+  name!: string;
+}
+
+@Entity({ discriminatorValue: 'dog' })
+export class Dog extends Animal {
+  @Property({ type: 'string', nullable: true })
+  breed?: string;
+}
+```
+
+엔티티에 `discriminatorColumn`이 설정되어 있으면 `mikro-orm-markdown`이 자동으로 감지합니다. 서브클래스들은 물리적으로 하나의 테이블을 공유하지만, 다이어그램에서는 **각 클래스가 별도 박스**로 그려져 서브클래스마다 실제 컬럼 구성을 보여줍니다:
+
+<Mermaid
+  code={`erDiagram
+  Animal {
+    integer id PK
+    string name
+    string type "discriminator"
+  }
+  Dog {
+    integer id PK
+    string name
+    string type
+    string breed
+  }`}
+/>
+
+루트(`Animal`)는 공유 컬럼만 나열하고 discriminator(`type`)를 표시하며, 각 서브클래스(`Dog`)는 상속 컬럼을 반복한 뒤 자기 컬럼을 추가합니다.
+
+생성된 Markdown 표에도 STI note가 함께 표시됩니다. 루트에는 `STI root — discriminator column: type`, 각 서브클래스에는 `Extends Animal (Single Table Inheritance, discriminator value: dog)` 같은 문구가 추가됩니다.

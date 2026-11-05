@@ -16,3 +16,7 @@ ERD.md
 
 # Local probe scripts (never committed)
 .probe/
+
+# Docs site: Astro cache and CLI-generated example data (website/build.mjs)
+website/.astro/
+website/src/data/
