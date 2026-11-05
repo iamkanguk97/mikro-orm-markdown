@@ -467,6 +467,20 @@ starlight-tabs [role="tab"] {
   font-weight: 500;
 }
 
+/* Label and buttons never fit one row on a phone, and wrapping split the buttons
+   across rows. Put the label on its own row so the three buttons stay together;
+   the tighter padding keeps them on one row down to 360px wide. */
+@media (max-width: 30rem) {
+  .home-demo-styles-label {
+    flex-basis: 100%;
+    margin-inline-end: 0;
+  }
+
+  .home-demo-styles button {
+    padding-inline: 0.625rem;
+  }
+}
+
 /* The demo: entity source and the ERD it becomes, on one sheet. */
 .home-demo {
   margin: 0;

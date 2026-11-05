@@ -17,7 +17,7 @@ description: JSDoc 주석으로 설명, 섹션, 노출 여부를 제어합니다
 @Entity()
 export class Post {
   /** Post title */
-  @Property()
+  @Property({ type: 'string' })
   title!: string;
 }
 ```
