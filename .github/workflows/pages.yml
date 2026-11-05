@@ -19,11 +19,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # Astro 7 needs Node >= 22.23.4; 22.x resolves to the latest 22 release.
       - name: Use Node.js 22
         uses: actions/setup-node@v7
         with:
           node-version: 22.x
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            website/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -31,8 +35,16 @@ jobs:
       - name: Build the library
         run: npm run build
 
-      - name: Build the website
+      - name: Generate the example documents
         run: node website/build.mjs
+
+      # The site keeps its own package.json so its Vite major stays independent
+      # of the root toolchain's (Vitest pins Vite 7).
+      - name: Install website dependencies
+        run: npm ci --prefix website
+
+      - name: Build the website
+        run: npm run build --prefix website
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
