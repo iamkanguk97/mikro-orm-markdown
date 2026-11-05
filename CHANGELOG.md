@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-11-05
+
+Columns can now be left out of the generated document. The new `excludeColumns` option (`--exclude-columns` on the CLI) takes DB column names — typically audit columns such as `created_at` / `updated_at` inherited from a shared base entity — and drops them from every ERD box and column table ([#134](https://github.com/iamkanguk97/mikro-orm-markdown/issues/134)). Contributed by [@smailliwniloc](https://github.com/smailliwniloc). The project also has a documentation site now: https://iamkanguk97.github.io/mikro-orm-markdown/
+
+### Added
+
+- `excludeColumns` option (`--exclude-columns <names...>`) that omits the listed DB column names from every entity. Names match the DB column name exactly, so flattened embedded columns such as `address_street` can be listed too. Excluding a foreign key column also removes its relation edge; a composite foreign key is excluded only when all of its columns are listed, otherwise it is left untouched and a warning is emitted. Index, unique, and check constraints are always kept
+- English and Korean documentation site, replacing the scenario showcase ([#153](https://github.com/iamkanguk97/mikro-orm-markdown/pull/153))
+
+### Changed
+
+- `package.json` `homepage` points to the documentation site
+- README and documentation examples corrected: the quick-start script quotes `--title` with double quotes (Windows `cmd.exe` ignores single quotes), declares `Author` before `Post` (required when compiled with `emitDecoratorMetadata`), and the JSDoc example gives its property an explicit `type` ([#156](https://github.com/iamkanguk97/mikro-orm-markdown/pull/156))
+
 ## [2.0.0] - 2026-11-04
 
 Raises the minimum supported Node.js version from 18.19.0 to **22.17.0**. Node 18 (end of life April 2025) and Node 20 (end of life April 2026) are no longer maintained upstream, and `commander` 15 — a runtime dependency since July 2026 — already required Node >= 22.12, so the old floor had not held for some time. 22.17.0 is also MikroORM 7's floor, so one number now covers both supported MikroORM majors ([#131](https://github.com/iamkanguk97/mikro-orm-markdown/pull/131)). Nothing changes in the generated output or the API; projects already on Node 22.17 or newer can upgrade without any code changes.
