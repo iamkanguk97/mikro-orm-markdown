@@ -24,7 +24,6 @@
   --sl-color-text-invert: #121722;
 
   --site-color-key: #e9b44c;
-  --site-color-mark: rgb(125 176 238 / 0.14);
 }
 
 :root[data-theme="light"] {
@@ -45,7 +44,6 @@
   --sl-color-text-invert: #ffffff;
 
   --site-color-key: #9a6200;
-  --site-color-mark: rgb(29 78 137 / 0.08);
 }
 
 /* ---------------------------------------------------------------------------
@@ -433,10 +431,6 @@ starlight-tabs [role="tab"] {
 .home-demo-input .expressive-code :is(.frame, pre, .header) {
   border-radius: 0;
   border: 0;
-}
-
-.home-demo-input .expressive-code .ec-line.mark {
-  background: var(--site-color-mark);
 }
 
 /* Entity file tabs: same height and type as the "ERD.md" bar beside them, and every
