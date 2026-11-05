@@ -2,11 +2,13 @@
 // Replaces Starlight's theme <select> with a single light/dark toggle button.
 // The visible icon is chosen by CSS from <html data-theme>, which Starlight's
 // inline ThemeProvider sets before paint, so the button never flashes the wrong icon.
+// For assistive technology it is a "Dark theme" toggle: aria-pressed says whether the
+// dark theme is on (the icons themselves carry no label).
 import { Icon } from '@astrojs/starlight/components';
 ---
 
 <starlight-theme-toggle>
-  <button type="button" class="header-icon-button" aria-label={Astro.locals.t('themeSelect.accessibleLabel')}>
+  <button type="button" class="header-icon-button" aria-label={Astro.locals.t('themeSelect.dark')} aria-pressed="false">
     <Icon name="sun" class="theme-icon-light" />
     <Icon name="moon" class="theme-icon-dark" />
   </button>
@@ -29,8 +31,20 @@ import { Icon } from '@astrojs/starlight/components';
     }
   }
 
+  /** The choice made with the toggle in this page view; kept even when storage is blocked. */
+  let manualTheme: Theme | undefined;
+
+  /** Header and mobile menu each render a toggle; keep every one in sync. */
+  function syncPressed(): void {
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    for (const button of document.querySelectorAll('starlight-theme-toggle button')) {
+      button.setAttribute('aria-pressed', String(isDark));
+    }
+  }
+
   function applyTheme(theme: Theme, shouldStore: boolean): void {
     document.documentElement.dataset.theme = theme;
+    syncPressed();
     if (!shouldStore) {
       return;
     }
@@ -43,7 +57,7 @@ import { Icon } from '@astrojs/starlight/components';
 
   // Without an explicit choice, keep following the system setting.
   matchMedia('(prefers-color-scheme: light)').addEventListener('change', () => {
-    if (storedTheme() === undefined) {
+    if (manualTheme === undefined && storedTheme() === undefined) {
       applyTheme(systemTheme(), false);
     }
   });
@@ -51,8 +65,10 @@ import { Icon } from '@astrojs/starlight/components';
   class StarlightThemeToggle extends HTMLElement {
     constructor() {
       super();
+      syncPressed();
       this.querySelector('button')?.addEventListener('click', () => {
         const next: Theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+        manualTheme = next;
         applyTheme(next, true);
       });
     }
