@@ -14,6 +14,7 @@ export default defineConfig({
       favicon: '/favicon.svg',
       social: [{ icon: 'github', label: 'GitHub', href: REPO_URL }],
       components: {
+        Footer: './src/components/Footer.astro',
         Hero: './src/components/Hero.astro',
         SocialIcons: './src/components/SocialIcons.astro',
         ThemeSelect: './src/components/ThemeToggle.astro',
@@ -58,6 +59,7 @@ export default defineConfig({
         '@fontsource/ibm-plex-mono/400.css',
         '@fontsource/ibm-plex-mono/500.css',
         './src/styles/custom.css',
+        './src/styles/footer.css',
       ],
     }),
   ],

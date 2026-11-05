@@ -1,0 +1,97 @@
+---
+// Extends Starlight's Footer: the default edit link, last-updated date, and pagination
+// stay, and a site footer follows on every page — the tool's mark and tagline, link
+// groups, and the copyright line. Styles live in src/styles/footer.css.
+import Default from '@astrojs/starlight/components/Footer.astro';
+import { logos } from 'virtual:starlight/user-images';
+
+type Lang = 'en' | 'ko';
+type FooterLink = { label: string; href: string };
+type FooterGroup = { id: string; heading: string; links: FooterLink[] };
+
+const REPO_URL = 'https://github.com/iamkanguk97/mikro-orm-markdown';
+// Matches the copyright line in the repository's LICENSE file.
+const COPYRIGHT_YEAR = 2026;
+const COPYRIGHT_HOLDER = 'iamkanguk97';
+
+const TAGLINE: Record<Lang, string> = {
+  en: 'Mermaid ERD and Markdown schema docs, generated from your MikroORM entities.',
+  ko: 'MikroORM 엔티티에서 만드는 Mermaid ERD와 Markdown 스키마 문서.',
+};
+
+const lang: Lang = Astro.locals.starlightRoute.lang === 'ko' ? 'ko' : 'en';
+const base: string = import.meta.env.BASE_URL.replace(/\/$/, '');
+const homeHref = `${base}/${lang === 'ko' ? 'ko/' : ''}`;
+const docHref = (slug: string): string => `${homeHref}${slug}/`;
+
+const groups: FooterGroup[] = [
+  {
+    id: 'docs',
+    heading: lang === 'ko' ? '문서' : 'Docs',
+    links: [
+      { label: lang === 'ko' ? '개요' : 'Overview', href: docHref('getting-started/overview') },
+      { label: lang === 'ko' ? '빠른 시작' : 'Quick Start', href: docHref('getting-started/quick-start') },
+      { label: lang === 'ko' ? 'CLI 옵션' : 'CLI Options', href: docHref('reference/cli') },
+      { label: lang === 'ko' ? 'JSDoc 태그' : 'JSDoc Tags', href: docHref('reference/jsdoc-tags') },
+    ],
+  },
+  {
+    id: 'community',
+    heading: lang === 'ko' ? '커뮤니티' : 'Community',
+    links: [
+      { label: 'Discussions', href: `${REPO_URL}/discussions` },
+      { label: 'Issues', href: `${REPO_URL}/issues` },
+      { label: 'Contributing', href: `${REPO_URL}/blob/main/CONTRIBUTING.md` },
+    ],
+  },
+  {
+    id: 'more',
+    heading: lang === 'ko' ? '더 보기' : 'More',
+    links: [
+      { label: 'GitHub', href: REPO_URL },
+      { label: 'npm', href: 'https://www.npmjs.com/package/mikro-orm-markdown' },
+      { label: 'Changelog', href: `${REPO_URL}/blob/main/CHANGELOG.md` },
+      { label: 'MikroORM', href: 'https://mikro-orm.io' },
+    ],
+  },
+];
+---
+
+<Default />
+
+<!-- Same on every page, so keep it out of the search index. -->
+<div class="site-footer not-content" data-pagefind-ignore>
+  <div class="site-footer-main">
+    <div class="site-footer-brand">
+      <a href={homeHref} class="site-footer-title">
+        {logos.dark && <img class="light:sl-hidden" alt="" src={logos.dark.src} width={logos.dark.width} height={logos.dark.height} />}
+        {logos.light && <img class="dark:sl-hidden" alt="" src={logos.light.src} width={logos.light.width} height={logos.light.height} />}
+        <span translate="no">mikro-orm-markdown</span>
+      </a>
+      <p class="site-footer-tagline">{TAGLINE[lang]}</p>
+    </div>
+
+    <nav class="site-footer-links" aria-label={lang === 'ko' ? '사이트 링크' : 'Site links'}>
+      {
+        groups.map(({ id, heading, links }) => (
+          <div>
+            <p class="site-footer-heading" id={`site-footer-${id}`}>
+              {heading}
+            </p>
+            <ul aria-labelledby={`site-footer-${id}`}>
+              {links.map(({ label, href }) => (
+                <li>
+                  <a href={href}>{label}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+    </nav>
+  </div>
+
+  <p class="site-footer-copyright">
+    {`© ${COPYRIGHT_YEAR} ${COPYRIGHT_HOLDER}`} · <a href={`${REPO_URL}/blob/main/LICENSE`}>MIT License</a>
+  </p>
+</div>
