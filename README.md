@@ -46,7 +46,7 @@ Beyond what Prisma-based tools can express, `mikro-orm-markdown` also visualizes
 - **Decorator or schema-defined entities** — `@Entity()` classes read JSDoc from the class. Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`, which builds on it) render identically and read JSDoc from the exported schema declaration — see [Schema-defined entities](#schema-defined-entities).
 - **On MikroORM 7, import decorators from `@mikro-orm/decorators`** — v7 moved them out of `@mikro-orm/core` into `@mikro-orm/decorators/legacy` (TypeScript `experimentalDecorators`) and `@mikro-orm/decorators/es` (ES-standard decorators). Both work with this tool; on v6 they stay in `@mikro-orm/core`.
 - **Resolvable property types** — each entity property's type must be known during MikroORM discovery. Use explicit decorator options such as `type:` / `entity:`, or install `@mikro-orm/reflection` so the CLI can auto-use `TsMorphMetadataProvider` for TypeScript sources.
-- **`tsx` for TypeScript config files** — required when loading a `.ts` MikroORM config through the CLI. A `.js` config needs no extra package, but it must import compiled `.js` entities: the CLI registers `tsx` only for `.ts` configs, so a `.js` config that imports `.ts` entity files fails to load. To work from TypeScript sources, use a `.ts` config.
+- **`tsx` for TypeScript config files** — required when loading a `.ts` MikroORM config through the CLI. A `.js` config needs no extra package, but the CLI registers `tsx` only for `.ts` configs, so any `.ts` entity file a `.js` config imports is loaded by Node.js itself. That works only on Node.js 22.18+ for schema-defined entities written in erasable-only TypeScript; decorator-based entities fail to load. Otherwise, import compiled `.js` entities or use a `.ts` config.
 
 > If you install `@mikro-orm/reflection`, keep it at the **same exact version** as `@mikro-orm/core`. MikroORM expects official `@mikro-orm/*` packages to share one version, and mismatches can fail discovery.
 
@@ -71,7 +71,7 @@ Add a script to your `package.json`, pointing `--config` at your MikroORM config
 ```
 
 - **`.ts` config** — install `tsx` as a dev dependency (`npm install -D tsx`); the CLI loads it automatically and defaults MikroORM discovery to `entitiesTs` unless you explicitly set `preferTs`.
-- **`.js` config** — no extra packages needed. Can be hand-written, or your own build output (e.g. `./dist/mikro-orm.config.js`), as long as it imports compiled `.js` entities.
+- **`.js` config** — no extra packages needed. Can be hand-written, or your own build output (e.g. `./dist/mikro-orm.config.js`). If it imports `.ts` entity files, see the `tsx` note under [Requirements](#requirements).
 
 Then run:
 

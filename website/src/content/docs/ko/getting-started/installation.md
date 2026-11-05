@@ -20,7 +20,7 @@ pnpm add -D mikro-orm-markdown
 - **데코레이터 또는 스키마 정의 엔티티** — `@Entity()` 클래스는 클래스에서 JSDoc을 읽습니다. `EntitySchema`(또는 그 위에 만들어진 MikroORM 7의 `defineEntity()`)로 정의한 엔티티도 동일하게 렌더링되며, export된 스키마 선언에서 JSDoc을 읽습니다 — [스키마 정의 엔티티](/mikro-orm-markdown/ko/guides/schema-entities/)를 참고하세요.
 - **MikroORM 7에서는 데코레이터를 `@mikro-orm/decorators`에서 임포트** — v7은 데코레이터를 `@mikro-orm/core`에서 분리해 `@mikro-orm/decorators/legacy`(TypeScript `experimentalDecorators`)와 `@mikro-orm/decorators/es`(ES 표준 데코레이터)로 옮겼습니다. 둘 다 이 도구와 함께 동작합니다. v6에서는 그대로 `@mikro-orm/core`에 있습니다.
 - **해석 가능한 프로퍼티 타입** — 각 엔티티 프로퍼티의 타입은 MikroORM discovery 시점에 알려져야 합니다. `type:` / `entity:` 같은 명시적인 데코레이터 옵션을 사용하거나, `@mikro-orm/reflection`을 설치해 CLI가 TypeScript 소스에 대해 `TsMorphMetadataProvider`를 자동으로 사용하게 하세요.
-- **TypeScript config 파일을 위한 `tsx`** — CLI에서 `.ts` MikroORM config를 로드할 때 필요합니다. `.js` config는 추가 패키지가 필요 없지만, 컴파일된 `.js` 엔티티를 import해야 합니다. CLI는 `.ts` config일 때만 `tsx`를 등록하므로, `.ts` 엔티티 파일을 import하는 `.js` config는 로드에 실패합니다. TypeScript 소스로 작업하려면 `.ts` config를 사용하세요.
+- **TypeScript config 파일을 위한 `tsx`** — CLI에서 `.ts` MikroORM config를 로드할 때 필요합니다. `.js` config는 추가 패키지가 필요 없지만, CLI는 `.ts` config일 때만 `tsx`를 등록하므로 `.js` config가 import하는 `.ts` 엔티티 파일은 Node.js가 직접 로드합니다. 이는 Node.js 22.18 이상에서, 타입 표기만 지우면 되는(erasable) TypeScript 문법으로 작성한 schema 정의 엔티티일 때만 동작하며, 데코레이터 기반 엔티티는 로드에 실패합니다. 그 밖의 경우에는 컴파일된 `.js` 엔티티를 import하거나 `.ts` config를 사용하세요.
 
 :::caution
 `@mikro-orm/reflection`을 설치한다면 **`@mikro-orm/core`와 정확히 같은 버전**으로 맞추세요. MikroORM은 공식 `@mikro-orm/*` 패키지들이 하나의 버전을 공유한다고 기대하며, 버전이 다르면 discovery가 실패할 수 있습니다.

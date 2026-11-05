@@ -18,7 +18,7 @@ import Mermaid from '../../../../components/Mermaid.astro';
 ```
 
 - **`.ts` config** — `tsx`를 devDependency로 설치하세요 (`npm install -D tsx`). CLI가 자동으로 로드하며, `preferTs`를 명시하지 않았다면 MikroORM discovery가 `entitiesTs`를 우선 사용하도록 설정합니다.
-- **`.js` config** — 추가 패키지 불필요. 직접 작성한 파일이든, 빌드 결과물(예: `./dist/mikro-orm.config.js`)이든 상관없습니다. 단, 컴파일된 `.js` 엔티티를 import해야 합니다.
+- **`.js` config** — 추가 패키지 불필요. 직접 작성한 파일이든, 빌드 결과물(예: `./dist/mikro-orm.config.js`)이든 상관없습니다. `.ts` 엔티티 파일을 import한다면 [설치](/mikro-orm-markdown/ko/getting-started/installation/)의 `tsx` 안내를 확인하세요.
 
 ## 2. JSDoc으로 엔티티 설명하기
 

@@ -18,7 +18,7 @@ Point `--config` at your MikroORM config file:
 ```
 
 - **`.ts` config** — install `tsx` as a dev dependency (`npm install -D tsx`). The CLI loads it automatically and defaults MikroORM discovery to `entitiesTs` unless you explicitly set `preferTs`.
-- **`.js` config** — no extra packages needed. It can be hand-written, or your own build output (e.g. `./dist/mikro-orm.config.js`), as long as it imports compiled `.js` entities.
+- **`.js` config** — no extra packages needed. It can be hand-written, or your own build output (e.g. `./dist/mikro-orm.config.js`). If it imports `.ts` entity files, see the `tsx` note in [Installation](/mikro-orm-markdown/getting-started/installation/).
 
 ## 2. Describe your entities with JSDoc
 
