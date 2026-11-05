@@ -17,7 +17,7 @@ Use a `.ts` MikroORM config with `entitiesTs` pointing at your source entities. 
 @Entity()
 export class Post {
   /** Post title */
-  @Property()
+  @Property({ type: 'string' })
   title!: string;
 }
 ```

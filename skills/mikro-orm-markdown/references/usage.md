@@ -27,7 +27,7 @@ Add a script to `package.json`:
 ```json
 {
   "scripts": {
-    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title 'My Database'"
+    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title \"My Database\""
   }
 }
 ```

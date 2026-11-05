@@ -20,7 +20,7 @@ pnpm add -D mikro-orm-markdown
 - **Decorator or schema-defined entities** — `@Entity()` classes read JSDoc from the class. Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`, which builds on it) render identically and read JSDoc from the exported schema declaration — see [Schema-defined entities](/mikro-orm-markdown/guides/schema-entities/).
 - **On MikroORM 7, import decorators from `@mikro-orm/decorators`** — v7 moved them out of `@mikro-orm/core` into `@mikro-orm/decorators/legacy` (TypeScript `experimentalDecorators`) and `@mikro-orm/decorators/es` (ES-standard decorators). Both work with this tool; on v6 they stay in `@mikro-orm/core`.
 - **Resolvable property types** — each entity property's type must be known during MikroORM discovery. Use explicit decorator options such as `type:` / `entity:`, or install `@mikro-orm/reflection` so the CLI can auto-use `TsMorphMetadataProvider` for TypeScript sources.
-- **`tsx` for TypeScript config files** — required only when loading a `.ts` MikroORM config through the CLI. `.js` config files do not need it.
+- **`tsx` for TypeScript config files** — required when loading a `.ts` MikroORM config through the CLI. A `.js` config needs no extra package, but it must import compiled `.js` entities: the CLI registers `tsx` only for `.ts` configs, so a `.js` config that imports `.ts` entity files fails to load. To work from TypeScript sources, use a `.ts` config.
 
 :::caution
 If you install `@mikro-orm/reflection`, keep it at the **same exact version** as `@mikro-orm/core`. MikroORM expects official `@mikro-orm/*` packages to share one version, and mismatches can fail discovery.

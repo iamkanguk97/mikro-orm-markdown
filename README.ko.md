@@ -46,7 +46,7 @@ Prisma 기반 도구로는 표현할 수 없는 MikroORM 고유 개념도 함께
 - **데코레이터 또는 스키마 정의 엔티티** — `@Entity()` 클래스는 클래스에서 JSDoc을 읽습니다. `EntitySchema`(또는 그 위에 만들어진 MikroORM 7의 `defineEntity()`)로 정의한 엔티티도 동일하게 렌더링되며, export된 스키마 선언에서 JSDoc을 읽습니다 — [스키마 정의 엔티티](#스키마-정의-엔티티)를 참고하세요.
 - **MikroORM 7에서는 데코레이터를 `@mikro-orm/decorators`에서 임포트** — v7은 데코레이터를 `@mikro-orm/core`에서 분리해 `@mikro-orm/decorators/legacy`(TypeScript `experimentalDecorators`)와 `@mikro-orm/decorators/es`(ES 표준 데코레이터)로 옮겼습니다. 둘 다 이 도구와 함께 동작합니다. v6에서는 그대로 `@mikro-orm/core`에 있습니다.
 - **해석 가능한 프로퍼티 타입** — 각 엔티티 프로퍼티의 타입은 MikroORM discovery 시점에 알려져야 합니다. `type:` / `entity:` 같은 명시적인 데코레이터 옵션을 사용하거나, `@mikro-orm/reflection`을 설치해 CLI가 TypeScript 소스에 대해 `TsMorphMetadataProvider`를 자동으로 사용하게 하세요.
-- **TypeScript config 파일을 위한 `tsx`** — CLI에서 `.ts` MikroORM config를 로드할 때만 필요합니다. `.js` config 파일에는 필요하지 않습니다.
+- **TypeScript config 파일을 위한 `tsx`** — CLI에서 `.ts` MikroORM config를 로드할 때 필요합니다. `.js` config는 추가 패키지가 필요 없지만, 컴파일된 `.js` 엔티티를 import해야 합니다. CLI는 `.ts` config일 때만 `tsx`를 등록하므로, `.ts` 엔티티 파일을 import하는 `.js` config는 로드에 실패합니다. TypeScript 소스로 작업하려면 `.ts` config를 사용하세요.
 
 > `@mikro-orm/reflection`을 설치한다면 **`@mikro-orm/core`와 정확히 같은 버전**으로 맞추세요. MikroORM은 공식 `@mikro-orm/*` 패키지들이 하나의 버전을 공유한다고 기대하며, 버전이 다르면 discovery가 실패할 수 있습니다.
 
@@ -65,13 +65,13 @@ pnpm add -D mikro-orm-markdown
 ```json
 {
   "scripts": {
-    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title 'My Database'"
+    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title \"My Database\""
   }
 }
 ```
 
 - **`.ts` config** — `tsx`를 devDependency로 설치하세요 (`npm install -D tsx`). CLI가 자동으로 로드하며, `preferTs`를 명시하지 않았다면 MikroORM discovery가 `entitiesTs`를 우선 사용하도록 설정합니다.
-- **`.js` config** — 추가 패키지 불필요. 직접 작성한 파일이든, 빌드 결과물(예: `./dist/mikro-orm.config.js`)이든 상관없습니다.
+- **`.js` config** — 추가 패키지 불필요. 직접 작성한 파일이든, 빌드 결과물(예: `./dist/mikro-orm.config.js`)이든 상관없습니다. 단, 컴파일된 `.js` 엔티티를 import해야 합니다.
 
 이후에는 아래 명령어 하나로 실행합니다:
 
@@ -122,7 +122,7 @@ mikro-orm-markdown --config ./mikro-orm.config.ts --exclude-columns created_at u
 @Entity()
 export class Post {
   /** 게시글 제목 */
-  @Property()
+  @Property({ type: 'string' })
   title!: string;
 }
 ```
@@ -216,6 +216,23 @@ Post }|--o| Author   →  작성자 글 1개+,  글은 작성자 0~1명        (
 다음과 같은 엔티티가 있다고 가정합니다:
 
 ```typescript
+/** @namespace Blog */
+@Entity()
+export class Author {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  @Property({ type: 'string' })
+  name!: string;
+
+  @Property({ type: 'string', unique: true })
+  email!: string;
+
+  /** @atLeastOne */
+  @OneToMany({ entity: () => Post, mappedBy: 'author' })
+  posts = new Collection<Post>(this);
+}
+
 /**
  * 등록된 사용자가 작성한 블로그 게시글입니다.
  * @namespace Blog
@@ -234,23 +251,6 @@ export class Post {
 
   @ManyToOne({ entity: () => Author })
   author!: Author;
-}
-
-/** @namespace Blog */
-@Entity()
-export class Author {
-  @PrimaryKey({ type: 'integer' })
-  id!: number;
-
-  @Property({ type: 'string' })
-  name!: string;
-
-  @Property({ type: 'string', unique: true })
-  email!: string;
-
-  /** @atLeastOne */
-  @OneToMany({ entity: () => Post, mappedBy: 'author' })
-  posts = new Collection<Post>(this);
 }
 ```
 

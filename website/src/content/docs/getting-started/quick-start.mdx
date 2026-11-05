@@ -12,17 +12,34 @@ Point `--config` at your MikroORM config file:
 ```json title="package.json"
 {
   "scripts": {
-    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title 'My Database'"
+    "erd": "mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md --title \"My Database\""
   }
 }
 ```
 
 - **`.ts` config** — install `tsx` as a dev dependency (`npm install -D tsx`). The CLI loads it automatically and defaults MikroORM discovery to `entitiesTs` unless you explicitly set `preferTs`.
-- **`.js` config** — no extra packages needed. It can be hand-written, or your own build output (e.g. `./dist/mikro-orm.config.js`).
+- **`.js` config** — no extra packages needed. It can be hand-written, or your own build output (e.g. `./dist/mikro-orm.config.js`), as long as it imports compiled `.js` entities.
 
 ## 2. Describe your entities with JSDoc
 
 ```ts
+/** @namespace Blog */
+@Entity()
+export class Author {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  @Property({ type: 'string' })
+  name!: string;
+
+  @Property({ type: 'string', unique: true })
+  email!: string;
+
+  /** @atLeastOne */
+  @OneToMany({ entity: () => Post, mappedBy: 'author' })
+  posts = new Collection<Post>(this);
+}
+
 /**
  * Blog post authored by a registered user.
  * @namespace Blog
@@ -41,23 +58,6 @@ export class Post {
 
   @ManyToOne({ entity: () => Author })
   author!: Author;
-}
-
-/** @namespace Blog */
-@Entity()
-export class Author {
-  @PrimaryKey({ type: 'integer' })
-  id!: number;
-
-  @Property({ type: 'string' })
-  name!: string;
-
-  @Property({ type: 'string', unique: true })
-  email!: string;
-
-  /** @atLeastOne */
-  @OneToMany({ entity: () => Post, mappedBy: 'author' })
-  posts = new Collection<Post>(this);
 }
 ```
 
