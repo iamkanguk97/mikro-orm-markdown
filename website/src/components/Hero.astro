@@ -31,8 +31,9 @@ const FILE_TABS_SYNC_KEY = 'home-demo-file';
     {tagline && <p class="home-hero-tagline" set:html={tagline} />}
     <div class="home-hero-actions">
       {
-        actions.map(({ link: href, text, variant, icon }) => (
-          <LinkButton href={href} variant={variant} icon={icon?.name}>
+        // Forward `attrs` (e.g. iconPlacement) the way Starlight's own Hero does.
+        actions.map(({ link: href, text, variant, icon, attrs: { class: className, ...attrs } = {} }) => (
+          <LinkButton href={href} variant={variant} icon={icon?.name} class:list={[className]} {...attrs}>
             {text}
           </LinkButton>
         ))
