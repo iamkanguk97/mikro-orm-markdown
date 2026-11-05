@@ -1,16 +1,27 @@
 ---
-// Replaces Starlight's social links with bordered square icon buttons that match
-// the theme toggle (src/components/ThemeToggle.astro).
+// Replaces Starlight's social links with outlined icon buttons that match the
+// theme toggle (src/components/ThemeToggle.astro). The GitHub button also shows
+// the star count fetched at build time (src/lib/github-stars.ts).
 import { Icon } from '@astrojs/starlight/components';
+import { formatStarCount, getStarCount } from '../lib/github-stars';
 import config from 'virtual:starlight/user-config';
 
 const links: NonNullable<typeof config.social> = config.social ?? [];
+const starCount: number | undefined = links.some((link) => link.icon === 'github') ? await getStarCount() : undefined;
 ---
 
 {
-  links.map(({ label, href, icon }) => (
-    <a href={href} rel="me" class="header-icon-button" aria-label={label}>
-      <Icon name={icon} />
-    </a>
-  ))
+  links.map(({ label, href, icon }) => {
+    const stars = icon === 'github' && starCount !== undefined ? formatStarCount(starCount) : undefined;
+    return (
+      <a
+        href={href}
+        rel="me"
+        class:list={['header-icon-button', { 'has-count': stars !== undefined }]}
+        aria-label={stars === undefined ? label : `${label} (${starCount} stars)`}>
+        <Icon name={icon} />
+        {stars !== undefined && <span class="header-icon-count">{stars}</span>}
+      </a>
+    );
+  })
 }
