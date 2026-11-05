@@ -1,0 +1,89 @@
+---
+title: mikro-orm-markdown
+description: MikroORM 엔티티에서 Mermaid ER 다이어그램과 Markdown 스키마 문서를 생성합니다 — 실행 중인 데이터베이스 연결이 필요 없습니다.
+template: splash
+hero:
+  tagline: MikroORM 엔티티에서 바로 만드는 Mermaid ERD와 Markdown 스키마 문서. DB 연결이 필요 없습니다.
+  image:
+    file: ../../../assets/logo-mark.png
+    alt: mikro-orm-markdown 로고 — 데이터베이스, MikroORM 마크, ERD 문서
+  actions:
+    - text: 시작하기
+      link: /mikro-orm-markdown/ko/getting-started/overview/
+      icon: right-arrow
+    - text: 예시 보기
+      link: /mikro-orm-markdown/ko/examples/
+      variant: minimal
+---
+
+import { Card, CardGrid, Code } from '@astrojs/starlight/components';
+import Mermaid from '../../../components/Mermaid.astro';
+
+## mikro-orm-markdown을 쓰는 이유
+
+<CardGrid>
+  <Card title="ERD + 컬럼 표" icon="document">
+    Mermaid ER 다이어그램과 함께, 실제 DB 컬럼명, 키, nullable 여부, 설명, 인덱스, 제약 조건을
+    담은 엔티티별 표를 만듭니다.
+  </Card>
+  <Card title="JSDoc 기반" icon="pencil">
+    설명, 섹션(`@namespace`, `@erd`, `@describe`), 노출 여부(`@hidden`)를 엔티티 파일에 이미
+    있는 주석에서 가져옵니다.
+  </Card>
+  <Card title="MikroORM 개념 지원" icon="puzzle">
+    Embeddable, Single Table Inheritance, `@Formula`, `EntitySchema` / `defineEntity()`
+    엔티티를 각각 독립된 개념으로 제대로 표현합니다.
+  </Card>
+  <Card title="DB 연결 불필요" icon="rocket">
+    MikroORM discovery로 엔티티 메타데이터를 읽습니다. SQLite, PostgreSQL, MySQL, MariaDB
+    드라이버에서 MikroORM 6과 7 모두 동작합니다.
+  </Card>
+</CardGrid>
+
+## 엔티티에서 다이어그램까지
+
+<div class="input-output">
+<Code
+  title="post.entity.ts"
+  lang="ts"
+  code={`/**
+ * Blog post authored by a registered user.
+ * @namespace Blog
+ */
+@Entity()
+export class Post {
+  @PrimaryKey({ type: 'integer' })
+  id!: number;
+
+  /** Post title */
+  @Property({ type: 'string' })
+  title!: string;
+
+  @Property({ type: 'text', nullable: true })
+  body?: string;
+
+  @ManyToOne({ entity: () => Author })
+  author!: Author;
+}`}
+/>
+<Mermaid
+  code={`erDiagram
+  Post {
+    integer id PK
+    string title
+    string body
+    integer author_id FK
+  }
+  Author {
+    integer id PK
+    string name
+    string email UK
+  }
+  Post }o--|| Author : "author"`}
+/>
+</div>
+
+```bash
+npm install -D mikro-orm-markdown
+npx mikro-orm-markdown --config ./mikro-orm.config.ts --out ./ERD.md
+```
