@@ -97,7 +97,7 @@
     "@commitlint/config-conventional": "^21.2.0",
     "@mikro-orm/core": "^6.6.16",
     "@mikro-orm/mariadb": "^6.6.16",
-    "@mikro-orm/mysql": "^6.6.16",
+    "@mikro-orm/mysql": "^7.2.7",
     "@mikro-orm/postgresql": "^6.6.16",
     "@mikro-orm/reflection": "^6.6.16",
     "@mikro-orm/sqlite": "^6.6.16",
