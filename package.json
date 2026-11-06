@@ -100,7 +100,7 @@
     "@mikro-orm/mysql": "^6.6.16",
     "@mikro-orm/postgresql": "^6.6.16",
     "@mikro-orm/reflection": "^6.6.16",
-    "@mikro-orm/sqlite": "^6.6.16",
+    "@mikro-orm/sqlite": "^7.2.7",
     "@types/node": "^22.20.4",
     "@vitest/coverage-v8": "^4.1.12",
     "husky": "^9.1.7",
