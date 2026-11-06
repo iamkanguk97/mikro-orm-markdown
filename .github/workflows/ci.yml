@@ -5,6 +5,12 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The consumer jobs install the newest MikroORM ^6/^7 peers, so a weekly run
+  # catches a MikroORM release that breaks the package before a user does,
+  # even when no PR is open. Monday 00:00 UTC = 09:00 KST.
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
 
 jobs:
   # Contributor tooling (Biome, commitlint, vitest, tsup) is validated once on
@@ -79,3 +85,32 @@ jobs:
       # exercises the installed package exactly as a consumer would.
       - name: Package smoke against the packed artifact
         run: node scripts/pack-smoke.mjs tarball/*.tgz
+
+  # Neither Dependabot (MikroORM majors are ignored) nor pack-smoke (pins ^6 and
+  # ^7) notices a new MikroORM major, yet users on it hit ERESOLVE against our
+  # peer range. Fail when npm's latest release falls outside that range. Skipped
+  # on push/PR so a new major does not turn every unrelated PR red.
+  mikro-orm-major:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+
+      # npm resolves the range itself, so no semver dependency is needed and
+      # widening peerDependencies later needs no change here.
+      - name: Latest MikroORM is inside the supported peer range
+        run: |
+          range=$(node -p "require('./package.json').peerDependencies['@mikro-orm/core']")
+          latest=$(npm view @mikro-orm/core version)
+          matches=$(npm view "@mikro-orm/core@${range}" version --json)
+          if ! LATEST="$latest" node -e 'const versions = [].concat(JSON.parse(process.argv[1])); process.exit(versions.includes(process.env.LATEST) ? 0 : 1)' "$matches"; then
+            echo "::error::MikroORM ${latest} is outside the supported peer range \"${range}\". Check compatibility, then widen peerDependencies."
+            exit 1
+          fi
+          echo "MikroORM ${latest} is inside the supported peer range \"${range}\"."
