@@ -105,7 +105,7 @@
     "@vitest/coverage-v8": "^4.1.12",
     "husky": "^9.1.7",
     "lint-staged": "^17.2.0",
-    "mermaid": "12.2.0",
+    "mermaid": "12.3.0",
     "tsup": "^9.0.0",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
