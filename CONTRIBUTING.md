@@ -70,6 +70,10 @@ Refs: #123
 Refs: ECOM-123
 ```
 
+Pull requests are squash-merged, and the PR title becomes the commit message on `main`.
+CI checks the PR title against these rules. Commits inside a PR are not checked, so if
+the check fails, edit the PR title — no need to rewrite your commits.
+
 ## Pull Request Process
 
 1. Fork the repository and create a branch from `main`.
