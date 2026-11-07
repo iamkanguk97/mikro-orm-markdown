@@ -2,8 +2,19 @@
 
 ## Prerequisites
 
-- Node.js >= 22.17
+- Node.js `^22.22.1 || ^24.11.0 || >=26.0.0` (required by development tools such as tsup and lint-staged)
 - npm >= 9
+
+This is a development requirement only. The published package still runs on Node.js >= 22.17 (`engines` in `package.json`), and CI checks that floor against the packed tarball.
+
+### Node.js support policy
+
+`engines.node` is the runtime floor promised to users. Raise it only when:
+
+- its Node.js release line reaches end-of-life (Node.js 22: 2027-04-30); move it to the oldest LTS line still supported, or
+- a runtime dependency, or a Node.js API used in `src/`, needs a newer version.
+
+Development tooling never moves it on its own; list such requirements above instead. Raising the floor is a breaking change, so it ships in a major release, bundled with other breaking changes where possible.
 
 ## Setup
 
