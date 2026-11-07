@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DocumentModel } from '../../src/model/build.js';
+import type { DocumentModel, NamespaceGroup } from '../../src/model/build.js';
 import { renderMarkdown } from '../../src/render/markdown.js';
 import { getFixtureMarkdown } from '../helpers/pipeline.js';
 
@@ -94,6 +94,45 @@ describe('renderMarkdown — table of contents', () => {
 
     expect(md).toContain('- [API](#api-1)');
     expect(md).toContain('- [api](#api-2)');
+  });
+
+  describe('when a namespace name equals an earlier suffixed anchor', () => {
+    function groupWithEntity(name: string, className: string): NamespaceGroup {
+      return {
+        name,
+        erdEntities: [],
+        erdRelations: [],
+        textEntities: [
+          {
+            model: { className, tableName: className.toLowerCase(), columns: [], constraints: [] },
+            jsDoc: undefined,
+            propDocs: new Map(),
+          },
+        ],
+      };
+    }
+
+    it('skips the anchor already taken by the suffixed entity heading', () => {
+      // Headings: ## Foo (foo), ### Foo (foo-1), ## Foo-1 → GitHub gives foo-1-1.
+      const docModel: DocumentModel = {
+        title: 'Collisions',
+        groups: [groupWithEntity('Foo', 'Foo'), groupWithEntity('Foo-1', 'Bar')],
+      };
+
+      expect(renderMarkdown(docModel)).toContain('- [Foo-1](#foo-1-1)');
+    });
+
+    it('increments the suffix on the original name instead of chaining suffixes', () => {
+      const docModel: DocumentModel = {
+        title: 'Collisions',
+        groups: [groupWithEntity('Foo', 'Foo'), groupWithEntity('Foo-1', 'Bar'), groupWithEntity('foo-1', 'Baz')],
+      };
+
+      const md = renderMarkdown(docModel);
+
+      expect(md).toContain('- [Foo-1](#foo-1-1)');
+      expect(md).toContain('- [foo-1](#foo-1-2)');
+    });
   });
 });
 
