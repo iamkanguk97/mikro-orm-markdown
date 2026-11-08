@@ -2,6 +2,7 @@ const MARKDOWN_INLINE_SPECIAL_CHARS = /[\\`|*#\[\]~]/g;
 const MARKDOWN_EMPHASIS_UNDERSCORE = /(?<![a-zA-Z0-9])_|_(?![a-zA-Z0-9])/g;
 const MARKDOWN_BULLET_LINE = /^[-+](?:\s|$)/;
 const MARKDOWN_HYPHEN_ONLY_LINE = /^-[-\s]*$/;
+const MARKDOWN_EQUALS_ONLY_LINE = /^=+$/;
 const MARKDOWN_ORDERED_MARKER = /^(\d{1,9})([.)])(?=\s|$)/;
 const MERMAID_IDENTIFIER_INVALID_CHARS = /[^a-zA-Z0-9_]/g;
 
@@ -32,13 +33,15 @@ function escapedLines(value: string): string[] {
 }
 
 /**
- * Escapes a line-leading list marker, ordered-list marker, or hyphen-only
- * thematic-break/setext line so a description line renders as literal text
- * instead of becoming document structure. Only block-level contexts
- * (paragraphs, blockquotes) need this; table cells are inline-only.
+ * Escapes a line-leading list marker, ordered-list marker, hyphen-only
+ * thematic-break/setext line, or equals-only setext line so a description line
+ * renders as literal text instead of becoming document structure — a setext
+ * heading would also take a heading anchor and capture a later Contents link.
+ * Only block-level contexts (paragraphs, blockquotes) need this; table cells
+ * are inline-only. Lines arrive trimmed, so `  ===  ` matches as `===`.
  */
 function escapeLeadingBlockMarker(line: string): string {
-  if (MARKDOWN_BULLET_LINE.test(line) || MARKDOWN_HYPHEN_ONLY_LINE.test(line)) {
+  if (MARKDOWN_BULLET_LINE.test(line) || MARKDOWN_HYPHEN_ONLY_LINE.test(line) || MARKDOWN_EQUALS_ONLY_LINE.test(line)) {
     return `\\${line}`;
   }
   return line.replace(MARKDOWN_ORDERED_MARKER, '$1\\$2');

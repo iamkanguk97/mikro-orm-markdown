@@ -669,6 +669,40 @@ describe('renderMarkdown — escaping', () => {
     // Table cells are inline-only: block markers stay raw, strikethrough is escaped.
     expect(md).toContain('| body | string |  |  | - stays inline \\~\\~gone\\~\\~ |');
   });
+
+  it('escapes equals-only setext underlines so descriptions cannot create headings', () => {
+    // An unescaped `===` turns the line above it into an H1 that takes a heading
+    // anchor, so a later "Foo" group's Contents link would jump to the description.
+    const docModel: DocumentModel = {
+      title: 'Schema',
+      description: 'Foo\n===',
+      groups: [
+        {
+          name: 'Foo',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: { className: 'Note', tableName: 'note', columns: [], constraints: [] },
+              jsDoc: {
+                description: 'Bar\n  ===  ',
+                namespaces: [],
+                erdNamespaces: [],
+                describeNamespaces: [],
+                hidden: false,
+              },
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+
+    expect(md).toContain('Foo  \n\\===');
+    expect(md).toContain('> Bar\n> \\===');
+  });
 });
 
 describe('renderMarkdown — composite keys', () => {
