@@ -45,7 +45,7 @@ When generation fails, preserve the original error message and inspect the cause
 - Missing property type metadata because decorators omit `type:`/`entity:` and `@mikro-orm/reflection` is not installed.
 - Missing JSDoc tags because entities were discovered from compiled JavaScript without `--src`.
 - Path aliases failing because the wrong `tsconfig.json` was applied.
-- Unsupported `EntitySchema` entities. `mikro-orm-markdown` currently supports decorator-based `@Entity()` classes.
+- Schema-defined entities (`EntitySchema` / `defineEntity()`) missing JSDoc because their exported schema declaration could not be read (a "JSDoc unavailable for schema-defined entities" warning names them).
 
 See [troubleshooting](references/troubleshooting.md) for error-specific fixes.
 

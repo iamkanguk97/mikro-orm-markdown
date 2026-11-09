@@ -65,9 +65,19 @@ export default async () => defineConfig({ ... });
 
 Resolve asynchronous config yourself and call the programmatic API instead.
 
-## EntitySchema entities
+## JSDoc unavailable for schema-defined entities
 
-Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`) render in the ERD and column tables from their metadata. JSDoc on the schema declaration is not read yet — a "JSDoc unavailable for schema-defined entities" warning names the affected entities, and descriptions, `@namespace`, and `@hidden` on those declarations are not applied until [#106](https://github.com/iamkanguk97/mikro-orm-markdown/issues/106) lands. JSDoc on decorator-based `@Entity()` classes keeps working unchanged.
+Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`) render like decorator entities and read JSDoc from the exported schema declaration. This warning names the schema-defined entities whose declaration could not be read: not found in the scanned sources, ambiguous, or found only in compiled JavaScript where comments were stripped. Their descriptions, `@namespace`, and `@hidden` are not applied, so hidden entities may appear.
+
+Common causes:
+
+- The config lists schema objects directly (`entities: [PostSchema]`). Without path globs there is no source file to scan. Pass `--src` (or the `src` option), or discover the schemas through globs such as `entitiesTs: ['./src/**/*.schema.ts']`.
+- Discovery runs from compiled JavaScript. Pass `--src` pointing at the original TypeScript files.
+- The schema is not an exported variable. Declare it as `export const PostSchema = new EntitySchema({...})`; a `const` exported with `export default PostSchema` also works. `export default new EntitySchema({...})` and schemas that are never exported cannot be read.
+
+```bash
+mikro-orm-markdown --config ./mikro-orm.config.ts --src "src/**/*.schema.ts"
+```
 
 ## Empty or incomplete Mermaid output
 
