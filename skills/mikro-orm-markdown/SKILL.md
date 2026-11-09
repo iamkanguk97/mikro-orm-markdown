@@ -13,6 +13,7 @@ Use this skill to help a project generate database documentation with `mikro-orm
 
 Before changing files in the target project:
 
+- Confirm Node.js is 22.17 or newer and `@mikro-orm/core` is v6 or v7.
 - Inspect `package.json` to identify the package manager and existing scripts.
 - Locate the MikroORM config file and confirm it default-exports a plain options object.
 - Locate entity source globs/classes and determine whether discovery uses TypeScript sources or compiled JavaScript.

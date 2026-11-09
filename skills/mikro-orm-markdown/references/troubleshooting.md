@@ -65,6 +65,15 @@ export default async () => defineConfig({ ... });
 
 Resolve asynchronous config yourself and call the programmatic API instead.
 
+## Cannot load config: Invalid or unexpected token
+
+A `.js` config imports `.ts` entity files. The CLI registers `tsx` only for a `.ts` config, so Node.js loads those entity files itself. Node.js 22.18 and newer can strip type annotations, so schema-defined entities written in erasable-only TypeScript (type annotations only, no `enum`, runtime `namespace`, or parameter properties) load. Decorator-based entities fail to load, and on Node.js 22.17 every `.ts` entity fails.
+
+Fix with one of:
+
+- Use a `.ts` config so the CLI loads it, and the entities it imports, through `tsx`.
+- Import the compiled `.js` entities, and pass `--src` with the original TypeScript files so JSDoc can still be read.
+
 ## JSDoc unavailable for schema-defined entities
 
 Entities defined with `EntitySchema` (or MikroORM 7's `defineEntity()`) render like decorator entities and read JSDoc from the exported schema declaration. This warning names the schema-defined entities whose declaration could not be read: not found in the scanned sources, ambiguous, or found only in compiled JavaScript where comments were stripped. Their descriptions, `@namespace`, and `@hidden` are not applied, so hidden entities may appear.

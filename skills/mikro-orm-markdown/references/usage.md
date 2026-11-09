@@ -18,7 +18,9 @@ pnpm add -D tsx
 yarn add -D tsx
 ```
 
-The target project must also have `@mikro-orm/core` v6 or newer and the matching driver package, such as `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`.
+Requires Node.js 22.17 or newer. The target project must also have `@mikro-orm/core` 6 or 7 (peer range `>=6.0.0 <8`) and the matching driver package, such as `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`.
+
+On MikroORM 7, decorators are imported from `@mikro-orm/decorators/legacy` (TypeScript `experimentalDecorators`) or `@mikro-orm/decorators/es` (ES-standard decorators) instead of `@mikro-orm/core`. Both work.
 
 ## CLI Setup
 
