@@ -140,7 +140,7 @@ Options:
 | `src` | Original TypeScript source paths/globs for compiled JavaScript discovery. |
 | `onWarn` | Callback for non-fatal warnings. |
 | `mermaid` | Optional Mermaid layout/theme config. |
-| `excludeColumns` | Exact DB column names to omit from every entity. Excluding an FK's columns also drops its edge. |
+| `excludeColumns` | Exact DB column names to omit from every entity. Excluding all of an FK's columns also drops its edge (ManyToOne / owning OneToOne only; ManyToMany edges stay). |
 
 ## Output Review Checklist
 

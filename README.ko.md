@@ -104,7 +104,7 @@ mikro-orm-markdown --config ./mikro-orm.config.ts --exclude-columns created_at u
 ```
 
 - 이름은 TypeScript 프로퍼티 이름이 아니라 출력에 표시되는 DB 컬럼 이름과 정확히 일치해야 합니다. `address_street` 같은 펼쳐진 embedded 컬럼도 지정할 수 있습니다.
-- 외래 키 컬럼을 제외하면 ERD에서 해당 관계선도 함께 제거됩니다. 복합 외래 키는 모든 컬럼을 나열해야 하며, 일부만 나열하면 해당 키는 그대로 두고 warning을 출력합니다.
+- 외래 키 컬럼을 제외하면 ERD에서 해당 관계선도 함께 제거됩니다. 엔티티에 외래 키 컬럼이 있는 관계(`@ManyToOne`, 소유 쪽 `@OneToOne`)만 해당하며, `@ManyToMany` 관계선은 엔티티에 컬럼이 없으므로 그대로 남습니다. 복합 외래 키는 모든 컬럼을 나열해야 하며, 일부만 나열하면 해당 키는 그대로 두고 warning을 출력합니다.
 - `@erd`로 다른 namespace의 다이어그램에 포함된 엔티티는 그곳에서 기본 키 컬럼만 표시됩니다. 기본 키 컬럼을 모두 제외하면(예: `--exclude-columns id`) 해당 엔티티와 관계선이 다른 namespace의 다이어그램에서 제거되며, 엔티티 자신의 섹션에서는 제외된 컬럼만 빠집니다.
 - 인덱스, unique, check 제약 조건은 제외된 컬럼을 포함하더라도 항상 유지됩니다. 실제 스키마를 설명하는 정보이므로, `deleted_at`을 제외해도 `UNIQUE (email, deleted_at)`은 그대로 표시됩니다.
 
