@@ -1033,6 +1033,7 @@ describe('buildDocumentModel — excludeColumns', () => {
     expect(shop.erdRelations).toEqual([]);
     // Its home namespace still renders it, just without the excluded column.
     expect(crm.erdEntities.map((entity) => entity.model.className)).toEqual(['Customer']);
+    expect(fieldNamesOf(crm.erdEntities[0]!)).toEqual([]);
   });
 
   it('still drops constraints on an FK to a @hidden entity when that FK column is also excluded', () => {
