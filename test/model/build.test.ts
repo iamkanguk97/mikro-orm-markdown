@@ -927,6 +927,63 @@ describe('buildDocumentModel — excludeColumns', () => {
     expect(calls[0]?.[1]?.detail).toContain('author_tenant_id');
   });
 
+  it('warns once, naming the STI root, when children inherit a partially excluded composite FK', () => {
+    // STI children repeat the root's FK property on the same table, so one key must not warn per subclass.
+    const owner = manyToOne('owner', 'TenantUser', ['owner_tenant_id', 'owner_id']);
+    const stiMeta = (className: string, sti: Record<string, unknown>): EntityMetadata =>
+      makeEntityMeta({
+        className,
+        tableName: 'animal',
+        primaryKeys: ['id'],
+        properties: { id: pkProperty(), owner },
+        ...sti,
+      });
+    const animal = stiMeta('Animal', { discriminatorColumn: 'type' });
+    const dog = stiMeta('Dog', { extends: 'Animal', discriminatorValue: 'dog' });
+    const cat = stiMeta('Cat', { extends: 'Animal', discriminatorValue: 'cat' });
+    const messages: string[] = [];
+
+    // Children come first so the root is named by lookup, not by iteration order.
+    const docModel = buildDocumentModel(
+      [dog, cat, animal, makeSimpleEntityMeta('TenantUser')],
+      makeJsDocResult(),
+      'T',
+      {
+        onWarn: (message: string) => {
+          messages.push(message);
+        },
+        excludeColumns: ['owner_tenant_id'],
+      }
+    );
+
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toContain('Animal.owner');
+    for (const className of ['Animal', 'Dog', 'Cat']) {
+      expect(fieldNamesOf(textEntity(docModel, className))).toEqual(['id', 'owner_tenant_id', 'owner_id']);
+    }
+  });
+
+  it('warns for each entity when unrelated entities have partially excluded composite FKs', () => {
+    const post = auditedEntityMeta('Post', {
+      author: manyToOne('author', 'TenantUser', ['author_tenant_id', 'author_id']),
+    });
+    const comment = auditedEntityMeta('Comment', {
+      author: manyToOne('author', 'TenantUser', ['author_tenant_id', 'author_id']),
+    });
+    const messages: string[] = [];
+
+    buildDocumentModel([post, comment, makeSimpleEntityMeta('TenantUser')], makeJsDocResult(), 'T', {
+      onWarn: (message: string) => {
+        messages.push(message);
+      },
+      excludeColumns: ['author_tenant_id'],
+    });
+
+    expect(messages).toHaveLength(2);
+    expect(messages[0]).toContain('Post.author');
+    expect(messages[1]).toContain('Comment.author');
+  });
+
   it('keeps index, unique, and check constraints that cover an excluded column', () => {
     const user = makeEntityMeta({
       className: 'User',

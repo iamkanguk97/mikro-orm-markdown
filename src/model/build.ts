@@ -73,6 +73,7 @@ export function buildDocumentModel(
   const excludedFieldNames = new Set(excludeColumns);
   // Keys (see relationEdgeKey) of edges whose FK columns were all excluded.
   const excludedEdgeKeys = new Set<string>();
+  const partiallyExcludedForeignKeys: PartiallyExcludedForeignKey[] = [];
 
   // Build enriched entity map, filtering out @hidden entities.
   const enrichedByClass = new Map<string, EnrichedEntity>();
@@ -85,16 +86,14 @@ export function buildDocumentModel(
     // constraints on those FK columns, which it could not find once exclusion
     // had already removed the columns.
     const enriched = buildEnrichedEntity(model, jsDoc, jsDocResult, metadataByClass, hiddenClasses);
-    const { model: trimmedModel, removedRelationLabels } = excludeConfiguredColumns(
-      enriched.model,
-      excludedFieldNames,
-      onWarn
-    );
-    for (const label of removedRelationLabels) {
+    const exclusion = excludeConfiguredColumns(enriched.model, excludedFieldNames);
+    for (const label of exclusion.removedRelationLabels) {
       excludedEdgeKeys.add(relationEdgeKey(model.className, label));
     }
-    enrichedByClass.set(model.className, { ...enriched, model: trimmedModel });
+    partiallyExcludedForeignKeys.push(...exclusion.partiallyExcludedForeignKeys);
+    enrichedByClass.set(model.className, { ...enriched, model: exclusion.model });
   }
+  warnPartiallyExcludedForeignKeys(partiallyExcludedForeignKeys, diagramEntities, onWarn);
 
   // @atLeastOne is matched against the full edge list first, so excluding an
   // FK column never turns a valid tag into a spurious "had no effect" warning.
@@ -141,24 +140,36 @@ function relationEdgeKey(fromEntity: string, label: string): string {
   return `${fromEntity}\0${label}`;
 }
 
+/** A composite FK property with only some of its columns listed in `excludeColumns`. */
+interface PartiallyExcludedForeignKey {
+  /** The entity the key was found on, before any column was dropped. */
+  model: EntityModel;
+  propName: string;
+  allFieldNames: string[];
+  listedFieldNames: string[];
+}
+
+interface ColumnExclusionResult {
+  model: EntityModel;
+  /** Property names of FKs whose columns were all excluded; their edges must go too. */
+  removedRelationLabels: string[];
+  partiallyExcludedForeignKeys: PartiallyExcludedForeignKey[];
+}
+
 /**
  * Drops columns whose DB column name is listed in `excludeColumns`.
  *
  * - Scalar and embedded columns are dropped on an exact field-name match.
  * - An FK property is dropped only when every one of its columns is listed;
  *   its relation edge is then reported back so the caller can remove it.
- * - A composite FK with only some columns listed is left untouched and a
- *   warning is emitted, rather than guessing what a half-hidden key means.
+ * - A composite FK with only some columns listed is left untouched and
+ *   reported back for a warning, rather than guessing what a half-hidden key means.
  * - Constraints are deliberately kept: they describe the real schema, and
  *   hiding `deleted_at` must not make `UNIQUE (email, deleted_at)` vanish.
  */
-function excludeConfiguredColumns(
-  model: EntityModel,
-  excludedFieldNames: ReadonlySet<string>,
-  onWarn?: WarnHandler
-): { model: EntityModel; removedRelationLabels: string[] } {
+function excludeConfiguredColumns(model: EntityModel, excludedFieldNames: ReadonlySet<string>): ColumnExclusionResult {
   if (excludedFieldNames.size === 0) {
-    return { model, removedRelationLabels: [] };
+    return { model, removedRelationLabels: [], partiallyExcludedForeignKeys: [] };
   }
 
   const foreignKeyColumnsByProp = new Map<string, ColumnModel[]>();
@@ -171,7 +182,7 @@ function excludeConfiguredColumns(
   }
 
   const removedRelationLabels: string[] = [];
-  const partiallyExcludedProps = new Set<string>();
+  const partiallyExcludedForeignKeys: PartiallyExcludedForeignKey[] = [];
   for (const [propName, columns] of foreignKeyColumnsByProp) {
     const allFieldNames = columns.map((column) => column.fieldName);
     const listedFieldNames = allFieldNames.filter((fieldName) => excludedFieldNames.has(fieldName));
@@ -182,25 +193,75 @@ function excludeConfiguredColumns(
       removedRelationLabels.push(propName);
       continue;
     }
-    partiallyExcludedProps.add(propName);
-    emitWarning(onWarn, {
-      title: 'Composite foreign key partially excluded',
-      detail:
-        `excludeColumns lists only some columns (${listedFieldNames.join(', ')}) of the composite foreign key ` +
-        `${model.className}.${propName} (${allFieldNames.join(', ')}), so the property was left untouched.`,
-      impact: ['The listed columns and the relation edge still appear in the generated document.'],
-      fix: `List every column of the foreign key (${allFieldNames.join(', ')}) to exclude it, or none of them.`,
-    });
+    partiallyExcludedForeignKeys.push({ model, propName, allFieldNames, listedFieldNames });
   }
 
+  const partiallyExcludedProps = new Set(partiallyExcludedForeignKeys.map((foreignKey) => foreignKey.propName));
   const columns = model.columns.filter(
     (column) =>
       !excludedFieldNames.has(column.fieldName) || (column.isForeignKey && partiallyExcludedProps.has(column.propName))
   );
   if (columns.length === model.columns.length) {
-    return { model, removedRelationLabels };
+    return { model, removedRelationLabels, partiallyExcludedForeignKeys };
   }
-  return { model: { ...model, columns }, removedRelationLabels };
+  return { model: { ...model, columns }, removedRelationLabels, partiallyExcludedForeignKeys };
+}
+
+/**
+ * Warns once per composite FK that `excludeColumns` covers only in part.
+ *
+ * STI children repeat the root's FK property on the shared table, so warning
+ * per entity would repeat the same message once per subclass. Keys are
+ * therefore told apart by table, property, and columns, and the warning names
+ * the topmost entity that declares the key.
+ */
+function warnPartiallyExcludedForeignKeys(
+  foreignKeys: readonly PartiallyExcludedForeignKey[],
+  diagramEntities: readonly EntityModel[],
+  onWarn?: WarnHandler
+): void {
+  const modelsByClass = new Map(diagramEntities.map((model) => [model.className, model]));
+  const warnedKeys = new Set<string>();
+  for (const foreignKey of foreignKeys) {
+    const { model, propName, allFieldNames, listedFieldNames } = foreignKey;
+    const key = [model.tableName, propName, ...allFieldNames].join('\0');
+    if (warnedKeys.has(key)) {
+      continue;
+    }
+    warnedKeys.add(key);
+    const owner = findTopmostForeignKeyOwner(foreignKey, modelsByClass);
+    emitWarning(onWarn, {
+      title: 'Composite foreign key partially excluded',
+      detail:
+        `excludeColumns lists only some columns (${listedFieldNames.join(', ')}) of the composite foreign key ` +
+        `${owner.className}.${propName} (${allFieldNames.join(', ')}), so the property was left untouched.`,
+      impact: ['The listed columns and the relation edge still appear in the generated document.'],
+      fix: `List every column of the foreign key (${allFieldNames.join(', ')}) to exclude it, or none of them.`,
+    });
+  }
+}
+
+/** Walks up the STI chain while the ancestor declares the same FK property on the same columns. */
+function findTopmostForeignKeyOwner(
+  foreignKey: PartiallyExcludedForeignKey,
+  modelsByClass: ReadonlyMap<string, EntityModel>
+): EntityModel {
+  const fieldNames = foreignKey.allFieldNames.join('\0');
+  const visitedClasses = new Set<string>();
+  let owner = foreignKey.model;
+  while (owner.extendsEntity !== undefined && !visitedClasses.has(owner.className)) {
+    visitedClasses.add(owner.className);
+    const parent = modelsByClass.get(owner.extendsEntity);
+    const parentFieldNames = parent?.columns
+      .filter((column) => column.isForeignKey && column.propName === foreignKey.propName)
+      .map((column) => column.fieldName)
+      .join('\0');
+    if (parent === undefined || parentFieldNames !== fieldNames) {
+      break;
+    }
+    owner = parent;
+  }
+  return owner;
 }
 
 /** Merges one diagram entity with its JSDoc, pruning columns and constraints that reference @hidden targets. */
