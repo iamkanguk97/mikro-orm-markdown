@@ -41,6 +41,15 @@ export interface DocumentModel {
   groups: NamespaceGroup[];
 }
 
+/** Optional inputs of `buildDocumentModel`. */
+export interface BuildDocumentModelOptions {
+  /** Paragraph rendered below the H1 heading. */
+  description?: string | undefined;
+  onWarn?: WarnHandler | undefined;
+  /** Exact DB column names dropped from every entity. */
+  excludeColumns?: readonly string[] | undefined;
+}
+
 /**
  * Merges MikroORM structural metadata with JSDoc information and organises the
  * result into namespace groups for rendering.
@@ -55,10 +64,9 @@ export function buildDocumentModel(
   metas: EntityMetadata[],
   jsDocResult: JsDocResult,
   title: string,
-  description?: string,
-  onWarn?: WarnHandler,
-  excludeColumns: readonly string[] = []
+  options: BuildDocumentModelOptions = {}
 ): DocumentModel {
+  const { description, onWarn, excludeColumns = [] } = options;
   const { entities: diagramEntities, relations } = buildDiagramModel(metas);
   const metadataByClass = new Map(metas.map((meta) => [meta.className, meta]));
   const hiddenClasses = collectHiddenClasses(diagramEntities, jsDocResult);

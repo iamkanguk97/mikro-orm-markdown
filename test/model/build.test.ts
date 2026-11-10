@@ -89,8 +89,10 @@ describe('buildDocumentModel — @atLeastOne warnings (L2)', () => {
     const jsDoc = createAtLeastOneJsDoc('Parent', 'children');
 
     const calls: [string, StructuredMessage | undefined][] = [];
-    buildDocumentModel([parent], jsDoc, 'T', undefined, (message, warning) => {
-      calls.push([message, warning]);
+    buildDocumentModel([parent], jsDoc, 'T', {
+      onWarn: (message: string, warning?: StructuredMessage) => {
+        calls.push([message, warning]);
+      },
     });
 
     expect(calls).toHaveLength(1);
@@ -801,10 +803,9 @@ describe('buildDocumentModel — excludeColumns', () => {
   it('drops listed DB columns from every entity in both the ERD and the text tables', () => {
     const metas = [auditedEntityMeta('User'), auditedEntityMeta('Post')];
 
-    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', undefined, undefined, [
-      'created_at',
-      'updated_at',
-    ]);
+    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', {
+      excludeColumns: ['created_at', 'updated_at'],
+    });
 
     for (const className of ['User', 'Post']) {
       expect(fieldNamesOf(textEntity(docModel, className))).toEqual(['id']);
@@ -815,7 +816,7 @@ describe('buildDocumentModel — excludeColumns', () => {
   it('matches DB column names exactly, not property names', () => {
     const metas = [auditedEntityMeta('User')];
 
-    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', undefined, undefined, ['createdAt', 'updated']);
+    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', { excludeColumns: ['createdAt', 'updated'] });
 
     expect(fieldNamesOf(textEntity(docModel, 'User'))).toEqual(['id', 'created_at', 'updated_at']);
   });
@@ -823,7 +824,7 @@ describe('buildDocumentModel — excludeColumns', () => {
   it('leaves the model untouched when the list is empty', () => {
     const metas = [auditedEntityMeta('User')];
 
-    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', undefined, undefined, []);
+    const docModel = buildDocumentModel(metas, makeJsDocResult(), 'T', { excludeColumns: [] });
 
     expect(fieldNamesOf(textEntity(docModel, 'User'))).toEqual(['id', 'created_at', 'updated_at']);
   });
@@ -836,9 +837,7 @@ describe('buildDocumentModel — excludeColumns', () => {
       team: manyToOne('team', 'Team', ['team_id']),
     });
 
-    const docModel = buildDocumentModel([post, user, team], makeJsDocResult(), 'T', undefined, undefined, [
-      'created_by',
-    ]);
+    const docModel = buildDocumentModel([post, user, team], makeJsDocResult(), 'T', { excludeColumns: ['created_by'] });
 
     expect(fieldNamesOf(textEntity(docModel, 'Post'))).toEqual(['id', 'created_at', 'updated_at', 'team_id']);
     const labels = docModel.groups.flatMap((g) => g.erdRelations).map((edge) => edge.label);
@@ -851,9 +850,9 @@ describe('buildDocumentModel — excludeColumns', () => {
     const post = auditedEntityMeta('Post', { owner: manyToOne('owner', 'User', ['post_owner_id']) });
     const team = auditedEntityMeta('Team', { owner: manyToOne('owner', 'User', ['team_owner_id']) });
 
-    const docModel = buildDocumentModel([post, team, user], makeJsDocResult(), 'T', undefined, undefined, [
-      'post_owner_id',
-    ]);
+    const docModel = buildDocumentModel([post, team, user], makeJsDocResult(), 'T', {
+      excludeColumns: ['post_owner_id'],
+    });
 
     const edges = docModel.groups.flatMap((g) => g.erdRelations);
     expect(edges.map((edge) => `${edge.fromEntity}.${edge.label}`)).toEqual(['Team.owner']);
@@ -880,14 +879,12 @@ describe('buildDocumentModel — excludeColumns', () => {
     });
     const warnings: string[] = [];
 
-    const docModel = buildDocumentModel(
-      [doc, tenantUser],
-      makeJsDocResult(),
-      'T',
-      undefined,
-      (message) => warnings.push(message),
-      ['author_tenant_id', 'author_id']
-    );
+    const docModel = buildDocumentModel([doc, tenantUser], makeJsDocResult(), 'T', {
+      onWarn: (message: string) => {
+        warnings.push(message);
+      },
+      excludeColumns: ['author_tenant_id', 'author_id'],
+    });
 
     expect(fieldNamesOf(textEntity(docModel, 'Doc'))).toEqual(['id']);
     expect(docModel.groups.flatMap((g) => g.erdRelations)).toEqual([]);
@@ -915,14 +912,12 @@ describe('buildDocumentModel — excludeColumns', () => {
     });
     const calls: [string, StructuredMessage | undefined][] = [];
 
-    const docModel = buildDocumentModel(
-      [doc, tenantUser],
-      makeJsDocResult(),
-      'T',
-      undefined,
-      (message, warning) => calls.push([message, warning]),
-      ['author_tenant_id']
-    );
+    const docModel = buildDocumentModel([doc, tenantUser], makeJsDocResult(), 'T', {
+      onWarn: (message: string, warning?: StructuredMessage) => {
+        calls.push([message, warning]);
+      },
+      excludeColumns: ['author_tenant_id'],
+    });
 
     expect(fieldNamesOf(textEntity(docModel, 'Doc'))).toEqual(['id', 'author_tenant_id', 'author_id']);
     expect(docModel.groups.flatMap((g) => g.erdRelations).map((edge) => edge.label)).toEqual(['author']);
@@ -948,7 +943,7 @@ describe('buildDocumentModel — excludeColumns', () => {
     });
 
     const withoutExclusion = buildDocumentModel([user], makeJsDocResult(), 'T');
-    const withExclusion = buildDocumentModel([user], makeJsDocResult(), 'T', undefined, undefined, ['deleted_at']);
+    const withExclusion = buildDocumentModel([user], makeJsDocResult(), 'T', { excludeColumns: ['deleted_at'] });
 
     expect(fieldNamesOf(textEntity(withExclusion, 'User'))).toEqual(['id', 'email']);
     expect(textEntity(withExclusion, 'User').model.constraints).toEqual(
@@ -973,7 +968,7 @@ describe('buildDocumentModel — excludeColumns', () => {
       ]),
     });
 
-    const docModel = buildDocumentModel([order, customer], jsDoc, 'T', undefined, undefined, ['id']);
+    const docModel = buildDocumentModel([order, customer], jsDoc, 'T', { excludeColumns: ['id'] });
     const shop = docModel.groups.find((group) => group.name === 'Shop')!;
     const crm = docModel.groups.find((group) => group.name === 'Crm')!;
 
@@ -1006,7 +1001,7 @@ describe('buildDocumentModel — excludeColumns', () => {
     const metas = [order, makeSimpleEntityMeta('Secret')];
 
     const hiddenOnly = buildDocumentModel(metas, jsDoc, 'T');
-    const hiddenAndExcluded = buildDocumentModel(metas, jsDoc, 'T', undefined, undefined, ['secret_id']);
+    const hiddenAndExcluded = buildDocumentModel(metas, jsDoc, 'T', { excludeColumns: ['secret_id'] });
 
     expect(textEntity(hiddenAndExcluded, 'Order').model).toEqual(textEntity(hiddenOnly, 'Order').model);
     expect(textEntity(hiddenAndExcluded, 'Order').model.constraints).toEqual([
@@ -1032,14 +1027,12 @@ describe('buildDocumentModel — excludeColumns', () => {
     });
     const warnings: string[] = [];
 
-    const docModel = buildDocumentModel(
-      [parent, child],
-      createAtLeastOneJsDoc('Parent', 'children'),
-      'T',
-      undefined,
-      (message) => warnings.push(message),
-      ['parent_id']
-    );
+    const docModel = buildDocumentModel([parent, child], createAtLeastOneJsDoc('Parent', 'children'), 'T', {
+      onWarn: (message: string) => {
+        warnings.push(message);
+      },
+      excludeColumns: ['parent_id'],
+    });
 
     expect(docModel.groups.flatMap((g) => g.erdRelations)).toEqual([]);
     expect(warnings).toEqual([]);
