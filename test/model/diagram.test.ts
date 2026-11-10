@@ -1092,6 +1092,140 @@ describe('buildDiagramModel — non-abstract STI root (M1)', () => {
   });
 });
 
+describe('buildDiagramModel — STI root skips child-only relations and constraints', () => {
+  // MikroORM copies every child-only property onto the STI root, flagged
+  // inherited=true and forced nullable. The root does not own those columns,
+  // so it must not draw edges or list constraints for them.
+  function childOnlyProperties(copiedOntoRoot: boolean): Record<string, Record<string, unknown>> {
+    const copyFlags = copiedOntoRoot ? { inherited: true, nullable: true } : {};
+    return {
+      owner: { name: 'owner', fieldNames: ['owner_id'], type: 'User', kind: ReferenceKind.MANY_TO_ONE, ...copyFlags },
+      plate: {
+        name: 'plate',
+        fieldNames: ['plate_id'],
+        type: 'Plate',
+        kind: ReferenceKind.ONE_TO_ONE,
+        owner: true,
+        unique: true,
+        ...copyFlags,
+      },
+      tags: { name: 'tags', type: 'Tag', kind: ReferenceKind.MANY_TO_MANY, owner: true, ...copyFlags },
+      vin: {
+        name: 'vin',
+        fieldNames: ['vin'],
+        type: 'string',
+        kind: ReferenceKind.SCALAR,
+        index: 'car_vin_idx',
+        ...copyFlags,
+      },
+      serial: {
+        name: 'serial',
+        fieldNames: ['serial'],
+        type: 'string',
+        kind: ReferenceKind.SCALAR,
+        unique: 'car_serial_uq',
+        ...copyFlags,
+      },
+    };
+  }
+
+  function rootOwnProperties(): Record<string, Record<string, unknown>> {
+    return {
+      id: pkProperty(),
+      type: { name: 'type', fieldNames: ['type'], type: 'string', kind: ReferenceKind.SCALAR },
+      garage: {
+        name: 'garage',
+        fieldNames: ['garage_id'],
+        type: 'Garage',
+        kind: ReferenceKind.MANY_TO_ONE,
+        nullable: true,
+      },
+      name: {
+        name: 'name',
+        fieldNames: ['name'],
+        type: 'string',
+        kind: ReferenceKind.SCALAR,
+        index: 'vehicle_name_idx',
+      },
+    };
+  }
+
+  function makeVehicleHierarchy(rootInit: Record<string, unknown> = {}): EntityMetadata[] {
+    return [
+      makeSimpleEntityMeta('User'),
+      makeSimpleEntityMeta('Plate'),
+      makeSimpleEntityMeta('Tag'),
+      makeSimpleEntityMeta('Garage'),
+      makeEntityMeta({
+        className: 'Vehicle',
+        tableName: 'vehicle',
+        discriminatorColumn: 'type',
+        primaryKeys: ['id'],
+        properties: { ...rootOwnProperties(), ...childOnlyProperties(true) },
+        ...rootInit,
+      }),
+      makeEntityMeta({
+        className: 'Car',
+        tableName: 'vehicle',
+        extends: 'Vehicle',
+        discriminatorValue: 'car',
+        primaryKeys: ['id'],
+        properties: { ...rootOwnProperties(), ...childOnlyProperties(false) },
+      }),
+    ];
+  }
+
+  function edgeLabelsFrom(model: ReturnType<typeof buildDiagramModel>, className: string): string[] {
+    return model.relations.filter((r) => r.fromEntity === className).map((r) => r.label);
+  }
+
+  function constraintNamesOf(model: ReturnType<typeof buildDiagramModel>, className: string): (string | undefined)[] {
+    return model.entities.find((e) => e.className === className)!.constraints.map((c) => c.name);
+  }
+
+  it('draws no root edge for child-only m:1, owning 1:1, or owning m:n properties', () => {
+    const model = buildDiagramModel(makeVehicleHierarchy());
+
+    expect(edgeLabelsFrom(model, 'Vehicle')).toEqual(['garage']);
+  });
+
+  it('keeps the root edge for a relation the root declares itself', () => {
+    const model = buildDiagramModel(makeVehicleHierarchy());
+
+    expect(model.relations).toContainEqual({
+      fromEntity: 'Vehicle',
+      toEntity: 'Garage',
+      fromCardinality: '}o',
+      toCardinality: 'o|',
+      label: 'garage',
+    });
+  });
+
+  it('draws the child-only relations from the child with their real cardinality', () => {
+    const model = buildDiagramModel(makeVehicleHierarchy());
+    const carEdges = model.relations.filter((r) => r.fromEntity === 'Car');
+
+    expect(carEdges.map((r) => r.label)).toEqual(['garage', 'owner', 'plate', 'tags']);
+    expect(carEdges.find((r) => r.label === 'owner')).toMatchObject({ toEntity: 'User', toCardinality: '||' });
+    expect(carEdges.find((r) => r.label === 'plate')).toMatchObject({ toEntity: 'Plate', toCardinality: '||' });
+    expect(carEdges.find((r) => r.label === 'tags')).toMatchObject({ toEntity: 'Tag', toCardinality: 'o{' });
+  });
+
+  it('lists no child-only index or unique on the root, while the child keeps them', () => {
+    const model = buildDiagramModel(makeVehicleHierarchy());
+
+    expect(constraintNamesOf(model, 'Vehicle')).toEqual(['vehicle_name_idx']);
+    expect(constraintNamesOf(model, 'Car')).toEqual(['vehicle_name_idx', 'car_vin_idx', 'car_serial_uq']);
+  });
+
+  it('applies the same rules to a non-abstract root with its own discriminatorValue', () => {
+    const model = buildDiagramModel(makeVehicleHierarchy({ discriminatorValue: 'vehicle' }));
+
+    expect(edgeLabelsFrom(model, 'Vehicle')).toEqual(['garage']);
+    expect(constraintNamesOf(model, 'Vehicle')).toEqual(['vehicle_name_idx']);
+  });
+});
+
 describe('buildDiagramModel — object/array embedded as single JSON column (M2)', () => {
   function makeOrgWithObjectEmbeddeds(): EntityMetadata {
     return makeEntityMeta({

@@ -28,29 +28,38 @@ export function buildDiagramModel(metas: EntityMetadata[]): DiagramModel {
   return { entities, relations };
 }
 
+/**
+ * STI root: defines the discriminatorColumn and does not itself extend a parent.
+ * A *non-abstract* root is also assigned its own discriminatorValue by MikroORM,
+ * so this must not key off the absence of discriminatorValue — that would
+ * misclassify non-abstract roots and leak every subclass column into them.
+ */
+function isStiRoot(meta: EntityMetadata): boolean {
+  return meta.discriminatorColumn !== undefined && resolveExtendsName(meta) === undefined;
+}
+
+/**
+ * MikroORM copies every child-only property onto an STI root, flagged
+ * `inherited: true` (and forced nullable). The root does not own those
+ * columns, so nothing drawn for the root — columns, relation edges,
+ * constraints — may come from them.
+ */
+function getOwnProperties(meta: EntityMetadata): EntityProperty[] {
+  const props = Object.values(meta.properties);
+  return isStiRoot(meta) ? props.filter((prop) => prop.inherited !== true) : props;
+}
+
 function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityMetadata>): EntityModel {
-  // STI root: defines the discriminatorColumn and does not itself extend a parent.
-  // A *non-abstract* root is also assigned its own discriminatorValue by MikroORM,
-  // so we must not key off the absence of discriminatorValue here — that would
-  // misclassify non-abstract roots and leak every subclass column into them.
-  // The root's properties list includes all child-only columns (inherited=true) — filter them out.
   const extendsEntity = resolveExtendsName(meta);
-  const isStiRoot = meta.discriminatorColumn !== undefined && extendsEntity === undefined;
   const isStiChild = extendsEntity !== undefined && meta.discriminatorValue !== undefined;
 
-  const columns: ColumnModel[] = [];
-  for (const prop of Object.values(meta.properties)) {
-    if (isStiRoot && prop.inherited === true) {
-      continue;
-    }
-    columns.push(...buildColumns(prop, metaByClass, meta));
-  }
+  const columns: ColumnModel[] = getOwnProperties(meta).flatMap((prop) => buildColumns(prop, metaByClass, meta));
 
   return {
     className: meta.className,
     tableName: meta.tableName,
     columns,
-    ...(isStiRoot && { discriminatorColumn: meta.discriminatorColumn as string }),
+    ...(isStiRoot(meta) && { discriminatorColumn: meta.discriminatorColumn as string }),
     ...(isStiChild && { extendsEntity }),
     ...(isStiChild && meta.discriminatorValue !== undefined && { discriminatorValue: String(meta.discriminatorValue) }),
     ...(meta.comment !== undefined && { comment: meta.comment }),
@@ -459,7 +468,7 @@ function collectEntityIndexes(meta: EntityMetadata, result: ConstraintModel[], i
 }
 
 function collectPropertyIndexes(meta: EntityMetadata, result: ConstraintModel[], identities: Set<string>): void {
-  for (const prop of Object.values(meta.properties)) {
+  for (const prop of getOwnProperties(meta)) {
     const fieldName = prop.fieldNames?.[0];
     if (
       (prop.index !== true && typeof prop.index !== 'string') ||
@@ -489,7 +498,7 @@ function collectEntityUniques(meta: EntityMetadata, result: ConstraintModel[], i
 }
 
 function collectPropertyUniques(meta: EntityMetadata, result: ConstraintModel[], identities: Set<string>): void {
-  for (const prop of Object.values(meta.properties)) {
+  for (const prop of getOwnProperties(meta)) {
     const fieldNames = prop.fieldNames ?? [];
     // A composite owning 1:1's uniqueness spans all FK columns, so it is one
     // ordered multi-column constraint rather than a per-column marker.
@@ -585,7 +594,7 @@ function buildRelationEdges(metas: EntityMetadata[]): RelationEdge[] {
       continue;
     }
 
-    for (const prop of Object.values(meta.properties)) {
+    for (const prop of getOwnProperties(meta)) {
       const edge = buildEdge(meta.className, prop);
       if (edge !== null) {
         edges.push(edge);
