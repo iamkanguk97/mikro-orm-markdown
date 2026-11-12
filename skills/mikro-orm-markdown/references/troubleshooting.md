@@ -91,7 +91,7 @@ Common causes:
 mikro-orm-markdown --config ./mikro-orm.config.ts --src "src/**/*.schema.ts" "src/**/*.entity.ts"
 ```
 
-`--src` must cover every entity source file, not only the schemas. Once `--src` is given, a decorator-based entity whose class is missing from those paths stops generation with `Explicit src paths did not include source declarations for discovered entities`.
+`--src` must cover every source file the document needs, not only the schemas: each decorator-based entity class and each embeddable whose columns appear in the document. Add a glob for embeddables if they live in separate files (for example `"src/**/*.embeddable.ts"`). Once `--src` is given, a missing class stops generation with `Entities missing from the explicit src paths`.
 
 ## Empty or incomplete Mermaid output
 
