@@ -370,7 +370,7 @@ export async function generateMarkdown(options: GenerateMarkdownOptions): Promis
     assertExplicitJsDocSourcesMatched(jsDocResult, src);
     assertExplicitEntityJsDocSourceCoverage(metas, jsDocResult, schemaEntityClassNames, onWarn);
   }
-  const docModel = buildDocumentModel(metas, jsDocResult, title, description, onWarn, excludeColumns);
+  const docModel = buildDocumentModel(metas, jsDocResult, title, { description, onWarn, excludeColumns });
   if (explicitSrc) {
     assertExplicitEmbeddableJsDocSourceCoverage(jsDocResult, docModel);
   }
