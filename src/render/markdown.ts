@@ -73,11 +73,20 @@ function resolveGroupAnchors(docModel: DocumentModel): Map<NamespaceGroup, strin
   return groupAnchors;
 }
 
+/**
+ * Mirrors github-slugger: a suffixed anchor (`foo-1`) is recorded as used too, so a
+ * later heading whose own slug is `foo-1` moves on to `foo-1-1` instead of reusing it.
+ */
 function resolveHeadingAnchor(value: string, seenAnchors: Map<string, number>): string {
   const baseAnchor = toMarkdownAnchor(value);
-  const previousCount = seenAnchors.get(baseAnchor) ?? 0;
-  seenAnchors.set(baseAnchor, previousCount + 1);
-  return previousCount === 0 ? baseAnchor : `${baseAnchor}-${previousCount}`;
+  let anchor = baseAnchor;
+  while (seenAnchors.has(anchor)) {
+    const suffix = (seenAnchors.get(baseAnchor) ?? 0) + 1;
+    seenAnchors.set(baseAnchor, suffix);
+    anchor = `${baseAnchor}-${suffix}`;
+  }
+  seenAnchors.set(anchor, 0);
+  return anchor;
 }
 
 function renderGroupSection(group: NamespaceGroup, mermaid?: MermaidRenderOptions): string {
