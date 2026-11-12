@@ -6,7 +6,9 @@ import { Marked, type Tokens } from 'marked';
 // - Headings get ids and in-document `#anchor` links are rewritten to match, so the
 //   document's own "Contents" list works. Ids are prefixed with the scenario id because
 //   all scenarios share one page; the slug rule mirrors toMarkdownAnchor() in
-//   src/render/escape.ts (GitHub-style, `-1`, `-2` suffixes for repeats).
+//   src/render/escape.ts and the suffixing mirrors resolveHeadingAnchor() in
+//   src/render/markdown.ts (github-slugger: `-1`, `-2` suffixes, skipping ids already
+//   in use, so `Foo-1` after two `Foo` headings becomes `foo-1-1`).
 
 const HTML_ENTITIES: Record<string, string> = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" };
 
@@ -41,9 +43,14 @@ export function renderScenarioMarkdown(scenarioId: string, markdown: string): st
       heading({ tokens, depth }: Tokens.Heading): string {
         const inner = this.parser.parseInline(tokens);
         const slug = toSlug(toPlainText(inner));
-        const seen = slugCounts.get(slug) ?? 0;
-        slugCounts.set(slug, seen + 1);
-        const id = prefixed(seen === 0 ? slug : `${slug}-${seen}`);
+        let anchor = slug;
+        while (slugCounts.has(anchor)) {
+          const suffix = (slugCounts.get(slug) ?? 0) + 1;
+          slugCounts.set(slug, suffix);
+          anchor = `${slug}-${suffix}`;
+        }
+        slugCounts.set(anchor, 0);
+        const id = prefixed(anchor);
         return `<h${depth} id="${escapeAttribute(id)}">${inner}</h${depth}>\n`;
       },
       link({ href, tokens }: Tokens.Link): string | false {
