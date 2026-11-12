@@ -18,7 +18,9 @@ pnpm add -D tsx
 yarn add -D tsx
 ```
 
-The target project must also have `@mikro-orm/core` v6 or newer and the matching driver package, such as `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`.
+Requires Node.js 22.17 or newer. The target project must also have `@mikro-orm/core` 6 or 7 (peer range `>=6.0.0 <8`) and the matching driver package, such as `@mikro-orm/postgresql`, `@mikro-orm/mysql`, `@mikro-orm/mariadb`, or `@mikro-orm/sqlite`.
+
+On MikroORM 7, decorators are imported from `@mikro-orm/decorators/legacy` (TypeScript `experimentalDecorators`) or `@mikro-orm/decorators/es` (ES-standard decorators) instead of `@mikro-orm/core`. Both work.
 
 ## CLI Setup
 
@@ -89,13 +91,13 @@ Add JSDoc to entity classes and properties to shape the generated document:
 
 | Tag | Scope | Effect |
 | --- | --- | --- |
-| `@namespace <Name>` | Entity class | Put entity in the named ERD and text section. |
-| `@erd <Name>` | Entity class | Put entity in the named ERD section only. |
-| `@describe <Name>` | Entity class | Put entity in the named text section only. |
-| `@hidden` | Entity class | Exclude entity from all output. |
+| `@namespace <Name>` | Entity class or schema declaration | Put entity in the named ERD and text section. |
+| `@erd <Name>` | Entity class or schema declaration | Put entity in the named ERD section only. |
+| `@describe <Name>` | Entity class or schema declaration | Put entity in the named text section only. |
+| `@hidden` | Entity class or schema declaration | Exclude entity from all output. |
 | `@atLeastOne` | Collection property | Render the collection side as one-or-more instead of zero-or-more. |
 
-Plain class JSDoc becomes the entity description. Plain property JSDoc becomes the column description. If property JSDoc is absent, `@Property({ comment })` is used as a fallback column description. If class JSDoc has no description, `@Entity({ comment })` (or an `EntitySchema` `comment`) is used as a fallback entity description.
+Plain class (or schema declaration) JSDoc becomes the entity description. Plain property JSDoc becomes the column description. If property JSDoc is absent, `@Property({ comment })` is used as a fallback column description. If that entity JSDoc has no description, `@Entity({ comment })` (or an `EntitySchema` `comment`) is used as a fallback entity description.
 
 Example:
 
@@ -111,6 +113,28 @@ export class Post {
   title!: string;
 }
 ```
+
+### Schema-defined entities
+
+`EntitySchema` and `defineEntity()` entities read the same tags from the exported schema declaration:
+
+```typescript
+/**
+ * Blog post declared without a decorator class.
+ * @namespace Blog
+ */
+export const PostSchema = new EntitySchema({
+  name: 'Post',
+  properties: {
+    id: { primary: true, type: 'integer' },
+    /** Post title */
+    title: { type: 'string' },
+  },
+});
+```
+
+- Name-only schemas (no `class:`) read property JSDoc from inside the `properties` object literal, including MikroORM 7's `properties: (p) => ({...})` builder callback. It beats the `comment` property option, which stays the fallback.
+- Class-linked schemas (`class:`) read property JSDoc from the class. Entity-level JSDoc merges field by field with the class winning conflicts, and `@hidden` applies when either location has it.
 
 ## Programmatic API
 

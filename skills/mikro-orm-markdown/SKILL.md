@@ -13,6 +13,7 @@ Use this skill to help a project generate database documentation with `mikro-orm
 
 Before changing files in the target project:
 
+- Confirm Node.js is 22.17 or newer and `@mikro-orm/core` is v6 or v7.
 - Inspect `package.json` to identify the package manager and existing scripts.
 - Locate the MikroORM config file and confirm it default-exports a plain options object.
 - Locate entity source globs/classes and determine whether discovery uses TypeScript sources or compiled JavaScript.
@@ -45,7 +46,7 @@ When generation fails, preserve the original error message and inspect the cause
 - Missing property type metadata because decorators omit `type:`/`entity:` and `@mikro-orm/reflection` is not installed.
 - Missing JSDoc tags because entities were discovered from compiled JavaScript without `--src`.
 - Path aliases failing because the wrong `tsconfig.json` was applied.
-- Unsupported `EntitySchema` entities. `mikro-orm-markdown` currently supports decorator-based `@Entity()` classes.
+- Schema-defined entities (`EntitySchema` / `defineEntity()`) missing JSDoc because their exported schema declaration could not be read (a "JSDoc unavailable for schema-defined entities" warning names them).
 
 See [troubleshooting](references/troubleshooting.md) for error-specific fixes.
 
