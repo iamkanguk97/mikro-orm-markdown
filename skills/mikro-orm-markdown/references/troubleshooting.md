@@ -65,9 +65,12 @@ export default async () => defineConfig({ ... });
 
 Resolve asynchronous config yourself and call the programmatic API instead.
 
-## Cannot load config: Invalid or unexpected token
+## Cannot load config: Invalid or unexpected token / Unknown file extension ".ts"
 
-A `.js` config imports `.ts` entity files. The CLI registers `tsx` only for a `.ts` config, so Node.js loads those entity files itself. Node.js 22.18 and newer can strip type annotations, so schema-defined entities written in erasable-only TypeScript (type annotations only, no `enum`, runtime `namespace`, or parameter properties) load. Decorator-based entities fail to load, and on Node.js 22.17 every `.ts` entity fails.
+A `.js` config imports `.ts` entity files. The CLI registers `tsx` only for a `.ts` config, so Node.js loads those entity files itself. The message depends on the Node.js version:
+
+- Node.js 22.17 does not load `.ts` files by default, so every `.ts` entity fails with `Unknown file extension ".ts"`.
+- Node.js 22.18 and newer strip type annotations, so schema-defined entities written in erasable-only TypeScript (type annotations only, no `enum`, runtime `namespace`, or parameter properties) load. Decorator-based entities fail with `Invalid or unexpected token`.
 
 Fix with one of:
 
@@ -85,8 +88,10 @@ Common causes:
 - The schema is not an exported variable. Declare it as `export const PostSchema = new EntitySchema({...})`; a `const` exported with `export default PostSchema` also works. `export default new EntitySchema({...})` and schemas that are never exported cannot be read.
 
 ```bash
-mikro-orm-markdown --config ./mikro-orm.config.ts --src "src/**/*.schema.ts"
+mikro-orm-markdown --config ./mikro-orm.config.ts --src "src/**/*.schema.ts" "src/**/*.entity.ts"
 ```
+
+`--src` must cover every entity source file, not only the schemas. Once `--src` is given, a decorator-based entity whose class is missing from those paths stops generation with `Explicit src paths did not include source declarations for discovered entities`.
 
 ## Empty or incomplete Mermaid output
 
