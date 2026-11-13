@@ -12,6 +12,7 @@ import {
   toConfigImportSpecifier,
   writeMarkdownFile,
 } from '../src/cli.js';
+import { TYPESCRIPT_IMPORT_HINT } from '../src/config-import-hint.js';
 import { StructuredError } from '../src/index.js';
 import { makeTempDir } from './helpers/temp-dir.js';
 
@@ -157,6 +158,66 @@ describe('CLI helpers', () => {
     const missing = path.join(dir, 'nope.tsconfig.json');
 
     await expect(loadOrmOptions(configPath, missing)).rejects.toThrow(`--tsconfig file not found: ${missing}`);
+  });
+
+  // A real `.js → .ts` import cannot be used in these unit tests: Vitest may
+  // transform the imported file itself. The configs throw errors with Node's
+  // shape instead; the real import is covered by the CLI smoke test.
+  it('appends the TypeScript import hint when a .js config fails on a TypeScript file', async () => {
+    const dir = createTempDir();
+    const configPath = path.join(dir, 'config.js');
+    await fs.writeFile(
+      configPath,
+      "throw Object.assign(new TypeError('Unknown file extension \".ts\" for /abs/post.entity.ts'), { code: 'ERR_UNKNOWN_FILE_EXTENSION' });\n",
+      'utf-8'
+    );
+
+    const error = await loadOrmOptions(configPath).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(Error);
+    expect((error as Error).message).toBe(
+      `Unknown file extension ".ts" for /abs/post.entity.ts${TYPESCRIPT_IMPORT_HINT}`
+    );
+    expect((error as Error).cause).toMatchObject({ code: 'ERR_UNKNOWN_FILE_EXTENSION' });
+  });
+
+  it('reads the config source to recognise a bare SyntaxError from a TypeScript import', async () => {
+    const dir = createTempDir();
+    const configPath = path.join(dir, 'config.js');
+    await fs.writeFile(path.join(dir, 'post.entity.ts'), 'export {};\n', 'utf-8');
+    await fs.writeFile(
+      configPath,
+      "export const load = () => import('./post.entity.ts');\nthrow new SyntaxError('Invalid or unexpected token');\n",
+      'utf-8'
+    );
+
+    await expect(loadOrmOptions(configPath)).rejects.toThrow(`Invalid or unexpected token${TYPESCRIPT_IMPORT_HINT}`);
+  });
+
+  it('keeps unrelated .js config load failures unchanged', async () => {
+    const dir = createTempDir();
+    const configPath = path.join(dir, 'config.js');
+    await fs.writeFile(configPath, "throw new Error('boom');\n", 'utf-8');
+
+    const error = await loadOrmOptions(configPath).catch((err: unknown) => err);
+
+    expect((error as Error).message).toBe('boom');
+    expect((error as Error).cause).toBeUndefined();
+  });
+
+  it('does not append the TypeScript import hint to a failing .ts config', async () => {
+    const dir = createTempDir();
+    const configPath = path.join(dir, 'config.ts');
+    await fs.writeFile(
+      configPath,
+      "throw Object.assign(new TypeError('Unknown file extension \".ts\" for /abs/post.entity.ts'), { code: 'ERR_UNKNOWN_FILE_EXTENSION' });\n",
+      'utf-8'
+    );
+
+    const error = await loadOrmOptions(configPath).catch((err: unknown) => err);
+
+    expect((error as Error).message.startsWith('Failed to load TypeScript config.')).toBe(true);
+    expect((error as Error).message).not.toContain(TYPESCRIPT_IMPORT_HINT);
   });
 
   it('surfaces the underlying cause chain, not just the top-level message', () => {

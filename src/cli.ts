@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import type { Options } from '@mikro-orm/core';
 import { Command, Option } from 'commander';
+import { typeScriptImportHint } from './config-import-hint.js';
 import { DEFAULT_TITLE } from './defaults.js';
 import { causeChain, errorMessage } from './error-chain.js';
 import { generateMarkdown, StructuredError, type StructuredMessage } from './index.js';
@@ -140,7 +141,22 @@ async function registerTsxForConfig(configPath: string, tsconfigPath?: string): 
   return register(tsconfig !== undefined ? { tsconfig } : {});
 }
 
-/** Imports the config module, rewriting TypeScript loader failures with decorator/tsconfig guidance. */
+/** Reads the config file's own text, or `undefined` when it cannot be read. */
+function readConfigSource(configPath: string): string | undefined {
+  try {
+    return syncFs.readFileSync(configPath, 'utf-8');
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Imports the config module. Two failures are rewritten with guidance: a `.ts`
+ * config failing under the tsx loader (decorator/tsconfig advice), and any
+ * other config failing because Node.js loaded a TypeScript file it imports on
+ * its own (tsx is registered only for `.ts` configs). Everything else is
+ * rethrown untouched.
+ */
 async function importConfigModule(configPath: string, isTypeScriptConfig: boolean): Promise<{ default?: unknown }> {
   const configUrl = toConfigImportSpecifier(configPath);
   try {
@@ -156,6 +172,10 @@ async function importConfigModule(configPath: string, isTypeScriptConfig: boolea
           'or pass one explicitly with --tsconfig <path>.',
         { cause }
       );
+    }
+    const hint = typeScriptImportHint(cause, readConfigSource(configPath));
+    if (hint !== undefined) {
+      throw new Error(`${errorMessage(cause)}${hint}`, { cause });
     }
     throw cause;
   }
