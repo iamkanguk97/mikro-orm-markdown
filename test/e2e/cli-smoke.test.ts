@@ -105,4 +105,31 @@ describe('CLI smoke (built bin)', () => {
     expect(result.stderr).toContain("error: option '--mermaid-layout <layout>' argument 'grid' is invalid");
     expect(result.stderr).toContain('Allowed choices are dagre, elk, elk.stress');
   });
+
+  it('explains how to fix a .js config that imports a TypeScript entity file', () => {
+    const dir = makeTempDir('cli-smoke-');
+    fs.writeFileSync(path.join(dir, 'package.json'), '{ "type": "module" }\n');
+    fs.writeFileSync(
+      path.join(dir, 'post.entity.ts'),
+      'function Entity(target: unknown): void {\n  void target;\n}\n\n@Entity\nexport class Post {}\n'
+    );
+    const configPath = path.join(dir, 'mikro-orm.config.js');
+    fs.writeFileSync(
+      configPath,
+      "import { Post } from './post.entity.ts';\n\nexport default { dbName: ':memory:', entities: [Post] };\n"
+    );
+
+    const result = spawnSync('node', [cliPath, '-c', configPath, '-o', path.join(dir, 'ERD.md')], {
+      cwd: REPO_ROOT,
+      encoding: 'utf-8',
+    });
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Error: Cannot load config: ');
+    // Node's own message is kept: 22.17 rejects the extension, 22.18+ fails on the decorator.
+    expect(result.stderr).toMatch(/Unknown file extension "\.ts"|Invalid or unexpected token/);
+    expect(result.stderr).toContain('did not register tsx');
+    expect(result.stderr).toContain('--src');
+    expect(fs.existsSync(path.join(dir, 'ERD.md'))).toBe(false);
+  });
 });
