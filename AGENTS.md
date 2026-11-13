@@ -23,6 +23,7 @@ src/
   index.ts          # Public API: generateMarkdown(), resolveJsDocSources()
   defaults.ts       # Defaults shared by the CLI and the programmatic API
   error-chain.ts    # causeChain() / errorMessage() helpers for unknown errors
+  config-import-hint.ts # Detects a non-.ts config failing on a TypeScript import; returns the CLI hint
   messages.ts       # Structured warning/error payloads (StructuredMessage, StructuredError)
   provider.ts       # Auto-injects TsMorphMetadataProvider when needed
   source-path.ts    # Canonicalizes entity source paths (symlinks, parent segments)
@@ -72,6 +73,7 @@ npm run lint && npm run format:check && npm run typecheck && npm run test && npm
 test/
   cli.test.ts              # CLI option parsing and validation
   error-chain.test.ts      # causeChain()/errorMessage() unit tests
+  config-import-hint.test.ts # TypeScript-import failure detection unit tests
   messages.test.ts         # StructuredMessage / emitWarning unit tests
   provider.test.ts         # TsMorphMetadataProvider auto-injection unit tests
   source-path.test.ts      # Source path canonicalization unit tests
