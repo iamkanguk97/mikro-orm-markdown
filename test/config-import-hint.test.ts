@@ -58,6 +58,11 @@ describe('typeScriptImportHint', () => {
       }),
     ],
     [
+      // tsx resolves an extensionless path to its .ts file, so this is the same failure as R3 with `.js`.
+      'R3 with an extensionless import path',
+      nodeError("Cannot find module '/abs/post.entity' imported from /abs/a.ts", { code: 'ERR_MODULE_NOT_FOUND' }),
+    ],
+    [
       'R4 stack headed by a .ts location',
       nodeError('Invalid or unexpected token', {
         name: 'SyntaxError',
@@ -109,6 +114,19 @@ describe('typeScriptImportHint', () => {
     [
       'a missing package imported from a .ts file',
       nodeError("Cannot find package 'foo' imported from /abs/a.ts", { code: 'ERR_MODULE_NOT_FOUND' }),
+      TS_IMPORTING_CONFIG,
+    ],
+    // tsx never maps these to a TypeScript file, so a missing one is simply missing.
+    [
+      'a missing JSON file imported from a .ts file',
+      nodeError("Cannot find module '/abs/missing.json' imported from /abs/a.ts", { code: 'ERR_MODULE_NOT_FOUND' }),
+      TS_IMPORTING_CONFIG,
+    ],
+    [
+      'a missing native addon imported from a .ts file',
+      nodeError("Cannot find module 'C:\\proj\\build\\addon.node' imported from C:\\proj\\src\\a.ts", {
+        code: 'ERR_MODULE_NOT_FOUND',
+      }),
       TS_IMPORTING_CONFIG,
     ],
     [

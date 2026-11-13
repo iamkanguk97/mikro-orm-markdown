@@ -16,11 +16,15 @@ export const TYPESCRIPT_IMPORT_HINT =
 const UNKNOWN_TYPESCRIPT_EXTENSION = /^Unknown file extension "\.(?:ts|mts|cts)"/;
 
 /**
- * R3 — Node 22.18+ / 24: a TypeScript file imports `./b.js` while only `b.ts`
- * exists. Anchored on "module" so a missing npm package ("Cannot find package")
- * imported from a `.ts` file does not match — `tsx` would not fix that.
+ * R3 — Node 22.18+ / 24: a TypeScript file imports `./b.js` or an
+ * extensionless `./b` while only `b.ts` exists; `tsx` resolves both. Anchored
+ * on "module" so a missing npm package ("Cannot find package") does not match,
+ * and a missing `.json` / `.node` / `.wasm` file is excluded — `tsx` never maps
+ * those to a TypeScript file, so it would not fix either. The missing path is
+ * not required to end in `.js`: `./post.entity` is extensionless too.
  */
-const MODULE_NOT_FOUND_FROM_TYPESCRIPT = /^Cannot find module .* imported from .*\.(?:ts|mts|cts)$/;
+const MODULE_NOT_FOUND_FROM_TYPESCRIPT =
+  /^Cannot find module '(?![^']*\.(?:json|node|wasm)')[^']+' imported from .*\.(?:ts|mts|cts)$/;
 
 /**
  * R4 — a TypeScript file compiled as CommonJS (`require()`, or a package
