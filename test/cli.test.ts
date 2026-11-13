@@ -187,11 +187,33 @@ describe('CLI helpers', () => {
     await fs.writeFile(path.join(dir, 'post.entity.ts'), 'export {};\n', 'utf-8');
     await fs.writeFile(
       configPath,
-      "export const load = () => import('./post.entity.ts');\nthrow new SyntaxError('Invalid or unexpected token');\n",
+      // The stack is set to the shape Node gives a decorator in an ES module:
+      // the error line first, then only Node-internal frames.
+      "export const load = () => import('./post.entity.ts');\n" +
+        "const err = new SyntaxError('Invalid or unexpected token');\n" +
+        "err.stack = 'SyntaxError: Invalid or unexpected token\\n    at compileSourceTextModule (node:internal/modules/esm/utils:319:16)';\n" +
+        'throw err;\n',
       'utf-8'
     );
 
     await expect(loadOrmOptions(configPath)).rejects.toThrow(`Invalid or unexpected token${TYPESCRIPT_IMPORT_HINT}`);
+  });
+
+  it('keeps a SyntaxError raised by the config itself unchanged even when it imports a TypeScript file', async () => {
+    const dir = createTempDir();
+    const configPath = path.join(dir, 'config.js');
+    await fs.writeFile(path.join(dir, 'post.entity.ts'), 'export {};\n', 'utf-8');
+    await fs.writeFile(
+      configPath,
+      "export const load = () => import('./post.entity.ts');\nJSON.parse('{ \"dbName\": ');\n",
+      'utf-8'
+    );
+
+    const error = await loadOrmOptions(configPath).catch((err: unknown) => err);
+
+    expect(error).toBeInstanceOf(SyntaxError);
+    expect((error as Error).message).not.toContain(TYPESCRIPT_IMPORT_HINT);
+    expect((error as Error).cause).toBeUndefined();
   });
 
   it('keeps unrelated .js config load failures unchanged', async () => {

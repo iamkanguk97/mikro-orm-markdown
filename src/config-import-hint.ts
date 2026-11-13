@@ -42,6 +42,12 @@ const MISSING_EXPORT_FROM_TYPESCRIPT =
  */
 const TYPESCRIPT_IMPORT_SPECIFIER = /(?:\bfrom\s*|\bimport\s*\(?\s*|\brequire\s*\(\s*)(['"])[^'"\n]+\.(?:ts|mts|cts)\1/;
 
+/** A stack frame line (`    at …`). */
+const STACK_FRAME = /^\s+at /;
+
+/** A frame inside Node.js itself: `at fn (node:internal/…)` or `at node:internal/…`. */
+const NODE_INTERNAL_FRAME = /\(node:|at (?:async )?node:/;
+
 /** Reads a string field from an unknown thrown value without assuming it is an Error. */
 function stringField(value: unknown, key: 'name' | 'code' | 'message' | 'stack'): string | undefined {
   if (value === null || typeof value !== 'object') {
@@ -64,7 +70,9 @@ function stringField(value: unknown, key: 'name' | 'code' | 'message' | 'stack')
  * one shape that carries no file information at all: a decorator in an ES
  * module surfaces as a bare `SyntaxError` whose stack has only Node-internal
  * frames, identical to a genuinely broken JavaScript file. That case counts
- * only when the config itself imports a TypeScript file.
+ * only when the config itself imports a TypeScript file. Any other SyntaxError
+ * — one whose stack names a file or starts in user code — is left alone, even
+ * when the config imports TypeScript that loaded fine.
  */
 export function typeScriptImportHint(err: unknown, configSource?: string): string | undefined {
   const name = stringField(err, 'name');
@@ -85,13 +93,32 @@ export function typeScriptImportHint(err: unknown, configSource?: string): strin
     return undefined;
   }
 
-  const firstStackLine = (stringField(err, 'stack') ?? '').split('\n', 1)[0]?.trimEnd() ?? '';
+  const stackLines = (stringField(err, 'stack') ?? '').split('\n');
+  const firstStackLine = stackLines[0]?.trimEnd() ?? '';
   if (TYPESCRIPT_STACK_LOCATION.test(firstStackLine) || MISSING_EXPORT_FROM_TYPESCRIPT.test(message)) {
     return TYPESCRIPT_IMPORT_HINT;
   }
-  // R6 — only a code-less SyntaxError is ambiguous enough to need the config's own imports as evidence.
-  if (code === undefined && configSource !== undefined && TYPESCRIPT_IMPORT_SPECIFIER.test(configSource)) {
+  // R6 — only a code-less SyntaxError that names no file needs the config's own imports as evidence.
+  if (
+    code === undefined &&
+    isFileLessSyntaxError(stackLines) &&
+    configSource !== undefined &&
+    TYPESCRIPT_IMPORT_SPECIFIER.test(configSource)
+  ) {
     return TYPESCRIPT_IMPORT_HINT;
   }
   return undefined;
+}
+
+/**
+ * True for a SyntaxError stack that says nothing about where it came from: it
+ * opens with the error line itself instead of a `<file>:<line>` location, and
+ * its top frame is inside Node.js. A stack headed by a location, or topped by
+ * a user or builtin frame (`JSON.parse`, the config's own `file://` frame),
+ * already names its source, so the config's imports are not evidence for it.
+ */
+function isFileLessSyntaxError(stackLines: string[]): boolean {
+  const opensWithErrorLine = stackLines[0]?.startsWith('SyntaxError:') === true;
+  const topFrame = stackLines.find((line) => STACK_FRAME.test(line)) ?? '';
+  return opensWithErrorLine && NODE_INTERNAL_FRAME.test(topFrame);
 }

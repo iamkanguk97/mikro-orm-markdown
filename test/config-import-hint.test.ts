@@ -116,6 +116,50 @@ describe('typeScriptImportHint', () => {
       nodeError("The requested module './deco.js' does not provide an export named 'Post'", { name: 'SyntaxError' }),
       undefined,
     ],
+    // The config imports a TypeScript file that loaded fine; these SyntaxErrors
+    // say where they came from, so the config source must not be consulted.
+    [
+      'a SyntaxError whose stack is headed by a .js location',
+      nodeError("The requested module './helpers.js' does not provide an export named 'dbNmae'", {
+        name: 'SyntaxError',
+        stack:
+          "file:///abs/mikro-orm.config.js:2\nimport { dbNmae } from './helpers.js';\n         ^^^^^^\n" +
+          "SyntaxError: The requested module './helpers.js' does not provide an export named 'dbNmae'\n" +
+          '    at ModuleJob._instantiate (node:internal/modules/esm/module_job:228:21)',
+      }),
+      TS_IMPORTING_CONFIG,
+    ],
+    [
+      'a SyntaxError whose stack is headed by a .cjs location',
+      nodeError("Unexpected token ';'", {
+        name: 'SyntaxError',
+        stack:
+          "/abs/broken.cjs:1\nconst = ;\n      ^\n\nSyntaxError: Unexpected token ';'\n" +
+          '    at wrapSafe (node:internal/modules/cjs/loader:1486:18)',
+      }),
+      TS_IMPORTING_CONFIG,
+    ],
+    [
+      'a SyntaxError raised by JSON.parse in the config',
+      nodeError('Unexpected end of JSON input', {
+        name: 'SyntaxError',
+        stack:
+          'SyntaxError: Unexpected end of JSON input\n    at JSON.parse (<anonymous>)\n' +
+          '    at file:///abs/mikro-orm.config.js:3:6\n' +
+          '    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)',
+      }),
+      TS_IMPORTING_CONFIG,
+    ],
+    [
+      'a SyntaxError thrown by the config itself',
+      nodeError('boom', {
+        name: 'SyntaxError',
+        stack:
+          'SyntaxError: boom\n    at file:///abs/mikro-orm.config.js:2:7\n' +
+          '    at ModuleJob.run (node:internal/modules/esm/module_job:343:25)',
+      }),
+      TS_IMPORTING_CONFIG,
+    ],
     ['an ordinary error', new Error('boom'), TS_IMPORTING_CONFIG],
     ['a thrown string', 'boom', TS_IMPORTING_CONFIG],
     ['a thrown null', null, TS_IMPORTING_CONFIG],
