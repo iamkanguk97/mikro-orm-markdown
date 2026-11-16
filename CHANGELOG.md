@@ -7,7 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-16
+
 Column types now use one fixed vocabulary. Every recognized type renders as one of 11 generic words — `string`, `uuid`, `integer`, `float`, `decimal`, `boolean`, `datetime`, `date`, `time`, `json`, `binary` — in both the ERD and the column table, so the same entities read the same on PostgreSQL, MySQL, MariaDB, and SQLite ([#165](https://github.com/iamkanguk97/mikro-orm-markdown/issues/165)). **Regenerating an existing document shows a diff** for the columns listed under "Changed".
+
+### Added
+
+- CLI: when a config that is not a `.ts` file fails because it imports TypeScript entity files, the error now explains why and how to fix it — use a `.ts` config, or import the compiled `.js` entities and pass `--src` with the original TypeScript files. Node's own message is kept and the explanation follows it ([#178](https://github.com/iamkanguk97/mikro-orm-markdown/issues/178))
+- Documentation site: a "Column types" guide in English and Korean that lists the generic words, how a declared type is matched to one, and the custom type naming limitation below
 
 ### Changed
 
@@ -18,6 +25,12 @@ Column types now use one fixed vocabulary. Every recognized type renders as one 
 - A `Date` property renders as `datetime` (was `Date`); a column declared as the SQL type `date` renders as `date`
 - More dialect spellings are recognized instead of being passed through: `citext`, `inet`, `cidr`, `macaddr`, `xml`, `bpchar`, `nchar`, `nvarchar`, and `enum` → `string`; `int2`, `int4`, `int8`, `serial2`, `serial4`, `serial8`, `smallserial` → `integer`; `float4`, `float8` → `float`; `time`, `timetz`, `time with(out) time zone` → `time`; `timestamp with(out) time zone` → `datetime`; `blob`, `bytea`, `binary`, `varbinary`, `buffer`, and the `*blob` sizes → `binary`
 - Unchanged: types with no clear generic word still pass through as written — `interval`, `geometry`, `tsvector`, `array`, arrays such as `string[]`, and custom types
+- The package is now built with TypeScript 6 and tsup 9. The emitted JavaScript is byte-identical and `engines.node` stays `>=22.17.0`; only developing the package itself needs a newer Node (`^22.22.1 || ^24.11.0 || >=26.0.0`, see CONTRIBUTING) ([#168](https://github.com/iamkanguk97/mikro-orm-markdown/pull/168))
+
+### Fixed
+
+- Contents links no longer open the wrong section when a namespace name collides with a suffixed heading anchor, such as a namespace named `Foo-1` after a repeated `Foo` heading. Suffixes now skip anchors already in use, the way GitHub numbers them ([#155](https://github.com/iamkanguk97/mikro-orm-markdown/issues/155))
+- The `excludeColumns` warning "Composite foreign key partially excluded" is reported once per key instead of once per single-table-inheritance subclass ([#157](https://github.com/iamkanguk97/mikro-orm-markdown/issues/157))
 
 ### Known limitations
 
