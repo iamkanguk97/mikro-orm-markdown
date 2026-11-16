@@ -1,12 +1,52 @@
 name: Release
 
+# release-please keeps a release PR open that bumps the version and writes the
+# CHANGELOG from the Conventional Commit titles merged into main. Merging that
+# PR makes the next run tag the release, create the GitHub Release and publish
+# to npm. See "Releasing" in CONTRIBUTING.md.
+#
+# Runs only after CI has passed on main, so nothing is tagged or published from
+# a commit whose CI (quality + consumer pack smoke) failed.
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
-  release:
+  release-please:
+    # workflow_run also fires for CI runs started by pull requests (a fork PR
+    # whose branch is named main matches the branches filter), by the weekly
+    # schedule and by manual dispatch. Only a green run for a push to this
+    # repository's main may release.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+
+    steps:
+      - id: release
+        uses: googleapis/release-please-action@v5
+        with:
+          target-branch: main
+
+  publish:
+    needs: release-please
+    if: needs.release-please.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -14,6 +54,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+          persist-credentials: false
 
       - name: Use Node.js
         uses: actions/setup-node@v7
@@ -25,27 +68,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Format check
-        run: npm run format:check
-
-      - name: Type check
-        run: npm run typecheck
-
-      - name: Test
-        run: npm run test
-
       - name: Verify tag matches package version
+        env:
+          TAG: ${{ needs.release-please.outputs.tag_name }}
         run: |
-          node -e "const pkg=require('./package.json'); const tag=process.env.GITHUB_REF_NAME; const expected='v'+pkg.version; if (tag !== expected) { console.error('Tag '+tag+' does not match package version '+expected); process.exit(1); }"
+          node -e "const expected='v'+require('./package.json').version; if (process.env.TAG !== expected) { console.error('Tag '+process.env.TAG+' does not match package version '+expected); process.exit(1); }"
 
       - name: Build
         run: npm run build
-
-      - name: Package smoke (npm tarball install)
-        run: npm run test:pack
 
       - name: Publish to npm
         run: npm publish --access public --provenance

@@ -81,6 +81,15 @@ the check fails, edit the PR title — no need to rewrite your commits.
 3. Open a PR against `main` — fill in the PR template.
 4. A maintainer will review and merge.
 
+## Releasing
+
+Releases are automated with [release-please](https://github.com/googleapis/release-please). Contributors don't need to do anything beyond using a Conventional Commit PR title.
+
+- **Version.** After CI passes on `main`, release-please opens or updates a release PR titled `chore: release x.y.z`. It picks the version from the commit titles merged since the last release: `fix:` bumps the patch, `feat:` bumps the minor, and `!` after the type (`feat!:`) or a `BREAKING CHANGE:` footer bumps the major.
+- **Changelog.** The release PR writes the version into `package.json` and `.release-please-manifest.json`, and adds a `CHANGELOG.md` entry. `feat` titles go under Added, `perf` under Changed, and `fix` under Fixed. Other types stay out of the changelog. To add a summary paragraph or reword an entry, edit `CHANGELOG.md` on the release PR branch before merging.
+- **Merging (maintainer).** The release PR is opened with the workflow's `GITHUB_TOKEN`, so GitHub does not run CI on it, and its required checks never report. A maintainer merges it with admin bypass ("Merge without waiting for requirements to be met"). The code it releases has already passed CI on `main`, and the PR itself changes only the version and the changelog.
+- **Publishing.** When CI passes on the merge commit, the Release workflow tags `vx.y.z`, creates the GitHub Release, and publishes to npm. If publishing fails, for example because `NPM_TOKEN` expired, fix the cause and use "Re-run failed jobs" on that workflow run. The tag and the GitHub Release already exist, so a re-run only retries the publish.
+
 ## Reporting Bugs / Requesting Features
 
 Use the GitHub Issue templates.
