@@ -366,48 +366,141 @@ describe('renderErDiagram — Mermaid frontmatter', () => {
 
 describe('normalizeType', () => {
   it.each([
+    'string',
+    'text',
+    'varchar',
+    'character varying',
+    'character',
+    'char',
+    'bpchar',
+    'nchar',
+    'nvarchar',
+    'tinytext',
+    'mediumtext',
+    'longtext',
+    'citext',
+    'inet',
+    'cidr',
+    'macaddr',
+    'xml',
+    'enum',
+    'StringType',
+    'TextType',
+    'CharacterType',
+    'EnumType',
+  ])('maps %s to string', (input) => {
+    expect(normalizeType(input)).toBe('string');
+  });
+
+  it.each(['uuid', 'UuidType'])('maps %s to uuid', (input) => {
+    expect(normalizeType(input)).toBe('uuid');
+  });
+
+  it.each([
+    'number',
+    'integer',
+    'int',
+    'int2',
+    'int4',
+    'int8',
+    'smallint',
+    'tinyint',
+    'mediumint',
+    'bigint',
+    'serial',
+    'serial2',
+    'serial4',
+    'serial8',
+    'smallserial',
+    'bigserial',
+    'IntegerType',
+    'SmallIntType',
+    'TinyIntType',
+    'MediumIntType',
+    'BigIntType',
+  ])('maps %s to integer', (input) => {
+    expect(normalizeType(input)).toBe('integer');
+  });
+
+  it.each(['float', 'float4', 'float8', 'double', 'double precision', 'real', 'FloatType', 'DoubleType'])(
+    'maps %s to float',
+    (input) => {
+      expect(normalizeType(input)).toBe('float');
+    }
+  );
+
+  it.each(['decimal', 'numeric', 'money', 'DecimalType'])('maps %s to decimal', (input) => {
+    expect(normalizeType(input)).toBe('decimal');
+  });
+
+  it.each(['boolean', 'bool', 'tinyint(1)', 'BooleanType'])('maps %s to boolean', (input) => {
+    expect(normalizeType(input)).toBe('boolean');
+  });
+
+  it.each([
+    'Date',
+    'datetime',
+    'timestamp',
+    'timestamptz',
+    'timestamp with time zone',
+    'timestamp without time zone',
+    'DateTimeType',
+  ])('maps %s to datetime', (input) => {
+    expect(normalizeType(input)).toBe('datetime');
+  });
+
+  it.each(['date', 'DateType'])('maps %s to date', (input) => {
+    expect(normalizeType(input)).toBe('date');
+  });
+
+  it.each(['time', 'timetz', 'time with time zone', 'time without time zone', 'TimeType'])(
+    'maps %s to time',
+    (input) => {
+      expect(normalizeType(input)).toBe('time');
+    }
+  );
+
+  it.each(['json', 'jsonb', 'JsonType'])('maps %s to json', (input) => {
+    expect(normalizeType(input)).toBe('json');
+  });
+
+  it.each([
+    'blob',
+    'tinyblob',
+    'mediumblob',
+    'longblob',
+    'bytea',
+    'binary',
+    'varbinary',
+    'buffer',
+    'BlobType',
+    'Uint8ArrayType',
+  ])('maps %s to binary', (input) => {
+    expect(normalizeType(input)).toBe('binary');
+  });
+
+  it.each([
     ['varchar(255)', 'string'],
-    ['character varying', 'string'],
     ['character varying(255)', 'string'],
-    ['character', 'string'],
     ['character(36)', 'string'],
     ['char(36)', 'string'],
-    ['tinytext', 'string'],
-    ['mediumtext', 'string'],
-    ['longtext', 'string'],
-  ])('normalizes %s to %s', (input, expected) => {
-    expect(normalizeType(input)).toBe(expected);
-  });
-
-  it.each([
-    ['numeric', 'float'],
-    ['numeric(10,2)', 'float'],
-    ['decimal(10,2)', 'float'],
-    ['double(8,2)', 'float'],
-    ['float(8,2)', 'float'],
-    ['real', 'float'],
-  ])('normalizes %s to %s', (input, expected) => {
-    expect(normalizeType(input)).toBe(expected);
-  });
-
-  it.each([
-    ['tinyint', 'integer'],
+    ["enum('a','b')", 'string'],
     ['tinyint(4)', 'integer'],
-    ['mediumint', 'integer'],
     ['smallint unsigned', 'integer'],
     ['int unsigned', 'integer'],
     ['bigint(20) unsigned', 'integer'],
-    ['serial', 'integer'],
-    ['bigserial', 'integer'],
-  ])('normalizes %s to %s', (input, expected) => {
-    expect(normalizeType(input)).toBe(expected);
-  });
-
-  it.each([
+    ['double(8,2)', 'float'],
+    ['float(8,2)', 'float'],
+    ['numeric(10,2)', 'decimal'],
+    ['decimal(10,2)', 'decimal'],
     ['datetime(3)', 'datetime'],
     ['timestamp(6)', 'datetime'],
     ['timestamptz(6)', 'datetime'],
-  ])('normalizes parameterized %s to %s', (input, expected) => {
+    ['timestamp(6) with time zone', 'datetime'],
+    ['time(6)', 'time'],
+    ['time(6) without time zone', 'time'],
+    ['varbinary(255)', 'binary'],
+  ])('ignores the parameters and modifiers of %s and maps it to %s', (input, expected) => {
     expect(normalizeType(input)).toBe(expected);
   });
 
@@ -418,41 +511,39 @@ describe('normalizeType', () => {
     expect(normalizeType('tinyint(2)')).toBe('integer');
   });
 
+  it('is case-insensitive and trims surrounding whitespace', () => {
+    expect(normalizeType(' CHARACTER VARYING(255) ')).toBe('string');
+    expect(normalizeType('DECIMAL(10,2)')).toBe('decimal');
+    expect(normalizeType('jsontype')).toBe('json');
+  });
+
+  it('tells the JS Date class (a date and time) apart from the SQL date type (a calendar day)', () => {
+    expect(normalizeType('Date')).toBe('datetime');
+    expect(normalizeType('date')).toBe('date');
+    expect(normalizeType('DATE')).toBe('date');
+  });
+
+  it('renames IntervalType to interval so no MikroORM type class name is shown', () => {
+    expect(normalizeType('IntervalType')).toBe('interval');
+  });
+
+  // PostgreSQL stores `FullTextType` for a column declared as tsvector; the other drivers keep `tsvector`.
+  it('renames FullTextType to tsvector so the column reads the same on every driver', () => {
+    expect(normalizeType('FullTextType')).toBe('tsvector');
+  });
+
+  // `type: 'array'` and v7's `p.array()` / `p.enumArray()` are stored as these class names on every driver.
+  it.each(['ArrayType', 'EnumArrayType'])('renames %s to array so no MikroORM type class name is shown', (input) => {
+    expect(normalizeType(input)).toBe('array');
+  });
+
   it('does not confuse interval with the int family', () => {
     expect(normalizeType('interval')).toBe('interval');
     expect(normalizeType('interval(6)')).toBe('interval(6)');
   });
 
-  it('is case-insensitive and trims surrounding whitespace', () => {
-    expect(normalizeType(' CHARACTER VARYING(255) ')).toBe('string');
-    expect(normalizeType('DECIMAL(10,2)')).toBe('float');
-  });
-
-  it.each([
-    ['uuid', 'string'],
-    ['text', 'string'],
-    ['string', 'string'],
-    ['timestamptz', 'datetime'],
-    ['timestamp', 'datetime'],
-    ['datetime', 'datetime'],
-    ['integer', 'integer'],
-    ['int', 'integer'],
-    ['bigint', 'integer'],
-    ['smallint', 'integer'],
-    ['DoubleType', 'float'],
-    ['double precision', 'float'],
-    ['double', 'float'],
-    ['float', 'float'],
-    ['decimal', 'float'],
-    ['boolean', 'boolean'],
-    ['bool', 'boolean'],
-    ['jsonb', 'json'],
-  ])('keeps existing mapping of %s to %s', (input, expected) => {
-    expect(normalizeType(input)).toBe(expected);
-  });
-
-  it.each(['bytea', 'blob', 'geometry', "enum('a','b')", 'text[]', 'unknown'])(
-    'passes unrecognized type %s through unchanged',
+  it.each(['interval', 'geometry', 'tsvector', 'string[]', 'text[]', 'unknown', 'Point', 'PointType'])(
+    'passes %s through unchanged',
     (input) => {
       expect(normalizeType(input)).toBe(input);
     }
