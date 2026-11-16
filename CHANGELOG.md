@@ -22,6 +22,7 @@ Column types now use one fixed vocabulary. Every recognized type renders as one 
 ### Known limitations
 
 - The generic word comes from the entity type (`type`), not the DB column type (`columnType`). A `number` property forced to a float column with `columnType: 'real'` therefore renders as `integer`, and an `EntitySchema` property that sets only `columnType` (which MikroORM's own types reject — `type` is required there) can render as `unknown`. Declare `type` to get the right word
+- Types are matched by name only, ignoring case, so a custom type class named like a recognized type renders as that type's word instead of passing through: `Money` → `decimal`, `Time` → `time`, `Xml` → `string`. Give the class a name that is not a type name (for example `MoneyType`) to keep it in the output
 
 ## [2.1.0] - 2026-11-05
 
