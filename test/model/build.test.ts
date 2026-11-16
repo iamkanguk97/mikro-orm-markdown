@@ -119,6 +119,91 @@ describe('buildDocumentModel — @atLeastOne many-to-many', () => {
   });
 });
 
+describe('buildDocumentModel — @atLeastOne on a collection typed to an STI root', () => {
+  // `Owner.vehicles` is typed to the root, but `owner` exists only on children.
+  // The root draws no edge for a child-only property, so the edge to upgrade
+  // comes from the child that declares it.
+  const owner = { name: 'owner', fieldNames: ['owner_id'], type: 'Owner', kind: ReferenceKind.MANY_TO_ONE };
+
+  function vehicleMeta(className: string, init: Record<string, unknown>, hasOwner: boolean): EntityMetadata {
+    return makeEntityMeta({
+      className,
+      tableName: 'vehicle',
+      primaryKeys: ['id'],
+      properties: { id: pkProperty(), ...(hasOwner && { owner }) },
+      ...init,
+    });
+  }
+
+  function makeFamily(children: EntityMetadata[]): EntityMetadata[] {
+    return [
+      makeEntityMeta({
+        className: 'Owner',
+        tableName: 'owner',
+        primaryKeys: ['id'],
+        properties: {
+          id: pkProperty(),
+          vehicles: { name: 'vehicles', type: 'Vehicle', kind: ReferenceKind.ONE_TO_MANY, mappedBy: 'owner' },
+        },
+      }),
+      makeEntityMeta({
+        className: 'Vehicle',
+        tableName: 'vehicle',
+        discriminatorColumn: 'type',
+        primaryKeys: ['id'],
+        properties: { id: pkProperty(), owner: { ...owner, inherited: true, nullable: true } },
+      }),
+      ...children,
+    ];
+  }
+
+  const car = vehicleMeta('Car', { extends: 'Vehicle', discriminatorValue: 'car' }, true);
+  const sportsCar = vehicleMeta('SportsCar', { extends: 'Car', discriminatorValue: 'sports' }, true);
+  const truck = vehicleMeta('Truck', { extends: 'Vehicle', discriminatorValue: 'truck' }, true);
+  const bike = vehicleMeta('Bike', { extends: 'Vehicle', discriminatorValue: 'bike' }, false);
+
+  function build(children: EntityMetadata[]): { fromCardinalityOf: (className: string) => string; warnings: string[] } {
+    const warnings: string[] = [];
+    const docModel = buildDocumentModel(makeFamily(children), createAtLeastOneJsDoc('Owner', 'vehicles'), 'T', {
+      onWarn: (message: string) => {
+        warnings.push(message);
+      },
+    });
+    const edges = docModel.groups.flatMap((group) => group.erdRelations);
+
+    return {
+      fromCardinalityOf: (className: string): string =>
+        edges.find((edge) => edge.fromEntity === className)!.fromCardinality,
+      warnings,
+    };
+  }
+
+  it('upgrades the edge drawn from the child that declares the mappedBy property', () => {
+    const { fromCardinalityOf, warnings } = build([car, bike]);
+
+    expect(fromCardinalityOf('Car')).toBe('}|');
+    expect(warnings).toEqual([]);
+  });
+
+  it('leaves the repeated edge of a grandchild that only inherits the property unchanged', () => {
+    const { fromCardinalityOf, warnings } = build([car, sportsCar]);
+
+    expect(fromCardinalityOf('Car')).toBe('}|');
+    expect(fromCardinalityOf('SportsCar')).toBe('}o');
+    expect(warnings).toEqual([]);
+  });
+
+  it('changes nothing and warns when several subclasses declare the property separately', () => {
+    const { fromCardinalityOf, warnings } = build([car, truck]);
+
+    expect(fromCardinalityOf('Car')).toBe('}o');
+    expect(fromCardinalityOf('Truck')).toBe('}o');
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('@atLeastOne on Owner.vehicles');
+    expect(warnings[0]).toContain('Car, Truck');
+  });
+});
+
 describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
   it('drops FK columns that reference a hidden entity', () => {
     const order = makeEntityMeta({

@@ -352,6 +352,8 @@ erDiagram
 
 생성된 Markdown 표에도 STI note가 함께 표시됩니다. 루트에는 `STI root — discriminator column: type`, 각 서브클래스에는 `Extends Animal (Single Table Inheritance, discriminator value: dog)` 같은 문구가 추가됩니다.
 
+index, unique, check 제약조건도 컬럼과 같은 원칙을 따릅니다. 프로퍼티 이름을 가리키는 제약조건은 그 프로퍼티를 모두 가진 클래스에만 표시되므로, 서브클래스에만 있는 프로퍼티의 제약조건은 루트나 형제 서브클래스에 표시되지 않습니다. SQL `expression`으로만 작성한 제약조건은 루트와 모든 서브클래스에 표시됩니다. MikroORM이 어느 클래스에서 선언했는지 기록하지 않고, SQL 문자열을 분석하지도 않기 때문입니다.
+
 ## 문제 해결
 
 **"엔티티가 발견되지 않았습니다" (No entities were discovered)**
@@ -388,6 +390,19 @@ mikro-orm-markdown --config ./packages/api/mikro-orm.config.ts --tsconfig ./pack
 ```bash
 mikro-orm-markdown --config ./dist/mikro-orm.config.js --src "src/**/*.entity.ts"
 ```
+
+**STI 클래스에 선언하지 않은 제약조건이 표시되는 경우**
+
+Single Table Inheritance에서는 모든 클래스가 테이블 하나를 공유합니다. MikroORM은 각 서브클래스의 클래스 단위 index, unique, check를 하나의 목록으로 합치며, 어느 클래스에서 선언했는지는 기록하지 않습니다.
+
+- 프로퍼티 이름을 가리키는 제약조건(`@Index({ properties: ['breed'] })`)은 그 프로퍼티를 모두 가진 클래스에만 표시됩니다.
+- SQL `expression`으로만 작성한 제약조건은 루트와 모든 서브클래스에 표시됩니다. SQL 문자열을 분석해 컬럼을 찾지 않기 때문입니다.
+
+제약조건을 한 서브클래스의 섹션에만 표시하려면, 가능한 경우 `expression` 대신 `properties`로 선언하세요.
+
+**서브클래스에만 있는 프로퍼티가 STI 루트와 다른 서브클래스에 표시되는 경우**
+
+MikroORM v6와 7.1.5보다 낮은 v7에서는, 둘 이상의 서브클래스가 같은 이름으로 각각 선언한 프로퍼티가 루트의 프로퍼티로 전달됩니다. 그래서 그 프로퍼티가 루트와 모든 서브클래스에 표시됩니다. 컬럼, 관계선, 프로퍼티 단위 index·unique가 모두 해당합니다. MikroORM의 메타데이터에서 비롯된 문제이며, 루트가 실제로 선언한 프로퍼티와 구분할 수 없습니다. MikroORM v7.1.5 이상으로 올리면 해결됩니다.
 
 **Config 파일 요구사항**
 

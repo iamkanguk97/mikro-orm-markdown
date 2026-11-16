@@ -362,11 +362,10 @@ function removeHiddenEntityReferences(model: EntityModel, hiddenClasses: Readonl
  * Merges property documentation from a visible STI ancestry chain.
  *
  * Ancestors are applied root-to-child so the nearest declaration wins, then
- * the current entity is applied last. Raw MikroORM metadata is used because an
- * abstract intermediate STI class may have `extends` without a discriminator
- * value, so it does not get an `EntityModel.extendsEntity` field. A hidden or
- * missing ancestor is a hard boundary, and the visited set keeps malformed
- * cyclic metadata from looping forever.
+ * the current entity is applied last. Raw MikroORM metadata is used so the
+ * walk does not depend on which members the diagram model labels as STI
+ * children. A hidden or missing ancestor is a hard boundary, and the visited
+ * set keeps malformed cyclic metadata from looping forever.
  */
 function withInheritedStiPropDocs(
   model: EntityModel,
@@ -454,31 +453,51 @@ function applyAtLeastOne(
         continue;
       }
 
-      const match = findAtLeastOneEdge(adjusted, className, propName, prop);
-      if (match) {
+      const match = findAtLeastOneEdge(adjusted, className, propName, prop, metaByClass);
+      if (match?.edge !== undefined) {
         if (match.side === 'from') {
           match.edge.fromCardinality = FROM_ONE_OR_MORE;
         } else {
           match.edge.toCardinality = TO_ONE_OR_MORE;
         }
+        continue;
+      }
+
+      // The relation is drawn once per declaring subclass. "At least one"
+      // holds across all of them together, which no single edge can say.
+      if (match !== undefined) {
+        emitWarning(onWarn, {
+          title: '@atLeastOne had no effect',
+          detail:
+            `@atLeastOne on ${className}.${propName} had no effect: the relation is drawn from several subclasses ` +
+            `of ${prop.type} (${match.declaringEntities.join(', ')}), and "at least one" across them cannot be ` +
+            'shown on a single edge.',
+          fix: `Declare ${prop.mappedBy} once on an entity all of them extend, or type the collection to a single subclass.`,
+        });
+        continue;
       }
 
       // No matching edge: a unidirectional @OneToMany (no mappedBy) or a label
       // mismatch leaves the cardinality unchanged. Warn instead of failing silently.
-      if (!match) {
-        emitWarning(onWarn, {
-          title: '@atLeastOne had no effect',
-          detail: `@atLeastOne on ${className}.${propName} had no effect: no matching relation edge was found.`,
-          fix:
-            'Apply @atLeastOne only to collection relations that can be matched to a rendered edge: ' +
-            '@OneToMany with mappedBy, or @ManyToMany on either the owning side or an inverse mappedBy side.',
-        });
-      }
+      emitWarning(onWarn, {
+        title: '@atLeastOne had no effect',
+        detail: `@atLeastOne on ${className}.${propName} had no effect: no matching relation edge was found.`,
+        fix:
+          'Apply @atLeastOne only to collection relations that can be matched to a rendered edge: ' +
+          '@OneToMany with mappedBy, or @ManyToMany on either the owning side or an inverse mappedBy side.',
+      });
     }
   }
 
   return adjusted;
 }
+
+/**
+ * The edge a collection's @atLeastOne upgrades and which end of it is the
+ * collection ("many") side — or, with `edge` undefined, the subclasses that
+ * each draw the relation separately, so no single edge can carry the tag.
+ */
+type AtLeastOneMatch = { edge: RelationEdge; side: 'from' | 'to' } | { edge: undefined; declaringEntities: string[] };
 
 /**
  * Finds the rendered edge a collection property's @atLeastOne applies to, and
@@ -490,28 +509,76 @@ function findAtLeastOneEdge(
   adjusted: RelationEdge[],
   className: string,
   propName: string,
-  prop: EntityProperty
-): { edge: RelationEdge; side: 'from' | 'to' } | undefined {
-  // 1:N collection — the edge comes from the m:1 owning side; bump its "many" (from) side.
-  if (prop.kind === ReferenceKind.ONE_TO_MANY && prop.mappedBy) {
-    const edge = adjusted.find(
-      (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
-    );
-    return edge ? { edge, side: 'from' } : undefined;
-  }
+  prop: EntityProperty,
+  metaByClass: Map<string, EntityMetadata>
+): AtLeastOneMatch | undefined {
   // M:N owning collection — edge built from this prop; the other (to) side becomes one-or-more.
   if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.owner === true) {
     const edge = adjusted.find((e) => e.fromEntity === className && e.toEntity === prop.type && e.label === propName);
     return edge ? { edge, side: 'to' } : undefined;
   }
-  // M:N inverse collection — edge built from the owner; this (from) side becomes one-or-more.
-  if (prop.kind === ReferenceKind.MANY_TO_MANY && prop.mappedBy) {
-    const edge = adjusted.find(
-      (e) => e.fromEntity === prop.type && e.toEntity === className && e.label === prop.mappedBy
-    );
-    return edge ? { edge, side: 'from' } : undefined;
+
+  // 1:N collection (edge from the m:1 owning side) or M:N inverse collection
+  // (edge from the owner): either way this is the edge's "many" (from) side.
+  const isInverseCollection = prop.kind === ReferenceKind.ONE_TO_MANY || prop.kind === ReferenceKind.MANY_TO_MANY;
+  if (!isInverseCollection || !prop.mappedBy) {
+    return undefined;
   }
-  return undefined;
+
+  const sources = findOwningSideEdges(adjusted, className, prop, metaByClass);
+  const [edge] = sources;
+  if (edge === undefined) {
+    return undefined;
+  }
+  return sources.length === 1
+    ? { edge, side: 'from' }
+    : { edge: undefined, declaringEntities: sources.map((source) => source.fromEntity) };
+}
+
+/**
+ * The edges an inverse collection is mapped by. Usually that is the single
+ * edge from `prop.type`. When `prop.type` is an STI root and the mappedBy
+ * property lives only on its children, the root draws no edge, so the edges
+ * come from those children instead. A subclass repeats every relation it
+ * inherits; only the topmost entity of each line of descent counts, which
+ * keeps the result to the entities that declare the property themselves.
+ */
+function findOwningSideEdges(
+  adjusted: RelationEdge[],
+  className: string,
+  prop: EntityProperty,
+  metaByClass: Map<string, EntityMetadata>
+): RelationEdge[] {
+  const candidates = adjusted.filter(
+    (e) =>
+      e.toEntity === className &&
+      e.label === prop.mappedBy &&
+      (e.fromEntity === prop.type || isDescendantOf(e.fromEntity, prop.type, metaByClass))
+  );
+
+  return candidates.filter(
+    (e) => !candidates.some((other) => other !== e && isDescendantOf(e.fromEntity, other.fromEntity, metaByClass))
+  );
+}
+
+/** Whether `className` extends `ancestorName`, directly or through intermediate entities. */
+function isDescendantOf(className: string, ancestorName: string, metaByClass: Map<string, EntityMetadata>): boolean {
+  const visited = new Set<string>([className]);
+  let meta = metaByClass.get(className);
+
+  while (meta !== undefined) {
+    const parentName = resolveExtendsName(meta);
+    if (parentName === undefined || visited.has(parentName)) {
+      return false;
+    }
+    if (parentName === ancestorName) {
+      return true;
+    }
+    visited.add(parentName);
+    meta = metaByClass.get(parentName);
+  }
+
+  return false;
 }
 
 function hasNoNamespaceTags(jsDoc: EntityJsDocInfo | undefined): boolean {

@@ -29,29 +29,123 @@ export function buildDiagramModel(metas: EntityMetadata[]): DiagramModel {
 }
 
 /**
- * STI root: defines the discriminatorColumn and does not itself extend a parent.
- * A *non-abstract* root is also assigned its own discriminatorValue by MikroORM,
- * so this must not key off the absence of discriminatorValue — that would
- * misclassify non-abstract roots and leak every subclass column into them.
+ * STI root: the one family member that carries the discriminatorColumn —
+ * MikroORM never copies it down to the children (verified on v6 and v7).
+ *
+ * Two signals look tempting and are both wrong:
+ *  - "extends nothing": a root may inherit from a shared base (an abstract
+ *    @Entity or a plain undecorated class) and still be the root.
+ *  - "has no discriminatorValue": a *non-abstract* root is assigned its own
+ *    value, so this would leak every subclass column into such roots.
  */
 function isStiRoot(meta: EntityMetadata): boolean {
-  return meta.discriminatorColumn !== undefined && resolveExtendsName(meta) === undefined;
+  return meta.discriminatorColumn !== undefined;
 }
 
 /**
  * MikroORM copies every child-only property onto an STI root, flagged
- * `inherited: true` (and forced nullable). The root does not own those
- * columns, so nothing drawn for the root — columns, relation edges,
- * constraints — may come from them.
+ * `inherited: true` (and forced nullable), and then hands those same copies to
+ * any family member without a discriminatorValue — an abstract class sitting
+ * between the root and its concrete children. Neither owns those columns, so
+ * nothing drawn for them — columns, relation edges, constraints — may come
+ * from the copies.
+ *
+ * No family check is needed: a concrete child never receives the copies, and
+ * MikroORM sets the flag nowhere outside STI (verified on v6 and v7).
  */
 function getOwnProperties(meta: EntityMetadata): EntityProperty[] {
-  const props = Object.values(meta.properties);
-  return isStiRoot(meta) ? props.filter((prop) => prop.inherited !== true) : props;
+  return Object.values(meta.properties).filter((prop) => !isCopiedFromChild(meta, prop));
+}
+
+/**
+ * Whether a property of `meta` was copied up from an STI child. A copied
+ * @Embedded property carries the `inherited` flag itself, but the properties
+ * MikroORM then flattens out of it do not — they only point back at it through
+ * `embedded: [parentName, fieldName]`, so the flag is looked up along that
+ * chain (a nested embeddable adds one more link).
+ */
+function isCopiedFromChild(
+  meta: EntityMetadata,
+  prop: EntityProperty,
+  visited: ReadonlySet<string> = new Set<string>()
+): boolean {
+  if (prop.inherited === true) {
+    return true;
+  }
+
+  const parentName = prop.embedded?.[0];
+  const parent = parentName === undefined ? undefined : meta.properties[parentName];
+  if (parent === undefined || visited.has(prop.name)) {
+    return false;
+  }
+
+  return isCopiedFromChild(meta, parent, new Set(visited).add(prop.name));
+}
+
+/** The STI root an entity belongs to (itself for a root), or undefined outside an STI family. */
+function findStiRoot(meta: EntityMetadata, metaByClass: Map<string, EntityMetadata>): EntityMetadata | undefined {
+  const visited = new Set<string>();
+  let current: EntityMetadata | undefined = meta;
+
+  while (current !== undefined && !visited.has(current.className)) {
+    if (isStiRoot(current)) {
+      return current;
+    }
+    visited.add(current.className);
+    const parentName = resolveExtendsName(current);
+    current = parentName === undefined ? undefined : metaByClass.get(parentName);
+  }
+
+  return undefined;
+}
+
+/** Tells whether a constraint naming the given properties belongs on one entity. */
+type ConstraintOwnershipCheck = (props: string | string[] | undefined) => boolean;
+
+/**
+ * MikroORM merges every class-level index, unique, and check of an STI family
+ * into one list shared by the root and all children, without recording which
+ * class declared it. The only usable signal is the properties a constraint
+ * names: one that belongs to another family member exists on the root as an
+ * `inherited: true` copy and is absent from this entity's own properties.
+ *
+ * Returns a predicate telling whether a constraint naming `props` belongs on
+ * `meta`. It deliberately keeps what it cannot attribute — raw SQL expressions
+ * (no property list) and names no family member declares — because hiding a
+ * real constraint is worse than repeating it.
+ */
+function createConstraintOwnershipCheck(
+  meta: EntityMetadata,
+  metaByClass: Map<string, EntityMetadata>
+): ConstraintOwnershipCheck {
+  const root = findStiRoot(meta, metaByClass);
+  if (root === undefined) {
+    return () => true;
+  }
+
+  const ownNames = new Set(getOwnProperties(meta).map((prop) => prop.name));
+  const belongsToAnotherMember = (name: string): boolean => {
+    const rootProp = root.properties[name];
+    return !ownNames.has(name) && rootProp !== undefined && isCopiedFromChild(root, rootProp);
+  };
+
+  return (props: string | string[] | undefined): boolean => !toPropertyNames(props).some(belongsToAnotherMember);
+}
+
+function toPropertyNames(props: string | string[] | undefined): string[] {
+  const names = Array.isArray(props) ? props : props !== undefined ? [props] : [];
+  return names.map(String);
 }
 
 function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityMetadata>): EntityModel {
   const extendsEntity = resolveExtendsName(meta);
-  const isStiChild = extendsEntity !== undefined && meta.discriminatorValue !== undefined;
+  // A root that inherits from a base class has `extends` set too, so the root check comes first.
+  // An abstract class in the middle of the family has no discriminatorValue; it is
+  // recognized by the root above it instead.
+  const isStiChild =
+    !isStiRoot(meta) &&
+    extendsEntity !== undefined &&
+    (meta.discriminatorValue !== undefined || findStiRoot(meta, metaByClass) !== undefined);
 
   const columns: ColumnModel[] = getOwnProperties(meta).flatMap((prop) => buildColumns(prop, metaByClass, meta));
 
@@ -63,7 +157,7 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
     ...(isStiChild && { extendsEntity }),
     ...(isStiChild && meta.discriminatorValue !== undefined && { discriminatorValue: String(meta.discriminatorValue) }),
     ...(meta.comment !== undefined && { comment: meta.comment }),
-    constraints: buildConstraints(meta),
+    constraints: buildConstraints(meta, metaByClass),
   };
 }
 
@@ -426,23 +520,32 @@ function getPrimaryPhysicalFields(meta: EntityMetadata): PrimaryPhysicalField[] 
  * declarations of the same kind share one dedup identity set so an exact
  * duplicate tuple appears only once.
  */
-function buildConstraints(meta: EntityMetadata): ConstraintModel[] {
+function buildConstraints(meta: EntityMetadata, metaByClass: Map<string, EntityMetadata>): ConstraintModel[] {
   const result: ConstraintModel[] = [];
   const indexIdentities = new Set<string>();
   const uniqueIdentities = new Set<string>();
+  const isOwned = createConstraintOwnershipCheck(meta, metaByClass);
 
-  collectEntityIndexes(meta, result, indexIdentities);
+  collectEntityIndexes(meta, result, indexIdentities, isOwned);
   collectPropertyIndexes(meta, result, indexIdentities);
-  collectEntityUniques(meta, result, uniqueIdentities);
+  collectEntityUniques(meta, result, uniqueIdentities, isOwned);
   collectPropertyUniques(meta, result, uniqueIdentities);
-  collectChecks(meta, result);
+  collectChecks(meta, result, isOwned);
 
   return result;
 }
 
-function collectEntityIndexes(meta: EntityMetadata, result: ConstraintModel[], identities: Set<string>): void {
+function collectEntityIndexes(
+  meta: EntityMetadata,
+  result: ConstraintModel[],
+  identities: Set<string>,
+  isOwned: ConstraintOwnershipCheck
+): void {
   for (const idx of meta.indexes ?? []) {
     const props = idx.properties;
+    if (!isOwned(props)) {
+      continue;
+    }
     const predicate = resolveIndexPredicate(idx.type);
     const expression =
       idx.expression === undefined
@@ -486,9 +589,17 @@ function collectPropertyIndexes(meta: EntityMetadata, result: ConstraintModel[],
   }
 }
 
-function collectEntityUniques(meta: EntityMetadata, result: ConstraintModel[], identities: Set<string>): void {
+function collectEntityUniques(
+  meta: EntityMetadata,
+  result: ConstraintModel[],
+  identities: Set<string>,
+  isOwned: ConstraintOwnershipCheck
+): void {
   for (const uniq of meta.uniques ?? []) {
     const props = uniq.properties;
+    if (!isOwned(props)) {
+      continue;
+    }
     pushDistinctConstraint(result, identities, {
       type: 'unique',
       properties: resolveConstraintProperties(meta, props),
@@ -534,10 +645,14 @@ function collectPropertyUniques(meta: EntityMetadata, result: ConstraintModel[],
   }
 }
 
-function collectChecks(meta: EntityMetadata, result: ConstraintModel[]): void {
+function collectChecks(meta: EntityMetadata, result: ConstraintModel[], isOwned: ConstraintOwnershipCheck): void {
   for (const check of meta.checks ?? []) {
     // Skip function-based check expressions (they require column reference objects at runtime)
     if (typeof check.expression !== 'string') {
+      continue;
+    }
+    // A check declared on a property carries that property's name; a class-level one names none.
+    if (!isOwned(check.property)) {
       continue;
     }
     result.push({
@@ -566,12 +681,10 @@ function pushDistinctConstraint(result: ConstraintModel[], identities: Set<strin
 }
 
 function resolveConstraintProperties(meta: EntityMetadata, props: string | string[] | undefined): string[] {
-  const propNames = Array.isArray(props) ? props : props !== undefined ? [props] : [];
-
-  return propNames.flatMap((propName) => {
-    const prop = meta.properties[String(propName)];
+  return toPropertyNames(props).flatMap((propName) => {
+    const prop = meta.properties[propName];
     if (prop === undefined) {
-      return [String(propName)];
+      return [propName];
     }
 
     if (prop.fieldNames !== undefined && prop.fieldNames.length > 0) {

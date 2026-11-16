@@ -93,6 +93,21 @@ mikro-orm-markdown --config ./mikro-orm.config.ts --src "src/**/*.schema.ts" "sr
 
 `--src` must cover every source file the document needs, not only the schemas: each decorator-based entity class and each embeddable whose columns appear in the document. Add a glob for embeddables if they live in separate files (for example `"src/**/*.embeddable.ts"`). Once `--src` is given, a missing class stops generation with `Entities missing from the explicit src paths`.
 
+## A constraint appears on an STI class that did not declare it
+
+In Single Table Inheritance every class shares one table, and MikroORM merges the class-level indexes, uniques, and checks of every subclass into one list without recording which class declared them.
+
+- A constraint that names properties (`@Index({ properties: ['breed'] })`) is listed only on the classes that have all of those properties.
+- A constraint written as a raw SQL `expression` is listed on the root and on every subclass, because the SQL text is not parsed to find its columns.
+
+This is expected output, not a discovery error. To keep a constraint in one subclass's section, declare it with `properties` instead of `expression` where possible.
+
+## A subclass-only property appears on the STI root and on other subclasses
+
+On MikroORM v6 and on v7 before 7.1.5, a property that two or more subclasses each declare under the same name (`Dog.owner` and `Cat.owner`, with no `owner` on the root) is reported as a root property. It then shows up on the root and on every subclass — column, relation edge, and property-level index or unique.
+
+This is a MikroORM metadata bug, not a discovery error, and it cannot be told apart from a property the root really declares. Upgrading to MikroORM v7.1.5 or later fixes it; there is no option in this tool that changes it.
+
 ## Empty or incomplete Mermaid output
 
 Check:
