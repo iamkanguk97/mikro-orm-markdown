@@ -1,12 +1,91 @@
 name: Release
 
+# release-please keeps a release PR open that bumps the version and writes the
+# CHANGELOG from the Conventional Commit titles merged into main. Merging that
+# PR tags the release, creates the GitHub Release and publishes to npm. See
+# "Releasing" in CONTRIBUTING.md.
+#
+# Runs after CI completes. A release is cut only from the run whose CI verified
+# the release PR's own merge commit, so nothing is tagged or published from a
+# commit whose CI (quality + consumer pack smoke) failed or is still running.
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions: {}
 
 jobs:
   release:
+    # workflow_run also fires for CI runs started by pull requests (a fork PR
+    # whose branch is named main matches the branches filter), by the weekly
+    # schedule and by manual dispatch. Only a green run for a push to this
+    # repository's main may release or update the release PR.
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+
+    steps:
+      # release-please tags every merged release PR still labeled
+      # "autorelease: pending", whichever commit's CI triggered the run. Tag only
+      # when that PR's merge commit is the commit this CI run verified. If its CI
+      # failed, re-running that CI run cuts the release.
+      - name: Check whether CI verified the merged release PR
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          pending=$(gh pr list -R "$REPO" --base main --state merged --label 'autorelease: pending' --json mergeCommit --jq '.[].mergeCommit.oid')
+          if [ -n "$pending" ] && [ "$pending" = "$HEAD_SHA" ]; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            if [ -n "$pending" ]; then
+              echo "::notice::Merged release PR commit(s) ${pending//$'\n'/, } not verified by this CI run (${HEAD_SHA}); not releasing."
+            fi
+          fi
+
+      - id: release
+        if: steps.check.outputs.release == 'true'
+        uses: googleapis/release-please-action@v5
+        with:
+          target-branch: main
+          skip-github-pull-request: true
+
+  release-pr:
+    needs: release
+    runs-on: ubuntu-latest
+    # Only the release PR update shares a queue. Each run rebuilds the PR from
+    # the latest main, so a newer run replacing a pending one loses nothing.
+    concurrency:
+      group: release-pr
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - uses: googleapis/release-please-action@v5
+        with:
+          target-branch: main
+          skip-github-release: true
+
+  publish:
+    needs: release
+    if: needs.release.outputs.release_created == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -14,6 +93,19 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release.outputs.tag_name }}
+          persist-credentials: false
+
+      - name: Verify the tag is the commit CI verified
+        env:
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          tagged=$(git rev-parse HEAD)
+          if [ "$tagged" != "$HEAD_SHA" ]; then
+            echo "::error::Tag points to ${tagged}, but CI verified ${HEAD_SHA}."
+            exit 1
+          fi
 
       - name: Use Node.js
         uses: actions/setup-node@v7
@@ -25,27 +117,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Format check
-        run: npm run format:check
-
-      - name: Type check
-        run: npm run typecheck
-
-      - name: Test
-        run: npm run test
-
       - name: Verify tag matches package version
+        env:
+          TAG: ${{ needs.release.outputs.tag_name }}
         run: |
-          node -e "const pkg=require('./package.json'); const tag=process.env.GITHUB_REF_NAME; const expected='v'+pkg.version; if (tag !== expected) { console.error('Tag '+tag+' does not match package version '+expected); process.exit(1); }"
+          node -e "const expected='v'+require('./package.json').version; if (process.env.TAG !== expected) { console.error('Tag '+process.env.TAG+' does not match package version '+expected); process.exit(1); }"
 
       - name: Build
         run: npm run build
-
-      - name: Package smoke (npm tarball install)
-        run: npm run test:pack
 
       - name: Publish to npm
         run: npm publish --access public --provenance
