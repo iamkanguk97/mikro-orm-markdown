@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Column types now use one fixed vocabulary. Every recognized type renders as one of 11 generic words — `string`, `uuid`, `integer`, `float`, `decimal`, `boolean`, `datetime`, `date`, `time`, `json`, `binary` — in both the ERD and the column table, so the same entities read the same on PostgreSQL, MySQL, MariaDB, and SQLite ([#165](https://github.com/iamkanguk97/mikro-orm-markdown/issues/165)). **Regenerating an existing document shows a diff** for the columns listed under "Changed".
+
+### Changed
+
+- `uuid` columns render as `uuid` (was `string`)
+- `decimal`, `numeric`, and `money` columns render as `decimal` (was `float`; `money` was passed through)
+- `number` columns render as `integer` (was `number`), so an integer column no longer appears as `number` in one place and `integer` in another
+- MikroORM's internal type class names no longer reach the output: `JsonType` → `json`, `DecimalType` → `decimal`, `DateType` → `date`, `BigIntType` → `integer`, `BlobType` → `binary`, `IntervalType` → `interval`, PostgreSQL's `FullTextType` → `tsvector`, `ArrayType` and `EnumArrayType` → `array`, and likewise for the rest of the built-in type classes (`StringType`, `IntegerType`, `BooleanType`, …)
+- A `Date` property renders as `datetime` (was `Date`); a column declared as the SQL type `date` renders as `date`
+- More dialect spellings are recognized instead of being passed through: `citext`, `inet`, `cidr`, `macaddr`, `xml`, `bpchar`, `nchar`, `nvarchar`, and `enum` → `string`; `int2`, `int4`, `int8`, `serial2`, `serial4`, `serial8`, `smallserial` → `integer`; `float4`, `float8` → `float`; `time`, `timetz`, `time with(out) time zone` → `time`; `timestamp with(out) time zone` → `datetime`; `blob`, `bytea`, `binary`, `varbinary`, `buffer`, and the `*blob` sizes → `binary`
+- Unchanged: types with no clear generic word still pass through as written — `interval`, `geometry`, `tsvector`, `array`, arrays such as `string[]`, and custom types
+
+### Known limitations
+
+- The generic word comes from the entity type (`type`), not the DB column type (`columnType`). A `number` property forced to a float column with `columnType: 'real'` therefore renders as `integer`, and an `EntitySchema` property that sets only `columnType` (which MikroORM's own types reject — `type` is required there) can render as `unknown`. Declare `type` to get the right word
+- Types are matched by name only, ignoring case, so a custom type class named like a recognized type renders as that type's word instead of passing through: `Money` → `decimal`, `Time` → `time`, `Xml` → `string`. Give the class a name that is not a type name (for example `MoneyType`) to keep it in the output
+
 ## [2.1.0] - 2026-11-05
 
 Columns can now be left out of the generated document. The new `excludeColumns` option (`--exclude-columns` on the CLI) takes DB column names — typically audit columns such as `created_at` / `updated_at` inherited from a shared base entity — and drops them from every ERD box and column table ([#134](https://github.com/iamkanguk97/mikro-orm-markdown/issues/134)). Contributed by [@smailliwniloc](https://github.com/smailliwniloc). The project also has a documentation site now: https://iamkanguk97.github.io/mikro-orm-markdown/

@@ -73,6 +73,122 @@ const sqlDriverSmokeCases = [
   ['MariaDB', MariaDbDriver, 'mikro_orm_markdown_test'],
 ] as const;
 
+/**
+ * One column per surveyed type declaration: [column name, the `type` the
+ * developer writes, the generic word expected in the rendered output].
+ * It covers every name MikroORM itself knows (its common list plus the
+ * PostgreSQL aliases) and the dialect spellings and pass-through types on top.
+ */
+const surveyedColumnTypes = [
+  ['id', 'number', 'integer'],
+  ['c_string', 'string', 'string'],
+  ['c_text', 'text', 'string'],
+  ['c_varchar', 'varchar', 'string'],
+  ['c_varchar_255', 'varchar(255)', 'string'],
+  ['c_character_varying', 'character varying', 'string'],
+  ['c_character', 'character', 'string'],
+  ['c_char', 'char', 'string'],
+  ['c_bpchar', 'bpchar', 'string'],
+  ['c_citext', 'citext', 'string'],
+  ['c_inet', 'inet', 'string'],
+  ['c_enum', 'enum', 'string'],
+  ['c_uuid', 'uuid', 'uuid'],
+  ['c_integer', 'integer', 'integer'],
+  ['c_int', 'int', 'integer'],
+  ['c_int2', 'int2', 'integer'],
+  ['c_int4', 'int4', 'integer'],
+  ['c_int8', 'int8', 'integer'],
+  ['c_smallint', 'smallint', 'integer'],
+  ['c_tinyint', 'tinyint', 'integer'],
+  ['c_mediumint', 'mediumint', 'integer'],
+  ['c_bigint', 'bigint', 'integer'],
+  ['c_serial', 'serial', 'integer'],
+  ['c_serial4', 'serial4', 'integer'],
+  ['c_serial8', 'serial8', 'integer'],
+  ['c_smallserial', 'smallserial', 'integer'],
+  ['c_bigserial', 'bigserial', 'integer'],
+  ['c_float', 'float', 'float'],
+  ['c_float4', 'float4', 'float'],
+  ['c_float8', 'float8', 'float'],
+  ['c_double', 'double', 'float'],
+  ['c_double_precision', 'double precision', 'float'],
+  ['c_real', 'real', 'float'],
+  ['c_decimal', 'decimal', 'decimal'],
+  ['c_numeric', 'numeric', 'decimal'],
+  ['c_numeric_10_2', 'numeric(10,2)', 'decimal'],
+  ['c_money', 'money', 'decimal'],
+  ['c_boolean', 'boolean', 'boolean'],
+  ['c_bool', 'bool', 'boolean'],
+  ['c_js_date', 'Date', 'datetime'],
+  ['c_datetime', 'datetime', 'datetime'],
+  ['c_timestamp', 'timestamp', 'datetime'],
+  ['c_timestamptz', 'timestamptz', 'datetime'],
+  ['c_date', 'date', 'date'],
+  ['c_time', 'time', 'time'],
+  ['c_timetz', 'timetz', 'time'],
+  ['c_json', 'json', 'json'],
+  ['c_jsonb', 'jsonb', 'json'],
+  ['c_object', 'object', 'json'],
+  ['c_blob', 'blob', 'binary'],
+  ['c_bytea', 'bytea', 'binary'],
+  ['c_buffer', 'buffer', 'binary'],
+  ['c_uint8array', 'uint8array', 'binary'],
+  ['c_interval', 'interval', 'interval'],
+  ['c_geometry', 'geometry', 'geometry'],
+  ['c_tsvector', 'tsvector', 'tsvector'],
+  ['c_array', 'array', 'array'],
+] as const;
+
+const expectedSurveyedTypes = Object.fromEntries(surveyedColumnTypes.map(([name, , generic]) => [name, generic]));
+
+/** A fresh schema per call: discovery rewrites `prop.type` in place, which would leak between drivers. */
+function makeColumnSurveySchema(): EntitySchema {
+  return new EntitySchema({
+    name: 'ColumnSurveySchema',
+    properties: Object.fromEntries(
+      surveyedColumnTypes.map(([name, type]) => [name, name === 'id' ? { type, primary: true } : { type }])
+    ),
+  });
+}
+
+/** The same columns declared through decorators; a fresh class per call (see makeRuntimeJsUser). */
+function makeColumnSurveyDecoratorEntity(): EntityClass<object> {
+  class ColumnSurveyDecorator {}
+  Entity()(ColumnSurveyDecorator);
+  for (const [name, type] of surveyedColumnTypes) {
+    const decorate = name === 'id' ? PrimaryKey({ type }) : Property({ type });
+    decorate(ColumnSurveyDecorator.prototype, name);
+  }
+  return ColumnSurveyDecorator;
+}
+
+/** Column name → type word, read from the entity's box in the Mermaid ERD. */
+function readErdColumnTypes(md: string, entityName: string): Record<string, string> {
+  const boxStart = md.indexOf(`  ${entityName} {`);
+  const box = md.slice(boxStart, md.indexOf('\n  }', boxStart));
+  const columnLines = box.split('\n').slice(1);
+  return Object.fromEntries(
+    columnLines.map((line) => {
+      const [type, name] = line.trim().split(' ');
+      return [name, type];
+    })
+  );
+}
+
+/** Column name → Type cell, read from the entity's Markdown table. */
+function readTableColumnTypes(md: string, entityName: string): Record<string, string> {
+  const sectionStart = md.indexOf(`### ${entityName}\n`);
+  const nextSection = md.indexOf('\n### ', sectionStart + 1);
+  const section = md.slice(sectionStart, nextSection === -1 ? undefined : nextSection);
+  const rows = section.split('\n').filter((line) => line.startsWith('| ') && !line.startsWith('| Column |'));
+  return Object.fromEntries(
+    rows.map((row) => {
+      const [, name, type] = row.split('|').map((cell) => cell.trim());
+      return [name, type];
+    })
+  );
+}
+
 describe('generateMarkdown', () => {
   it('returns a non-empty markdown string', async () => {
     const md = await generateMarkdown({
@@ -455,6 +571,27 @@ describe('generateMarkdown', () => {
       expect(md).toContain('### Post');
       expect(md).toContain('| name |');
       expect(md).toContain('Post }|--|| Author : "author"');
+    }
+  );
+
+  // MikroORM stores a different `prop.type` for some declarations depending on
+  // the driver (int8 is `BigIntType` on PostgreSQL and `int8` elsewhere) and
+  // rewrites others to its own class names (json → `JsonType`). The generic
+  // words hide both, so one set of entities documents the same on every driver.
+  it.each(sqlDriverSmokeCases)(
+    'renders the same generic column types from %s metadata in the ERD and the table',
+    async (_name, driver, dbName) => {
+      const md = await generateMarkdown({
+        orm: { driver, dbName, entities: [makeColumnSurveySchema(), makeColumnSurveyDecoratorEntity()] },
+        onWarn: () => {},
+      });
+
+      for (const entityName of ['ColumnSurveySchema', 'ColumnSurveyDecorator']) {
+        expect(readErdColumnTypes(md, entityName)).toEqual(expectedSurveyedTypes);
+        expect(readTableColumnTypes(md, entityName)).toEqual(expectedSurveyedTypes);
+      }
+      // No MikroORM type class name (JsonType, BigIntType, IntervalType, …) reaches the output.
+      expect(md).not.toMatch(/\w+Type\b/);
     }
   );
 
