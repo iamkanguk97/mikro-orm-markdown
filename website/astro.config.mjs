@@ -42,6 +42,7 @@ export default defineConfig({
           items: [
             'guides/schema-entities',
             'guides/cardinality',
+            'guides/column-types',
             'guides/exclude-columns',
             'guides/compiled-js',
             'guides/sti',

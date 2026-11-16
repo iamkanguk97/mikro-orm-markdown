@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DocumentModel, NamespaceGroup } from '../../src/model/build.js';
+import type { ColumnModel } from '../../src/model/types.js';
 import { renderMarkdown } from '../../src/render/markdown.js';
 import { getFixtureMarkdown } from '../helpers/pipeline.js';
 
@@ -262,6 +263,104 @@ describe('renderMarkdown — column table', () => {
     expect(md).toContain('| nickname | string |');
     const tableRow = md.split('\n').find((line) => line.startsWith('| nickname |'));
     expect(tableRow).not.toContain('varchar_255_');
+  });
+
+  it('shows the same generic type words in the table as in the ERD', () => {
+    const column = (fieldName: string, type: string, isPrimary = false): ColumnModel => ({
+      propName: fieldName,
+      fieldName,
+      type,
+      isPrimary,
+      isForeignKey: false,
+      isUnique: false,
+      isNullable: false,
+    });
+    const model = {
+      className: 'Product',
+      tableName: 'product',
+      columns: [
+        column('id', 'number', true),
+        column('sku', 'uuid'),
+        column('meta', 'JsonType'),
+        column('price', 'DecimalType'),
+        column('created_at', 'Date'),
+        column('released_on', 'DateType'),
+        column('tags', 'string[]'),
+        column('location', 'geometry'),
+      ],
+      constraints: [],
+    };
+    const entity = { model, jsDoc: undefined, propDocs: new Map() };
+    const docModel: DocumentModel = {
+      title: 'Generic types',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [entity],
+          erdRelations: [],
+          textEntities: [entity],
+        },
+      ],
+    };
+
+    const md = renderMarkdown(docModel);
+
+    expect(md).toContain('    integer id PK\n');
+    expect(md).toContain('| id | integer | PK |');
+    expect(md).toContain('    uuid sku\n');
+    expect(md).toContain('| sku | uuid |');
+    expect(md).toContain('    json meta\n');
+    expect(md).toContain('| meta | json |');
+    expect(md).toContain('    decimal price\n');
+    expect(md).toContain('| price | decimal |');
+    expect(md).toContain('    datetime created_at\n');
+    expect(md).toContain('| created_at | datetime |');
+    expect(md).toContain('    date released_on\n');
+    expect(md).toContain('| released_on | date |');
+    expect(md).toContain('    geometry location\n');
+    expect(md).toContain('| location | geometry |');
+  });
+
+  it('keeps the original spelling of a pass-through type in the table', () => {
+    const docModel: DocumentModel = {
+      title: 'Pass-through',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'Article',
+                tableName: 'article',
+                columns: [
+                  {
+                    propName: 'tags',
+                    fieldName: 'tags',
+                    type: 'string[]',
+                    isPrimary: false,
+                    isForeignKey: false,
+                    isUnique: false,
+                    isNullable: false,
+                  },
+                ],
+                constraints: [],
+              },
+              jsDoc: undefined,
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    };
+
+    // The brackets are backslash-escaped for Markdown, so the cell reads "string[]"
+    // when rendered — not the "string_" the Mermaid type slot falls back to.
+    const row = renderMarkdown(docModel)
+      .split('\n')
+      .find((line) => line.startsWith('| tags |'));
+    expect(row).toBe('| tags | string\\[\\] |  |  |  |');
   });
 
   it('property JSDoc description appears in column table', async () => {
