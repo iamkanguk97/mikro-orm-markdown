@@ -135,7 +135,10 @@ describe('buildDocumentModel — @atLeastOne on a collection typed to an STI roo
     });
   }
 
-  function makeFamily(children: EntityMetadata[]): EntityMetadata[] {
+  // What MikroORM stores on the root for a property only its children declare.
+  const copiedOntoRoot = { ...owner, inherited: true, nullable: true };
+
+  function makeFamily(children: EntityMetadata[], rootOwner: Record<string, unknown>): EntityMetadata[] {
     return [
       makeEntityMeta({
         className: 'Owner',
@@ -151,7 +154,7 @@ describe('buildDocumentModel — @atLeastOne on a collection typed to an STI roo
         tableName: 'vehicle',
         discriminatorColumn: 'type',
         primaryKeys: ['id'],
-        properties: { id: pkProperty(), owner: { ...owner, inherited: true, nullable: true } },
+        properties: { id: pkProperty(), owner: rootOwner },
       }),
       ...children,
     ];
@@ -162,9 +165,13 @@ describe('buildDocumentModel — @atLeastOne on a collection typed to an STI roo
   const truck = vehicleMeta('Truck', { extends: 'Vehicle', discriminatorValue: 'truck' }, true);
   const bike = vehicleMeta('Bike', { extends: 'Vehicle', discriminatorValue: 'bike' }, false);
 
-  function build(children: EntityMetadata[]): { fromCardinalityOf: (className: string) => string; warnings: string[] } {
+  function build(
+    children: EntityMetadata[],
+    rootOwner: Record<string, unknown> = copiedOntoRoot
+  ): { fromCardinalityOf: (className: string) => string; warnings: string[] } {
     const warnings: string[] = [];
-    const docModel = buildDocumentModel(makeFamily(children), createAtLeastOneJsDoc('Owner', 'vehicles'), 'T', {
+    const metas = makeFamily(children, rootOwner);
+    const docModel = buildDocumentModel(metas, createAtLeastOneJsDoc('Owner', 'vehicles'), 'T', {
       onWarn: (message: string) => {
         warnings.push(message);
       },
@@ -201,6 +208,72 @@ describe('buildDocumentModel — @atLeastOne on a collection typed to an STI roo
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain('@atLeastOne on Owner.vehicles');
     expect(warnings[0]).toContain('Car, Truck');
+  });
+
+  it('applies the tag to the root edge when MikroORM reports the property as root-owned', () => {
+    // MikroORM 6.x and 7.x before 7.1.5 store a property that several
+    // subclasses declare separately as a plain root property, without the
+    // `inherited` flag (verified on 6.6.18). The root then draws its own edge,
+    // which is the one the tag reaches; no warning names the subclasses.
+    const { fromCardinalityOf, warnings } = build([car, truck], owner);
+
+    expect(fromCardinalityOf('Vehicle')).toBe('}|');
+    expect(fromCardinalityOf('Car')).toBe('}o');
+    expect(fromCardinalityOf('Truck')).toBe('}o');
+    expect(warnings).toEqual([]);
+  });
+});
+
+describe('buildDocumentModel — @atLeastOne on a self-reference declared by an STI root', () => {
+  // `Animal.parent` points back at `Animal`, so the root draws no edge for it
+  // by design. The subclasses only repeat the root's relation; "no edge from
+  // the root" must not be read as "the property is declared on a subclass".
+  const parent = { name: 'parent', fieldNames: ['parent_id'], type: 'Animal', kind: ReferenceKind.MANY_TO_ONE };
+
+  function animalMeta(className: string, init: Record<string, unknown>): EntityMetadata {
+    return makeEntityMeta({
+      className,
+      tableName: 'animal',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        parent,
+        children: { name: 'children', type: 'Animal', kind: ReferenceKind.ONE_TO_MANY, mappedBy: 'parent' },
+      },
+      ...init,
+    });
+  }
+
+  const animal = animalMeta('Animal', { discriminatorColumn: 'type', discriminatorValue: 'animal' });
+  const dog = animalMeta('Dog', { extends: 'Animal', discriminatorValue: 'dog' });
+  const cat = animalMeta('Cat', { extends: 'Animal', discriminatorValue: 'cat' });
+
+  function build(metas: EntityMetadata[]): { fromCardinalities: string[]; warnings: string[] } {
+    const warnings: string[] = [];
+    const docModel = buildDocumentModel(metas, createAtLeastOneJsDoc('Animal', 'children'), 'T', {
+      onWarn: (message: string) => {
+        warnings.push(message);
+      },
+    });
+    const edges = docModel.groups.flatMap((group) => group.erdRelations);
+
+    return { fromCardinalities: edges.map((edge) => `${edge.fromEntity} ${edge.fromCardinality}`), warnings };
+  }
+
+  it('leaves the edge a single subclass repeats unchanged and reports no matching edge', () => {
+    const { fromCardinalities, warnings } = build([animal, dog]);
+
+    expect(fromCardinalities).toEqual(['Dog }o']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('no matching relation edge was found');
+  });
+
+  it('does not advise declaring the property once when the root already declares it', () => {
+    const { fromCardinalities, warnings } = build([animal, dog, cat]);
+
+    expect(fromCardinalities).toEqual(['Dog }o', 'Cat }o']);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('no matching relation edge was found');
   });
 });
 

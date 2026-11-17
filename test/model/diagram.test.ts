@@ -1329,6 +1329,69 @@ describe('buildDiagramModel — STI root that extends a base class', () => {
   });
 });
 
+describe('buildDiagramModel — STI subclass that repeats discriminatorColumn', () => {
+  // A subclass may repeat `discriminatorColumn` in its own @Entity options.
+  // MikroORM keeps the option on the subclass metadata and still treats the
+  // topmost class as the root (verified on v6: `Dog.root` is `Animal`).
+  const breed = { name: 'breed', fieldNames: ['breed'], type: 'string', kind: ReferenceKind.SCALAR };
+  const indoor = { name: 'indoor', fieldNames: ['indoor'], type: 'boolean', kind: ReferenceKind.SCALAR };
+  const catIndex = { name: 'cat_indoor_idx', properties: ['indoor'] };
+
+  function shared(): Record<string, Record<string, unknown>> {
+    return {
+      id: pkProperty(),
+      type: { name: 'type', fieldNames: ['type'], type: 'string', kind: ReferenceKind.SCALAR },
+    };
+  }
+
+  function member(className: string, init: Record<string, unknown>): EntityMetadata {
+    return makeEntityMeta({ className, tableName: 'animal', primaryKeys: ['id'], indexes: [catIndex], ...init });
+  }
+
+  function makeFamily(): EntityMetadata[] {
+    const copiedOntoRoot = { inherited: true, nullable: true };
+
+    return [
+      member('Animal', {
+        discriminatorColumn: 'type',
+        properties: { ...shared(), breed: { ...breed, ...copiedOntoRoot }, indoor: { ...indoor, ...copiedOntoRoot } },
+      }),
+      member('Dog', {
+        extends: 'Animal',
+        discriminatorColumn: 'type',
+        discriminatorValue: 'dog',
+        properties: { ...shared(), breed },
+      }),
+      member('Puppy', { extends: 'Dog', discriminatorValue: 'puppy', properties: { ...shared(), breed } }),
+      member('Cat', { extends: 'Animal', discriminatorValue: 'cat', properties: { ...shared(), indoor } }),
+    ];
+  }
+
+  function entityOf(className: string): EntityModel {
+    return buildDiagramModel(makeFamily()).entities.find((e) => e.className === className)!;
+  }
+
+  it('labels the subclass as an STI child, not as a second root', () => {
+    const dog = entityOf('Dog');
+
+    expect(dog).toMatchObject({ extendsEntity: 'Animal', discriminatorValue: 'dog' });
+    expect(dog.discriminatorColumn).toBeUndefined();
+  });
+
+  it('keeps the topmost class as the root', () => {
+    const root = entityOf('Animal');
+
+    expect(root.discriminatorColumn).toBe('type');
+    expect(root.extendsEntity).toBeUndefined();
+  });
+
+  it("keeps a sibling's class-level index off the subclass and its own children", () => {
+    expect(entityOf('Dog').constraints).toEqual([]);
+    expect(entityOf('Puppy').constraints).toEqual([]);
+    expect(entityOf('Cat').constraints.map((c) => c.name)).toEqual(['cat_indoor_idx']);
+  });
+});
+
 describe('buildDiagramModel — STI root skips columns flattened from a child-only embedded', () => {
   // MikroORM flags the copied @Embedded property itself as inherited, then
   // flattens it on the root into fresh properties that carry no flag of their

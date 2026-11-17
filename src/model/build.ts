@@ -542,6 +542,10 @@ function findAtLeastOneEdge(
  * come from those children instead. A subclass repeats every relation it
  * inherits; only the topmost entity of each line of descent counts, which
  * keeps the result to the entities that declare the property themselves.
+ *
+ * The children are searched only when `prop.type` does not declare the
+ * mappedBy property itself. A self-reference it declares draws no edge by
+ * design, and the edges its subclasses repeat for it are not declarations.
  */
 function findOwningSideEdges(
   adjusted: RelationEdge[],
@@ -549,11 +553,15 @@ function findOwningSideEdges(
   prop: EntityProperty,
   metaByClass: Map<string, EntityMetadata>
 ): RelationEdge[] {
+  const mappedByProp = prop.mappedBy === undefined ? undefined : metaByClass.get(prop.type)?.properties[prop.mappedBy];
+  // MikroORM flags a property it copied onto an STI root from a child `inherited: true`.
+  const isDeclaredOnType = mappedByProp !== undefined && mappedByProp.inherited !== true;
+
   const candidates = adjusted.filter(
     (e) =>
       e.toEntity === className &&
       e.label === prop.mappedBy &&
-      (e.fromEntity === prop.type || isDescendantOf(e.fromEntity, prop.type, metaByClass))
+      (e.fromEntity === prop.type || (!isDeclaredOnType && isDescendantOf(e.fromEntity, prop.type, metaByClass)))
   );
 
   return candidates.filter(

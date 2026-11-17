@@ -29,8 +29,10 @@ export function buildDiagramModel(metas: EntityMetadata[]): DiagramModel {
 }
 
 /**
- * STI root: the one family member that carries the discriminatorColumn —
- * MikroORM never copies it down to the children (verified on v6 and v7).
+ * STI root: the topmost family member that carries the discriminatorColumn.
+ * MikroORM never copies the option down to the children (verified on v6 and
+ * v7), but a subclass may repeat it in its own @Entity options; MikroORM keeps
+ * that copy on the subclass and still treats the topmost class as the root.
  *
  * Two signals look tempting and are both wrong:
  *  - "extends nothing": a root may inherit from a shared base (an abstract
@@ -38,8 +40,8 @@ export function buildDiagramModel(metas: EntityMetadata[]): DiagramModel {
  *  - "has no discriminatorValue": a *non-abstract* root is assigned its own
  *    value, so this would leak every subclass column into such roots.
  */
-function isStiRoot(meta: EntityMetadata): boolean {
-  return meta.discriminatorColumn !== undefined;
+function isStiRoot(meta: EntityMetadata, metaByClass: Map<string, EntityMetadata>): boolean {
+  return findStiRoot(meta, metaByClass)?.className === meta.className;
 }
 
 /**
@@ -86,17 +88,19 @@ function isCopiedFromChild(
 function findStiRoot(meta: EntityMetadata, metaByClass: Map<string, EntityMetadata>): EntityMetadata | undefined {
   const visited = new Set<string>();
   let current: EntityMetadata | undefined = meta;
+  let root: EntityMetadata | undefined;
 
+  // Walk the whole chain: the last member found carrying the option is the topmost one.
   while (current !== undefined && !visited.has(current.className)) {
-    if (isStiRoot(current)) {
-      return current;
+    if (current.discriminatorColumn !== undefined) {
+      root = current;
     }
     visited.add(current.className);
     const parentName = resolveExtendsName(current);
     current = parentName === undefined ? undefined : metaByClass.get(parentName);
   }
 
-  return undefined;
+  return root;
 }
 
 /** Tells whether a constraint naming the given properties belongs on one entity. */
@@ -142,8 +146,9 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
   // A root that inherits from a base class has `extends` set too, so the root check comes first.
   // An abstract class in the middle of the family has no discriminatorValue; it is
   // recognized by the root above it instead.
+  const isRoot = isStiRoot(meta, metaByClass);
   const isStiChild =
-    !isStiRoot(meta) &&
+    !isRoot &&
     extendsEntity !== undefined &&
     (meta.discriminatorValue !== undefined || findStiRoot(meta, metaByClass) !== undefined);
 
@@ -153,7 +158,7 @@ function buildEntityModel(meta: EntityMetadata, metaByClass: Map<string, EntityM
     className: meta.className,
     tableName: meta.tableName,
     columns,
-    ...(isStiRoot(meta) && { discriminatorColumn: meta.discriminatorColumn as string }),
+    ...(isRoot && { discriminatorColumn: meta.discriminatorColumn as string }),
     ...(isStiChild && { extendsEntity }),
     ...(isStiChild && meta.discriminatorValue !== undefined && { discriminatorValue: String(meta.discriminatorValue) }),
     ...(meta.comment !== undefined && { comment: meta.comment }),

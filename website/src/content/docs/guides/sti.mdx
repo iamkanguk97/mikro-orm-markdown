@@ -88,6 +88,8 @@ export class Dog extends Animal {
 
 If several subclasses declare that property separately (`Dog.owner` and `Cat.owner`), the relation is drawn once per subclass. "At least one animal" then says nothing about any single one of those edges, so they stay zero-or-more and an `@atLeastOne had no effect` warning names the subclasses. Declare the property once on the root to get a single edge the tag can apply to.
 
+This applies to MikroORM 7.1.5 and later. Older versions report such a property as the root's own ([known limitation](#known-limitation-on-older-mikroorm-versions)). The tag is then applied to the root's edge, the subclass edges stay zero-or-more, and no warning is emitted.
+
 ## Abstract classes inside the family
 
 An abstract class between the root and its concrete subclasses gets its own box too. It lists the root's columns plus its own, and nothing from the subclasses beside it.
