@@ -40,6 +40,21 @@ mikro-orm-markdown --config ./dist/mikro-orm.config.js --src "src/**/*.entity.ts
 
 [컴파일된 JavaScript 빌드](/mikro-orm-markdown/ko/guides/compiled-js/)를 참고하세요.
 
+## STI 클래스에 선언하지 않은 제약조건이 표시되는 경우
+
+Single Table Inheritance에서는 모든 클래스가 테이블 하나를 공유합니다. MikroORM은 각 서브클래스의 클래스 단위 index, unique, check를 하나의 목록으로 합치며, 어느 클래스에서 선언했는지는 기록하지 않습니다.
+
+- 프로퍼티 이름을 가리키는 제약조건(`@Index({ properties: ['breed'] })`)은 그 프로퍼티를 모두 가진 클래스에만 표시됩니다.
+- SQL `expression`으로만 작성한 제약조건은 루트와 모든 서브클래스에 표시됩니다. SQL 문자열을 분석해 컬럼을 찾지 않기 때문입니다.
+
+제약조건을 한 서브클래스의 섹션에만 표시하려면, 가능한 경우 `expression` 대신 `properties`로 선언하세요. [Single Table Inheritance (STI)](/mikro-orm-markdown/ko/guides/sti/#제약조건)를 참고하세요.
+
+## 서브클래스에만 있는 프로퍼티가 STI 루트와 다른 서브클래스에 표시되는 경우
+
+MikroORM v6와 7.1.5보다 낮은 v7에서는, 둘 이상의 서브클래스가 같은 이름으로 각각 선언한 프로퍼티가 루트의 프로퍼티로 전달됩니다. 그래서 그 프로퍼티가 루트와 모든 서브클래스에 표시됩니다. 컬럼, 관계선, 프로퍼티 단위 index·unique가 모두 해당합니다.
+
+MikroORM의 메타데이터에서 비롯된 문제이며, 루트가 실제로 선언한 프로퍼티와 구분할 수 없습니다. MikroORM v7.1.5 이상으로 올리면 해결됩니다. [Single Table Inheritance (STI)](/mikro-orm-markdown/ko/guides/sti/#이전-mikroorm-버전에서의-제한)를 참고하세요.
+
 ## Config 파일 요구사항
 
 config 파일은 일반 설정 객체를 **default export** 해야 합니다 — [CLI 옵션](/mikro-orm-markdown/ko/reference/cli/#config-파일-요구사항)을 참고하세요. config를 비동기적으로 만들어야 한다면 [프로그래밍 API](/mikro-orm-markdown/ko/reference/api/)를 사용하세요.

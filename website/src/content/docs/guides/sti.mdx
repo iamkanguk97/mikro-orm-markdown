@@ -44,3 +44,80 @@ When an entity uses `discriminatorColumn`, `mikro-orm-markdown` detects it autom
 The root (`Animal`) lists only the shared columns and marks the discriminator (`type`); each subclass (`Dog`) repeats the inherited columns and adds its own.
 
 The generated Markdown table also includes STI notes, such as `STI root — discriminator column: type` on the root and `Extends Animal (Single Table Inheritance, discriminator value: dog)` on each subclass.
+
+## Constraints
+
+Index, unique, and check constraints follow the same idea as columns: each class lists the constraints that apply to its own columns.
+
+- A constraint that names properties — declared on a property, or on the class with a `properties` list — is listed on every class that has all of those properties. One that names a subclass-only property is listed on that subclass, not on the root or on sibling subclasses.
+- A constraint written as a raw SQL `expression` is listed on the root and on every subclass. All classes share one table, MikroORM does not record which class declared the constraint, and the SQL text is not parsed to find its columns.
+
+```ts
+@Entity({ discriminatorValue: 'dog' })
+// Listed on Dog only: `breed` is a Dog-only property.
+@Index({ name: 'dog_breed_idx', properties: ['breed'] })
+// Listed on Animal, Dog, and every other subclass: it names no property.
+@Index({ name: 'dog_breed_lower_idx', expression: 'create index dog_breed_lower_idx on animal (lower(breed))' })
+export class Dog extends Animal {
+  @Property({ type: 'string', nullable: true })
+  breed?: string;
+}
+```
+
+## Relations
+
+A relation follows the same rule: it is drawn from every class that has the property. A relation declared on a subclass is drawn from that subclass, not from the root.
+
+`@atLeastOne` on a collection typed to the root still works when the property it is mapped by lives on a subclass — the tag is applied to that subclass's edge:
+
+```ts
+@Entity()
+export class Owner {
+  /** @atLeastOne */
+  @OneToMany(() => Animal, 'owner')
+  animals = new Collection<Animal>(this);
+}
+
+@Entity({ discriminatorValue: 'dog' })
+export class Dog extends Animal {
+  // Drawn as `Dog }|--|| Owner`.
+  @ManyToOne(() => Owner)
+  owner!: Owner;
+}
+```
+
+If several subclasses declare that property separately (`Dog.owner` and `Cat.owner`), the relation is drawn once per subclass. "At least one animal" then says nothing about any single one of those edges, so they stay zero-or-more and an `@atLeastOne had no effect` warning names the subclasses. Declare the property once on the root to get a single edge the tag can apply to.
+
+This applies to MikroORM 7.1.5 and later. Older versions report such a property as the root's own ([known limitation](#known-limitation-on-older-mikroorm-versions)). The tag is then applied to the root's edge, the subclass edges stay zero-or-more, and no warning is emitted.
+
+## Abstract classes inside the family
+
+An abstract class between the root and its concrete subclasses gets its own box too. It lists the root's columns plus its own, and nothing from the subclasses beside it.
+
+```ts
+@Entity({ abstract: true })
+export abstract class Pet extends Animal {
+  @ManyToOne(() => Owner)
+  owner!: Owner;
+}
+
+@Entity({ discriminatorValue: 'dog' })
+export class Dog extends Pet {}
+
+@Entity({ discriminatorValue: 'cat' })
+export class Cat extends Pet {}
+```
+
+`Pet`, `Dog`, and `Cat` each list `owner`; the root and any subclass that does not extend `Pet` do not. The note on `Pet` reads `Extends Animal (Single Table Inheritance)`, with no discriminator value, because an abstract class has no rows of its own.
+
+## Known limitation on older MikroORM versions
+
+This affects MikroORM v6 (as of 6.6.18) and v7 before 7.1.5.
+
+When two or more subclasses each declare a property with the same name and the root does not (`Dog.owner` and `Cat.owner`), those MikroORM versions report the property as if the root had declared it. The generated document then shows it on the root and on every subclass, including the ones that never declared it — the column, its relation edge, and its property-level index or unique.
+
+`mikro-orm-markdown` cannot correct this itself. In those versions the metadata is identical to that of a property the root really declares, so hiding it would also hide real root columns.
+
+MikroORM fixed this in v7.1.5 ([mikro-orm#7923](https://github.com/mikro-orm/mikro-orm/pull/7923)). From that version on, the property is listed only on the subclasses that declare it.
+
+If you cannot upgrade (v6, for example), declare the property once on an abstract class that those subclasses extend, as in [Abstract classes inside the family](#abstract-classes-inside-the-family). It is then listed only on that class and its subclasses.

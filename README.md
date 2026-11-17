@@ -352,6 +352,8 @@ The root (`Animal`) lists only the shared columns and marks the discriminator (`
 
 The generated Markdown table also includes STI notes, such as `STI root — discriminator column: type` on the root and `Extends Animal (Single Table Inheritance, discriminator value: dog)` on each subclass.
 
+Index, unique, and check constraints follow the same idea as columns. A constraint that names properties is listed only on the classes that have all of those properties, so one on a subclass-only property stays off the root and sibling subclasses. A constraint written as a raw SQL `expression` is listed on the root and on every subclass, because MikroORM does not record which class declared it and the SQL text is not parsed.
+
 ## Troubleshooting
 
 **"No entities were discovered"**
@@ -388,6 +390,19 @@ Prefer a `.ts` config with `entitiesTs` pointing at your source files. If you mu
 ```bash
 mikro-orm-markdown --config ./dist/mikro-orm.config.js --src "src/**/*.entity.ts"
 ```
+
+**A constraint appears on an STI class that did not declare it**
+
+In Single Table Inheritance every class shares one table, and MikroORM merges the class-level indexes, uniques, and checks of every subclass into one list without recording which class declared them.
+
+- A constraint that names properties (`@Index({ properties: ['breed'] })`) is listed only on the classes that have all of those properties.
+- A constraint written as a raw SQL `expression` is listed on the root and on every subclass, because the SQL text is not parsed to find its columns.
+
+To keep a constraint in one subclass's section, declare it with `properties` instead of `expression` where possible.
+
+**A subclass-only property appears on the STI root and on other subclasses**
+
+On MikroORM v6 and on v7 before 7.1.5, a property that two or more subclasses each declare under the same name is reported as a root property. It then shows up on the root and on every subclass — column, relation edge, and property-level index or unique. This comes from MikroORM's metadata and cannot be told apart from a property the root really declares. Upgrading to MikroORM v7.1.5 or later fixes it.
 
 **Config file requirements**
 

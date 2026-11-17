@@ -44,3 +44,80 @@ export class Dog extends Animal {
 루트(`Animal`)는 공유 컬럼만 나열하고 discriminator(`type`)를 표시하며, 각 서브클래스(`Dog`)는 상속 컬럼을 반복한 뒤 자기 컬럼을 추가합니다.
 
 생성된 Markdown 표에도 STI note가 함께 표시됩니다. 루트에는 `STI root — discriminator column: type`, 각 서브클래스에는 `Extends Animal (Single Table Inheritance, discriminator value: dog)` 같은 문구가 추가됩니다.
+
+## 제약조건
+
+index, unique, check 제약조건도 컬럼과 같은 원칙을 따릅니다. 각 클래스는 자기 컬럼에 해당하는 제약조건만 나열합니다.
+
+- 프로퍼티 이름을 가리키는 제약조건(프로퍼티에 직접 선언했거나, 클래스에 `properties` 목록으로 선언한 것)은 그 프로퍼티를 모두 가진 클래스에만 표시됩니다. 서브클래스에만 있는 프로퍼티를 가리키면 그 서브클래스에만 표시되고, 루트나 형제 서브클래스에는 표시되지 않습니다.
+- SQL `expression`으로만 작성한 제약조건은 루트와 모든 서브클래스에 표시됩니다. 모든 클래스가 테이블 하나를 공유하고, MikroORM이 어느 클래스에서 선언했는지 기록하지 않으며, SQL 문자열을 분석해 컬럼을 찾지도 않기 때문입니다.
+
+```ts
+@Entity({ discriminatorValue: 'dog' })
+// Dog에만 표시됩니다: `breed`는 Dog에만 있는 프로퍼티입니다.
+@Index({ name: 'dog_breed_idx', properties: ['breed'] })
+// Animal, Dog, 그리고 다른 모든 서브클래스에 표시됩니다: 가리키는 프로퍼티가 없습니다.
+@Index({ name: 'dog_breed_lower_idx', expression: 'create index dog_breed_lower_idx on animal (lower(breed))' })
+export class Dog extends Animal {
+  @Property({ type: 'string', nullable: true })
+  breed?: string;
+}
+```
+
+## 관계
+
+관계선도 같은 원칙을 따릅니다. 그 프로퍼티를 가진 클래스마다 관계선이 그려집니다. 서브클래스에 선언한 관계는 루트가 아니라 그 서브클래스에서 그려집니다.
+
+루트 타입의 컬렉션에 붙인 `@atLeastOne`은, 연결된 프로퍼티(`mappedBy`)가 서브클래스에만 있어도 동작합니다. 태그는 그 서브클래스의 관계선에 적용됩니다:
+
+```ts
+@Entity()
+export class Owner {
+  /** @atLeastOne */
+  @OneToMany(() => Animal, 'owner')
+  animals = new Collection<Animal>(this);
+}
+
+@Entity({ discriminatorValue: 'dog' })
+export class Dog extends Animal {
+  // `Dog }|--|| Owner`로 그려집니다.
+  @ManyToOne(() => Owner)
+  owner!: Owner;
+}
+```
+
+여러 서브클래스가 그 프로퍼티를 각각 선언하면(`Dog.owner`와 `Cat.owner`) 관계선도 서브클래스마다 하나씩 그려집니다. 이때 "동물이 1개 이상"이라는 말은 그중 어느 한 관계선에 대한 말이 아니므로, 관계선은 0개 이상으로 그대로 두고 해당 서브클래스 이름을 담은 `@atLeastOne had no effect` 경고를 냅니다. 프로퍼티를 루트에 한 번만 선언하면 태그를 적용할 관계선이 하나로 정해집니다.
+
+이 동작은 MikroORM 7.1.5 이상에 해당합니다. 그보다 낮은 버전은 이런 프로퍼티를 루트가 선언한 것처럼 알려 줍니다([이전 MikroORM 버전에서의 제한](#이전-mikroorm-버전에서의-제한)). 그래서 태그는 루트의 관계선에 적용되고, 서브클래스의 관계선은 0개 이상으로 남으며, 경고는 나오지 않습니다.
+
+## 가족 안의 추상 클래스
+
+루트와 실제 서브클래스 사이에 둔 추상 클래스도 별도 박스로 그려집니다. 루트의 컬럼과 자기 컬럼만 나열하고, 옆에 있는 다른 서브클래스의 것은 나열하지 않습니다.
+
+```ts
+@Entity({ abstract: true })
+export abstract class Pet extends Animal {
+  @ManyToOne(() => Owner)
+  owner!: Owner;
+}
+
+@Entity({ discriminatorValue: 'dog' })
+export class Dog extends Pet {}
+
+@Entity({ discriminatorValue: 'cat' })
+export class Cat extends Pet {}
+```
+
+`owner`는 `Pet`, `Dog`, `Cat`에 각각 표시되고, 루트와 `Pet`을 상속하지 않는 서브클래스에는 표시되지 않습니다. `Pet`의 note는 `Extends Animal (Single Table Inheritance)`로 표시됩니다. 추상 클래스에는 자기 행이 없으므로 discriminator 값은 붙지 않습니다.
+
+## 이전 MikroORM 버전에서의 제한
+
+MikroORM v6(6.6.18 기준)와 7.1.5보다 낮은 v7에 해당합니다.
+
+둘 이상의 서브클래스가 같은 이름의 프로퍼티를 각각 선언하고 루트에는 그 프로퍼티가 없으면(`Dog.owner`와 `Cat.owner`), 해당 MikroORM 버전은 그 프로퍼티를 루트가 선언한 것처럼 알려 줍니다. 그래서 생성된 문서에는 그 프로퍼티가 루트와 모든 서브클래스에 표시됩니다. 선언한 적 없는 서브클래스에도 표시되며, 컬럼뿐 아니라 관계선과 프로퍼티 단위 index·unique도 함께 나옵니다.
+
+`mikro-orm-markdown` 쪽에서는 이를 바로잡을 수 없습니다. 해당 버전에서는 이 경우의 메타데이터가 루트가 실제로 선언한 프로퍼티의 메타데이터와 완전히 같아서, 숨기면 진짜 루트 컬럼까지 숨기게 됩니다.
+
+MikroORM은 v7.1.5에서 이 문제를 고쳤습니다([mikro-orm#7923](https://github.com/mikro-orm/mikro-orm/pull/7923)). 그 버전부터는 프로퍼티를 선언한 서브클래스에만 표시됩니다.
+
+버전을 올릴 수 없다면(예: v6), 그 서브클래스들이 함께 상속하는 추상 클래스에 프로퍼티를 한 번만 선언하세요. [가족 안의 추상 클래스](#가족-안의-추상-클래스)를 참고하세요. 그러면 그 추상 클래스와 그 서브클래스에만 표시됩니다.

@@ -159,6 +159,34 @@ describe('renderMarkdown — entity descriptions', () => {
     expect(md).toContain('Extends `Animal` (Single Table Inheritance, discriminator value: `dog`)');
   });
 
+  it('shows the Extends note without a discriminator value for an abstract class inside an STI family', () => {
+    const md = renderMarkdown({
+      title: 'STI',
+      groups: [
+        {
+          name: 'default',
+          erdEntities: [],
+          erdRelations: [],
+          textEntities: [
+            {
+              model: {
+                className: 'OwnedVehicle',
+                tableName: 'vehicle',
+                columns: [],
+                constraints: [],
+                extendsEntity: 'Vehicle',
+              },
+              jsDoc: undefined,
+              propDocs: new Map(),
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(md).toContain('*Table: `vehicle`*\n\n*Extends `Vehicle` (Single Table Inheritance)*');
+  });
+
   describe('table comment fallback', () => {
     /** A one-entity document; `description` is the class-level JSDoc description, if any. */
     function renderAccount(options: { comment?: string; jsDoc?: { description?: string } }): string {

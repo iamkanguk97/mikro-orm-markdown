@@ -85,12 +85,13 @@ export interface EntityModel {
   discriminatorColumn?: string;
   /**
    * STI child: the className of the root/parent entity (e.g. "Animal").
-   * Populated from meta.extends for entities that have a discriminatorValue.
+   * Populated from meta.extends for every non-root member of an STI family.
    */
   extendsEntity?: string;
   /**
    * STI child: the discriminator value identifying this subclass's rows
    * (e.g. "dog"). Stringified so a numeric value like 0 is preserved.
+   * Undefined for an abstract class in the middle of the family, which has no rows of its own.
    */
   discriminatorValue?: string;
   /**
