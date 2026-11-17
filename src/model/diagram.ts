@@ -66,7 +66,7 @@ function getOwnProperties(meta: EntityMetadata): EntityProperty[] {
  * `embedded: [parentName, fieldName]`, so the flag is looked up along that
  * chain (a nested embeddable adds one more link).
  */
-function isCopiedFromChild(
+export function isCopiedFromChild(
   meta: EntityMetadata,
   prop: EntityProperty,
   visited: ReadonlySet<string> = new Set<string>()

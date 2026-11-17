@@ -2,7 +2,7 @@ import { type EntityMetadata, type EntityProperty, ReferenceKind } from '@mikro-
 import type { EntityJsDocInfo, JsDocResult, PropJsDocInfo, PropJsDocMap } from '../docs/jsdoc.js';
 import { emitWarning, type WarnHandler } from '../messages.js';
 import { resolveExtendsName } from '../metadata/extends.js';
-import { buildDiagramModel } from './diagram.js';
+import { buildDiagramModel, isCopiedFromChild } from './diagram.js';
 import type { ColumnModel, EntityModel, RelationEdge } from './types.js';
 
 // Mermaid cardinality tokens upgrading the "many" side from zero-or-more to one-or-more.
@@ -553,9 +553,11 @@ function findOwningSideEdges(
   prop: EntityProperty,
   metaByClass: Map<string, EntityMetadata>
 ): RelationEdge[] {
-  const mappedByProp = prop.mappedBy === undefined ? undefined : metaByClass.get(prop.type)?.properties[prop.mappedBy];
-  // MikroORM flags a property it copied onto an STI root from a child `inherited: true`.
-  const isDeclaredOnType = mappedByProp !== undefined && mappedByProp.inherited !== true;
+  const typeMeta = metaByClass.get(prop.type);
+  const mappedByProp = prop.mappedBy === undefined ? undefined : typeMeta?.properties[prop.mappedBy];
+  // Same test the diagram uses to keep a child's property off the STI root.
+  const isDeclaredOnType =
+    typeMeta !== undefined && mappedByProp !== undefined && !isCopiedFromChild(typeMeta, mappedByProp);
 
   const candidates = adjusted.filter(
     (e) =>

@@ -277,6 +277,73 @@ describe('buildDocumentModel — @atLeastOne on a self-reference declared by an 
   });
 });
 
+describe('buildDocumentModel — @atLeastOne mapped by a relation inside a subclass-only embeddable', () => {
+  // MikroORM flags only the copied @Embedded property `inherited: true`. The
+  // relation it flattens out of the embeddable carries no flag of its own; it
+  // points back at the embeddable through `embedded: [parentName, fieldName]`.
+  const assignment = { name: 'assignment', type: 'Assignment', kind: ReferenceKind.EMBEDDED, nullable: true };
+  const assignmentOwner = {
+    name: 'assignment_owner',
+    fieldNames: ['assignment_owner_id'],
+    type: 'Owner',
+    kind: ReferenceKind.MANY_TO_ONE,
+    embedded: ['assignment', 'owner'],
+    nullable: true,
+  };
+
+  const metas = [
+    makeEntityMeta({
+      className: 'Owner',
+      tableName: 'owner',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        vehicles: { name: 'vehicles', type: 'Vehicle', kind: ReferenceKind.ONE_TO_MANY, mappedBy: 'assignment_owner' },
+      },
+    }),
+    makeEntityMeta({
+      className: 'Vehicle',
+      tableName: 'vehicle',
+      discriminatorColumn: 'type',
+      primaryKeys: ['id'],
+      properties: {
+        id: pkProperty(),
+        assignment: { ...assignment, inherited: true },
+        assignment_owner: assignmentOwner,
+      },
+    }),
+    makeEntityMeta({
+      className: 'Car',
+      tableName: 'vehicle',
+      extends: 'Vehicle',
+      discriminatorValue: 'car',
+      primaryKeys: ['id'],
+      properties: { id: pkProperty(), assignment, assignment_owner: assignmentOwner },
+    }),
+    makeEntityMeta({
+      className: 'Truck',
+      tableName: 'vehicle',
+      extends: 'Vehicle',
+      discriminatorValue: 'truck',
+      primaryKeys: ['id'],
+      properties: { id: pkProperty() },
+    }),
+  ];
+
+  it('applies the tag to the edge of the subclass that declares the embeddable', () => {
+    const warnings: string[] = [];
+    const docModel = buildDocumentModel(metas, createAtLeastOneJsDoc('Owner', 'vehicles'), 'T', {
+      onWarn: (message: string) => {
+        warnings.push(message);
+      },
+    });
+    const edges = docModel.groups.flatMap((group) => group.erdRelations);
+
+    expect(edges.map((edge) => `${edge.fromEntity} ${edge.fromCardinality}`)).toEqual(['Car }|']);
+    expect(warnings).toEqual([]);
+  });
+});
+
 describe('buildDocumentModel — FK to @hidden entity (L3)', () => {
   it('drops FK columns that reference a hidden entity', () => {
     const order = makeEntityMeta({
