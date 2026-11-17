@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1](https://github.com/iamkanguk97/mikro-orm-markdown/compare/v2.2.0...v2.2.1) (2026-11-17)
+
+
+### Fixed
+
+* draw STI columns, relations and constraints on the owning class only ([#186](https://github.com/iamkanguk97/mikro-orm-markdown/issues/186)) ([dfabe92](https://github.com/iamkanguk97/mikro-orm-markdown/commit/dfabe926c51fd2d4f9e982c7d9d416a7c3c27d23)), closes [#144](https://github.com/iamkanguk97/mikro-orm-markdown/issues/144)
+
 ## [2.2.0] - 2026-11-16
 
 Column types now use one fixed vocabulary. Every recognized type renders as one of 11 generic words — `string`, `uuid`, `integer`, `float`, `decimal`, `boolean`, `datetime`, `date`, `time`, `json`, `binary` — in both the ERD and the column table, so the same entities read the same on PostgreSQL, MySQL, MariaDB, and SQLite ([#165](https://github.com/iamkanguk97/mikro-orm-markdown/issues/165)). **Regenerating an existing document shows a diff** for the columns listed under "Changed".
