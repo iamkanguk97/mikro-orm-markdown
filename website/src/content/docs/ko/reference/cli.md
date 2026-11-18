@@ -40,9 +40,10 @@ config를 비동기적으로 만들어야 한다면 [프로그래밍 API](/mikro
 검사 전용 플래그는 없습니다. CI에서 문서를 다시 생성한 뒤 `git`으로 커밋된 파일과 비교하세요:
 
 ```bash
-mikro-orm-markdown --config ./mikro-orm.config.ts
-git diff --exit-code ERD.md
+mikro-orm-markdown --config ./mikro-orm.config.ts && git diff --exit-code ERD.md
 ```
+
+`&&`는 생성이 성공했을 때만 비교를 실행합니다. 그래서 생성이 실패하면 예전 파일을 비교하지 않고 job이 실패합니다.
 
 다시 생성한 파일이 커밋된 파일과 다르면 `git diff --exit-code`가 차이를 출력하고 `1`로 종료하므로 job이 실패합니다.
 

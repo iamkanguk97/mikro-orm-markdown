@@ -40,9 +40,10 @@ If you need to resolve the config asynchronously, use the [programmatic API](/mi
 There is no dedicated check flag. Regenerate the document in CI and let `git` compare it with the committed file:
 
 ```bash
-mikro-orm-markdown --config ./mikro-orm.config.ts
-git diff --exit-code ERD.md
+mikro-orm-markdown --config ./mikro-orm.config.ts && git diff --exit-code ERD.md
 ```
+
+`&&` runs the comparison only when generation succeeded, so a failed run fails the job instead of comparing the old file.
 
 `git diff --exit-code` exits with `1` and prints the difference when the regenerated file no longer matches the committed one, which fails the job.
 
