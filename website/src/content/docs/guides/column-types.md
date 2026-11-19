@@ -30,8 +30,8 @@ Every recognized column type renders as one of 11 generic words, in both the ERD
 
 The ERD draws such a type with the same spelling as the column table. Only the Mermaid source differs, in two ways:
 
-- A type is wrapped in backticks when it contains anything other than letters, digits, and `_ - [ ] ( ) . ,`, or when it does not start with a letter or `_`.
-- Inside backticks, `<`, `>`, `#`, `&`, `~`, and a backtick are written as Mermaid entity codes such as `#lt;`, because Mermaid would otherwise read them as markup.
+- A type is wrapped in backticks when it contains anything other than letters, digits, and `_ - [ ] ( ) . ,`, or when it does not start with a letter or `_`. So is a type that Mermaid would read as something else: one that starts with the word `pk`, `fk`, or `uk`, and one such as `_x_`, whose underscores Mermaid would draw as emphasis.
+- Inside backticks, characters that Mermaid would read as markup, such as `<`, `>`, `#`, and `*`, are written as Mermaid entity codes such as `#lt;`.
 
 | Declared as | Mermaid source | Drawn as |
 |---|---|---|

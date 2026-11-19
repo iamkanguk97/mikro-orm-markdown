@@ -134,6 +134,18 @@ describe('official Mermaid parser contract', () => {
       'a # b & c ~d~ `e`',
       'a #lt; b &amp; c',
       '좌표 타입',
+      'pk',
+      'FK',
+      'uk[]',
+      'pk.point',
+      '%%{wrap}%%',
+      'a %%{init: {}}%% b',
+      'a %%{ b',
+      '_x_',
+      'a *b* c',
+      '$$x^2$$',
+      'a\\*b',
+      'fa:fa-user',
     ];
 
     const snapshot = await parseMermaidErSnapshot(renderErDiagram(makeTypedModel(types)));

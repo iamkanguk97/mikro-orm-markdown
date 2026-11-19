@@ -309,6 +309,11 @@ describe('renderErDiagram — attribute type slot', () => {
     ['numeric(10,2)[]', 'numeric(10,2)[] col'],
     ['public.citext', 'public.citext col'],
     ['my-type', 'my-type col'],
+    ['pkey', 'pkey col'],
+    ['fk_id', 'fk_id col'],
+    ['uk1', 'uk1 col'],
+    ['user_status', 'user_status col'],
+    ['_text', '_text col'],
   ])('writes a type bare when the type slot accepts every character: %s', async (type, expectedLine) => {
     const result = renderColumn(type);
 
@@ -326,6 +331,12 @@ describe('renderErDiagram — attribute type slot', () => {
     ['2d_point', '`2d_point` col'],
     ['[]', '`[]` col'],
     ['좌표 타입', '`좌표 타입` col'],
+    ['pk', '`pk` col'],
+    ['FK', '`FK` col'],
+    ['uk[]', '`uk[]` col'],
+    ['pk.point', '`pk.point` col'],
+    ['_x_', '`#95;x#95;` col'],
+    ['__brand__', '`#95;#95;brand#95;#95;` col'],
   ])('wraps a type in backticks when the bare type slot would reject it: %s', async (type, expectedLine) => {
     const result = renderColumn(type);
 
@@ -340,6 +351,14 @@ describe('renderErDiagram — attribute type slot', () => {
     ['a ~b~ c', '`a #126;b#126; c` col'],
     ['it`s', '`it#96;s` col'],
     ['a #lt; b', '`a #35;lt; b` col'],
+    ['50%', '`50#37;` col'],
+    ['%%{wrap}%%', '`#37;#37;{wrap}#37;#37;` col'],
+    ['a *b* c', '`a #42;b#42; c` col'],
+    ['$$x^2$$', '`#36;#36;x^2#36;#36;` col'],
+    ['a\\b', '`a#92;b` col'],
+    ["'_a_' | 'b'", "`'#95;a#95;' | 'b'` col"],
+    ['fa:fa-user', '`fa#58;fa-user` col'],
+    ['{ lat: number; my_key: string; }', '`{ lat: number; my_key: string; }` col'],
   ])('writes a character Mermaid misreads inside backticks as an entity code: %s', async (type, expectedLine) => {
     const result = renderColumn(type);
 
