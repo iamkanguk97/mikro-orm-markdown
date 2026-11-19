@@ -384,7 +384,7 @@ describe('renderMarkdown — column table', () => {
     };
 
     // The brackets are backslash-escaped for Markdown, so the cell reads "string[]"
-    // when rendered — not the "string_" the Mermaid type slot falls back to.
+    // when rendered, the same spelling the Mermaid type slot shows.
     const row = renderMarkdown(docModel)
       .split('\n')
       .find((line) => line.startsWith('| tags |'));

@@ -5,11 +5,11 @@ import { renderErDiagram } from '../../src/render/mermaid.js';
 import config from '../fixtures/mikro-orm.config.js';
 import { parseMermaidDiagram, parseMermaidErSnapshot, parseMermaidFences } from './mermaid-parser.js';
 
-function makeColumn(fieldName: string): ColumnModel {
+function makeColumn(fieldName: string, type = 'string'): ColumnModel {
   return {
     propName: fieldName,
     fieldName,
-    type: 'string',
+    type,
     isPrimary: false,
     isForeignKey: false,
     isUnique: false,
@@ -21,8 +21,22 @@ function makeEntity(className: string, fieldNames: string[]): EntityModel {
   return {
     className,
     tableName: className,
-    columns: fieldNames.map(makeColumn),
+    columns: fieldNames.map((fieldName) => makeColumn(fieldName)),
     constraints: [],
+  };
+}
+
+function makeTypedModel(types: string[]): DiagramModel {
+  return {
+    entities: [
+      {
+        className: 'Sample',
+        tableName: 'sample',
+        columns: types.map((type, index) => makeColumn(`col${index}`, type)),
+        constraints: [],
+      },
+    ],
+    relations: [],
   };
 }
 
@@ -102,6 +116,38 @@ describe('official Mermaid parser contract', () => {
       { from: 'User$Profile', to: 'User-Profile', label: 'dollar-to-hyphen' },
       { from: 'User_Profile', to: 'User$Profile', label: 'underscore-to-dollar' },
     ]);
+  });
+
+  it('reads back each column type exactly as declared', async () => {
+    const types = [
+      'string[]',
+      'geometry(Point,4326)',
+      'numeric(10,2)[]',
+      'public.citext',
+      'bit varying(8)',
+      "set('a','b')",
+      '"draft" | "published"',
+      '{ lat: number; lng: number; }',
+      '[number, number]',
+      '2d_point',
+      'Map<string, number>',
+      'a # b & c ~d~ `e`',
+      'a #lt; b &amp; c',
+      '좌표 타입',
+    ];
+
+    const snapshot = await parseMermaidErSnapshot(renderErDiagram(makeTypedModel(types)));
+
+    expect(snapshot.entities[0]?.attributeTypes).toEqual(types);
+  });
+
+  it('reads back every printable ASCII character at the start, middle and end of a column type', async () => {
+    const characters = Array.from({ length: 0x7e - 0x21 + 1 }, (_, index) => String.fromCharCode(0x21 + index));
+    const types = ['x y', ...characters.flatMap((character) => [`${character}xy`, `x${character}y`, `xy${character}`])];
+
+    const snapshot = await parseMermaidErSnapshot(renderErDiagram(makeTypedModel(types)));
+
+    expect(snapshot.entities[0]?.attributeTypes).toEqual(types);
   });
 
   it('keeps already-safe ASCII Mermaid output byte-for-byte unchanged', () => {

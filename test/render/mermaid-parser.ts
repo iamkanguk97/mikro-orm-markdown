@@ -29,7 +29,7 @@ interface MermaidErEntity {
   id: string;
   label: string;
   alias: string;
-  attributes: Array<{ name: string }>;
+  attributes: Array<{ name: string; type: string }>;
 }
 
 interface MermaidErRelationship {
@@ -49,12 +49,26 @@ export interface MermaidErSnapshot {
     internalName: string;
     displayName: string;
     attributes: string[];
+    attributeTypes: string[];
   }>;
   relationships: Array<{
     fromEntityId: string;
     toEntityId: string;
     label: string;
   }>;
+}
+
+const MERMAID_NAMED_ENTITIES: Record<string, string> = { amp: '&', gt: '>', lt: '<', quot: '"' };
+
+/**
+ * Mermaid keeps an entity code such as `#lt;` or `#35;` as a placeholder in its
+ * parsed database and turns it into the character only when drawing. This does
+ * the same for the codes the renderer under test writes.
+ */
+function decodeMermaidEntityPlaceholders(text: string): string {
+  return text
+    .replace(/ﬂ°°(\d+)¶ß/g, (_match, code: string) => String.fromCodePoint(Number(code)))
+    .replace(/ﬂ°([a-z]+)¶ß/g, (match, name: string) => MERMAID_NAMED_ENTITIES[name] ?? match);
 }
 
 /** Parses an ER diagram and exposes the official Mermaid parser's normalized database state. */
@@ -73,6 +87,7 @@ export async function parseMermaidErSnapshot(source: string): Promise<MermaidErS
       internalName,
       displayName: entity.alias || entity.label,
       attributes: entity.attributes.map((attribute) => attribute.name),
+      attributeTypes: entity.attributes.map((attribute) => decodeMermaidEntityPlaceholders(attribute.type)),
     })),
     relationships: database.getRelationships().map((relationship) => ({
       fromEntityId: relationship.entityA,

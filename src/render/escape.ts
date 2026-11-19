@@ -5,6 +5,16 @@ const MARKDOWN_HYPHEN_ONLY_LINE = /^-[-\s]*$/;
 const MARKDOWN_EQUALS_ONLY_LINE = /^=+$/;
 const MARKDOWN_ORDERED_MARKER = /^(\d{1,9})([.)])(?=\s|$)/;
 const MERMAID_IDENTIFIER_INVALID_CHARS = /[^a-zA-Z0-9_]/g;
+const MERMAID_BARE_ATTRIBUTE_TYPE = /^[a-zA-Z_][a-zA-Z0-9_\-[\]().,]*$/;
+const MERMAID_BACKTICK_RESERVED_CHARS = /[#&<>~`]/g;
+const MERMAID_BACKTICK_ENTITY_CODES: Record<string, string> = {
+  '#': '#35;',
+  '&': '#amp;',
+  '<': '#lt;',
+  '>': '#gt;',
+  '~': '#126;',
+  '`': '#96;',
+};
 
 function normalizeInlineText(value: string): string {
   return value
@@ -81,6 +91,41 @@ export function toMermaidIdentifier(value: string): string {
   const normalized = normalizeInlineText(value).replace(MERMAID_IDENTIFIER_INVALID_CHARS, '_').replace(/_+/g, '_');
   const identifier = normalized === '' ? '_' : normalized;
   return /^[a-zA-Z_]/.test(identifier) ? identifier : `_${identifier}`;
+}
+
+/**
+ * Writes a column type for the attribute type slot of an erDiagram so the
+ * diagram shows the type exactly as declared.
+ *
+ * A type made only of characters the slot accepts is written bare, so
+ * `string[]` and `geometry(Point,4326)` stay as they are. Any other type is
+ * wrapped in backticks, the slot's quoted form, which carries spaces, quotes
+ * and every other character: `bit varying(8)` becomes `` `bit varying(8)` ``.
+ *
+ * Inside backticks Mermaid still reads a few characters specially when it
+ * draws the label, so they are written as entity codes: `<` and `>` (dropped
+ * as an HTML tag), `~` (a pair turns into `<>`), `#` and `&` (they start an
+ * entity code), and the backtick itself (it would close the quote).
+ *
+ * Mermaid parses bare `[]` from 9.1 and `()` from 9.4, but `,`, `.` and the
+ * backtick form only from 11.16.0; an older renderer rejects a diagram that
+ * contains one. Showing the declared spelling was chosen over supporting those
+ * renderers.
+ */
+export function toMermaidAttributeType(value: string): string {
+  const normalized = normalizeInlineText(value);
+  if (normalized === '') {
+    return '_';
+  }
+  if (MERMAID_BARE_ATTRIBUTE_TYPE.test(normalized)) {
+    return normalized;
+  }
+
+  const escaped = normalized.replace(
+    MERMAID_BACKTICK_RESERVED_CHARS,
+    (character) => MERMAID_BACKTICK_ENTITY_CODES[character] ?? character
+  );
+  return `\`${escaped}\``;
 }
 
 export function escapeMermaidQuotedText(value: string): string {
