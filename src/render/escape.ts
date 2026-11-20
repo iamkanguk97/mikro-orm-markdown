@@ -5,6 +5,15 @@ const MARKDOWN_HYPHEN_ONLY_LINE = /^-[-\s]*$/;
 const MARKDOWN_EQUALS_ONLY_LINE = /^=+$/;
 const MARKDOWN_ORDERED_MARKER = /^(\d{1,9})([.)])(?=\s|$)/;
 const MERMAID_IDENTIFIER_INVALID_CHARS = /[^a-zA-Z0-9_]/g;
+const MERMAID_BARE_ATTRIBUTE_TYPE = /^[a-zA-Z_][a-zA-Z0-9_\-[\]().,]*$/;
+const MERMAID_ATTRIBUTE_KEY_PREFIX = /^(?:pk|fk|uk)\b/i;
+/**
+ * What Mermaid reads specially inside a backtick-quoted type: any of
+ * `` # & < > ~ ` % * \ $ ``, an underscore that could open or close Markdown
+ * emphasis, and the colon of an icon reference such as `fa:fa-user`.
+ */
+const MERMAID_BACKTICK_RESERVED = /[#&<>~`%*\\$]|(?<![a-zA-Z0-9])_|_(?![a-zA-Z0-9])|(?<=\bfa[bklrs]?):(?=fa-)/g;
+const MERMAID_NAMED_ENTITY_CODES: Record<string, string> = { '&': '#amp;', '<': '#lt;', '>': '#gt;' };
 
 function normalizeInlineText(value: string): string {
   return value
@@ -81,6 +90,59 @@ export function toMermaidIdentifier(value: string): string {
   const normalized = normalizeInlineText(value).replace(MERMAID_IDENTIFIER_INVALID_CHARS, '_').replace(/_+/g, '_');
   const identifier = normalized === '' ? '_' : normalized;
   return /^[a-zA-Z_]/.test(identifier) ? identifier : `_${identifier}`;
+}
+
+/**
+ * Whether Mermaid would draw part of the text as Markdown emphasis because of
+ * underscores, as in `_x_`. An underscore between two letters or digits never
+ * does, and a single other underscore has nothing to pair with.
+ */
+function hasUnderscoreEmphasis(value: string): boolean {
+  return (value.match(MARKDOWN_EMPHASIS_UNDERSCORE)?.length ?? 0) >= 2;
+}
+
+/**
+ * Writes a column type for the attribute type slot of an erDiagram so the
+ * diagram shows the type exactly as declared.
+ *
+ * A type made only of characters the slot accepts is written bare, so
+ * `string[]` and `geometry(Point,4326)` stay as they are. Any other type is
+ * wrapped in backticks, the slot's quoted form, which carries spaces, quotes
+ * and every other character: `bit varying(8)` becomes `` `bit varying(8)` ``.
+ * So is a type that starts with the word `pk`, `fk` or `uk` in any case, which
+ * Mermaid would read as a key marker, and one whose underscores would be drawn
+ * as Markdown emphasis, such as `_x_`.
+ *
+ * Inside backticks Mermaid still reads some text specially, so it is written
+ * as entity codes: `<` and `>` (dropped as an HTML tag), `~` (a pair turns
+ * into `<>`), `#` and `&` (they start an entity code), `%` (`%%{…}%%` is taken
+ * out as a directive before parsing), `*`, `_`, `\` and `$` (Markdown emphasis,
+ * escapes and math), the colon of an icon reference, and the backtick itself
+ * (it would close the quote).
+ *
+ * Mermaid parses bare `[]` from 9.1 and `()` from 9.4, but `,`, `.` and the
+ * backtick form only from 11.16.0; an older renderer rejects a diagram that
+ * contains one. Showing the declared spelling was chosen over supporting those
+ * renderers.
+ */
+export function toMermaidAttributeType(value: string): string {
+  const normalized = normalizeInlineText(value);
+  if (normalized === '') {
+    return '_';
+  }
+  if (
+    MERMAID_BARE_ATTRIBUTE_TYPE.test(normalized) &&
+    !MERMAID_ATTRIBUTE_KEY_PREFIX.test(normalized) &&
+    !hasUnderscoreEmphasis(normalized)
+  ) {
+    return normalized;
+  }
+
+  const escaped = normalized.replace(
+    MERMAID_BACKTICK_RESERVED,
+    (character) => MERMAID_NAMED_ENTITY_CODES[character] ?? `#${character.charCodeAt(0)};`
+  );
+  return `\`${escaped}\``;
 }
 
 export function escapeMermaidQuotedText(value: string): string {
