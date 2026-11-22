@@ -358,6 +358,7 @@ describe('renderErDiagram — attribute type slot', () => {
     ['a\\b', '`a#92;b` col'],
     ["'_a_' | 'b'", "`'#95;a#95;' | 'b'` col"],
     ['fa:fa-user', '`fa#58;fa-user` col'],
+    ['sofa:fa-bed', '`sofa#58;fa-bed` col'],
     ['{ lat: number; my_key: string; }', '`{ lat: number; my_key: string; }` col'],
   ])('writes a character Mermaid misreads inside backticks as an entity code: %s', async (type, expectedLine) => {
     const result = renderColumn(type);

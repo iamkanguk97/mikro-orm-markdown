@@ -10,9 +10,10 @@ const MERMAID_ATTRIBUTE_KEY_PREFIX = /^(?:pk|fk|uk)\b/i;
 /**
  * What Mermaid reads specially inside a backtick-quoted type: any of
  * `` # & < > ~ ` % * \ $ ``, an underscore that could open or close Markdown
- * emphasis, and the colon of an icon reference such as `fa:fa-user`.
+ * emphasis, and the colon of an icon reference such as `fa:fa-user`. Mermaid
+ * finds an icon reference anywhere in the text, so `sofa:fa-bed` holds one too.
  */
-const MERMAID_BACKTICK_RESERVED = /[#&<>~`%*\\$]|(?<![a-zA-Z0-9])_|_(?![a-zA-Z0-9])|(?<=\bfa[bklrs]?):(?=fa-)/g;
+const MERMAID_BACKTICK_RESERVED = /[#&<>~`%*\\$]|(?<![a-zA-Z0-9])_|_(?![a-zA-Z0-9])|(?<=fa[bklrs]?):(?=fa-)/g;
 const MERMAID_NAMED_ENTITY_CODES: Record<string, string> = { '&': '#amp;', '<': '#lt;', '>': '#gt;' };
 
 function normalizeInlineText(value: string): string {

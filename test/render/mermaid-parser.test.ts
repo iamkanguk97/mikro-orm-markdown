@@ -146,6 +146,7 @@ describe('official Mermaid parser contract', () => {
       '$$x^2$$',
       'a\\*b',
       'fa:fa-user',
+      'sofa:fa-bed',
     ];
 
     const snapshot = await parseMermaidErSnapshot(renderErDiagram(makeTypedModel(types)));
