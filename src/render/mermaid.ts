@@ -1,6 +1,6 @@
 import type { ColumnModel, DiagramModel } from '../model/types.js';
 import { DISCRIMINATOR_LABEL, embeddedLabel } from './column-markers.js';
-import { escapeMermaidQuotedText, toMermaidIdentifier } from './escape.js';
+import { escapeMermaidQuotedText, toMermaidAttributeType, toMermaidIdentifier } from './escape.js';
 
 export const MERMAID_LAYOUTS = ['dagre', 'elk', 'elk.stress'] as const;
 export type MermaidLayout = (typeof MERMAID_LAYOUTS)[number];
@@ -257,5 +257,5 @@ function renderColumnLine(col: ColumnModel, fieldIdentifier: string): string {
   }
 
   const commentStr = comment !== undefined ? ` "${escapeMermaidQuotedText(comment)}"` : '';
-  return `${toMermaidIdentifier(normalizeType(col.type))} ${fieldIdentifier}${qualifier}${commentStr}`;
+  return `${toMermaidAttributeType(normalizeType(col.type))} ${fieldIdentifier}${qualifier}${commentStr}`;
 }

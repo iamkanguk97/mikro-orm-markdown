@@ -275,6 +275,124 @@ describe('renderErDiagram', () => {
   });
 });
 
+// ─── renderErDiagram — attribute type slot ────────────────────────────────────
+
+describe('renderErDiagram — attribute type slot', () => {
+  function renderColumn(type: string, fieldName = 'col'): string {
+    return renderErDiagram({
+      entities: [
+        {
+          className: 'Sample',
+          tableName: 'sample',
+          columns: [
+            {
+              propName: fieldName,
+              fieldName,
+              type,
+              isPrimary: false,
+              isForeignKey: false,
+              isUnique: false,
+              isNullable: false,
+            },
+          ],
+          constraints: [],
+        },
+      ],
+      relations: [],
+    });
+  }
+
+  it.each([
+    ['string[]', 'string[] col'],
+    ['text[]', 'text[] col'],
+    ['geometry(Point,4326)', 'geometry(Point,4326) col'],
+    ['numeric(10,2)[]', 'numeric(10,2)[] col'],
+    ['public.citext', 'public.citext col'],
+    ['my-type', 'my-type col'],
+    ['pkey', 'pkey col'],
+    ['fk_id', 'fk_id col'],
+    ['uk1', 'uk1 col'],
+    ['user_status', 'user_status col'],
+    ['_text', '_text col'],
+  ])('writes a type bare when the type slot accepts every character: %s', async (type, expectedLine) => {
+    const result = renderColumn(type);
+
+    expect(result.split('\n')).toContain(`    ${expectedLine}`);
+    await expect(parseMermaidDiagram(result)).resolves.toMatchObject({ diagramType: 'er' });
+  });
+
+  it.each([
+    ['my type', '`my type` col'],
+    ['bit varying(8)', '`bit varying(8)` col'],
+    ["set('a','b')", "`set('a','b')` col"],
+    ['"draft" | "published"', '`"draft" | "published"` col'],
+    ['{ lat: number; lng: number; }', '`{ lat: number; lng: number; }` col'],
+    ['[number, number]', '`[number, number]` col'],
+    ['2d_point', '`2d_point` col'],
+    ['[]', '`[]` col'],
+    ['좌표 타입', '`좌표 타입` col'],
+    ['pk', '`pk` col'],
+    ['FK', '`FK` col'],
+    ['uk[]', '`uk[]` col'],
+    ['pk.point', '`pk.point` col'],
+    ['_x_', '`#95;x#95;` col'],
+    ['__brand__', '`#95;#95;brand#95;#95;` col'],
+  ])('wraps a type in backticks when the bare type slot would reject it: %s', async (type, expectedLine) => {
+    const result = renderColumn(type);
+
+    expect(result.split('\n')).toContain(`    ${expectedLine}`);
+    await expect(parseMermaidDiagram(result)).resolves.toMatchObject({ diagramType: 'er' });
+  });
+
+  it.each([
+    ['Map<string, number>', '`Map#lt;string, number#gt;` col'],
+    ['a # b', '`a #35; b` col'],
+    ['a & b', '`a #amp; b` col'],
+    ['a ~b~ c', '`a #126;b#126; c` col'],
+    ['it`s', '`it#96;s` col'],
+    ['a #lt; b', '`a #35;lt; b` col'],
+    ['50%', '`50#37;` col'],
+    ['%%{wrap}%%', '`#37;#37;{wrap}#37;#37;` col'],
+    ['a *b* c', '`a #42;b#42; c` col'],
+    ['$$x^2$$', '`#36;#36;x^2#36;#36;` col'],
+    ['a\\b', '`a#92;b` col'],
+    ["'_a_' | 'b'", "`'#95;a#95;' | 'b'` col"],
+    ['fa:fa-user', '`fa#58;fa-user` col'],
+    ['sofa:fa-bed', '`sofa#58;fa-bed` col'],
+    ['{ lat: number; my_key: string; }', '`{ lat: number; my_key: string; }` col'],
+  ])('writes a character Mermaid misreads inside backticks as an entity code: %s', async (type, expectedLine) => {
+    const result = renderColumn(type);
+
+    expect(result.split('\n')).toContain(`    ${expectedLine}`);
+    await expect(parseMermaidDiagram(result)).resolves.toMatchObject({ diagramType: 'er' });
+  });
+
+  it('collapses a line break inside a type to one space', () => {
+    const result = renderColumn('{\n  lat: number;\n}');
+
+    expect(result.split('\n')).toContain('    `{ lat: number; }` col');
+  });
+
+  it('writes a placeholder for an empty type', async () => {
+    const result = renderColumn('   ');
+
+    expect(result.split('\n')).toContain('    _ col');
+    await expect(parseMermaidDiagram(result)).resolves.toMatchObject({ diagramType: 'er' });
+  });
+
+  it('keeps the strict identifier rule for the field name next to a relaxed type', () => {
+    const result = renderColumn('string[]', 'tags[]');
+
+    expect(result.split('\n')).toContain('    string[] tags_');
+  });
+
+  it('keeps the strict identifier rule for the field name next to a backtick-quoted type', () => {
+    const result = renderColumn('bit varying(8)', 'flag bits');
+
+    expect(result.split('\n')).toContain('    `bit varying(8)` flag_bits');
+  });
+});
+
 // ─── renderErDiagram — Mermaid frontmatter ────────────────────────────────────
 
 describe('renderErDiagram — Mermaid frontmatter', () => {
